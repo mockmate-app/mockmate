@@ -24,8 +24,26 @@ Every session updates your skill progression dashboard, tracking your improvemen
 - **Mock Hiring Decision Letter** — at the end of every session, MockMate generates a simulated offer or rejection letter with specific, personalized reasoning. This makes feedback feel consequential rather than academic.
 - **Skill Progression Dashboard** — every session contributes to a longitudinal skill graph that tracks your growth over time and unlocks harder interview modes as your scores improve.
 
+### USP & Differentiation
+Most interview platforms evaluate what you say. MockMate evaluates who you are under pressure — your voice, your body, your vocabulary, your resilience when interrupted. It is the only platform that combines live voice interviewing, real-time vision analysis, resume personalization, adversarial stress injection, and a consequential hiring decision output in a single session. It does not just prepare you for interview questions — it prepares you for the full human experience of being interviewed.
+
 ### Technologies Used
 MockMate is built on Google's Gemini Live API for real-time conversational interviewing, Gemini 2.0 Flash vision for posture and presence analysis, and Gemini 1.5 Flash for resume parsing, jargon calibration, and offer letter generation. The agent pipeline is orchestrated using Google ADK, with all model calls routed through Vertex AI. The backend is a FastAPI application containerized and deployed on Google Cloud Run. Session data, user profiles, and skill scores are stored in Firestore. Resumes and session recordings are stored in Cloud Storage. A Pub/Sub stream handles async communication between the live interview engine and the parallel vision analysis worker. The frontend is built in Next.js with WebSocket-based real-time audio and video streaming.
 
-### USP & Differentiation
-Most interview platforms evaluate what you say. MockMate evaluates who you are under pressure — your voice, your body, your vocabulary, your resilience when interrupted. It is the only platform that combines live voice interviewing, real-time vision analysis, resume personalization, adversarial stress injection, and a consequential hiring decision output in a single session. It does not just prepare you for interview questions — it prepares you for the full human experience of being interviewed.
+### Folder Structure
+```
+mockmate/
+├── frontend/          # Next.js app
+├── backend/
+│   ├── main.py        # Cloud Run entrypoint
+│   ├── agents/        # ADK agent definitions
+│   │   ├── resume_parser.py
+│   │   ├── question_generator.py
+│   │   ├── interview_engine.py
+│   │   ├── posture_analyzer.py
+│   │   └── feedback_compiler.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── architecture.png   # For judges
+└── README.md          # Spin-up instructions
+```
