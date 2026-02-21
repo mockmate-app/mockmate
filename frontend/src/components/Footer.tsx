@@ -16,7 +16,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="max-w-xs">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <Logo color="#ffffff" size={28} />
+              <Logo color="#ffffff" />
               <span className="text-light font-semibold text-lg tracking-tight">
                 Mock<span className="text-orange">Mate</span>
               </span>
