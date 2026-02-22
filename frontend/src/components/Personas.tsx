@@ -51,7 +51,7 @@ export default function Personas() {
             interview — free, no credit card required.
           </p>
           <Link
-            href="#"
+            href="/login"
             className="group mt-8 inline-flex items-center gap-2 rounded-full bg-orange px-8 py-3.5 text-sm font-semibold text-light hover:opacity-90 transition-opacity"
           >
             Start your free session

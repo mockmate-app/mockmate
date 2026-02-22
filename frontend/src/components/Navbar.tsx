@@ -40,11 +40,11 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <Link href="#" className="text-sm font-medium text-dark hover:text-orange transition-colors">
+          <Link href="/login" className="text-sm font-medium text-dark hover:text-orange transition-colors">
             Sign in
           </Link>
           <Link
-            href="#"
+            href="/login"
             className="rounded-full bg-orange px-5 py-2 text-sm font-semibold text-light hover:opacity-90 transition-opacity"
           >
             Start free
@@ -75,7 +75,7 @@ export default function Navbar() {
             </Link>
           ))}
           <Link
-            href="#"
+            href="/login"
             onClick={() => setOpen(false)}
             className="mt-2 rounded-full bg-orange px-5 py-2.5 text-center text-sm font-semibold text-light hover:opacity-90 transition-opacity"
           >

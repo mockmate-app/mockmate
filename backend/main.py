@@ -6,12 +6,28 @@ REST + WebSocket endpoints consumed by the Next.js frontend.
 
 from __future__ import annotations
 
+# Load .env FIRST — before any module-level os.getenv() calls in agent files.
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
+import json
+import logging
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+# Enable DEBUG logging for our agents when LOG_LEVEL=DEBUG (default: INFO)
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+)
+logging.getLogger("agents").setLevel(os.getenv("LOG_LEVEL", "DEBUG").upper())
 
 from agents.resume_parser import ResumeParserAgent
 from agents.question_generator import QuestionGeneratorAgent
@@ -83,16 +99,96 @@ async def health_check():
 # Resume
 # ---------------------------------------------------------------------------
 
-@app.post("/resume/upload", tags=["resume"])
+_ACCEPTED_CONTENT_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    "text/plain",
+}
+_ACCEPTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt"}
+
+
+@app.post("/resume/upload", tags=["resume"], status_code=201)
 async def upload_resume(user_id: str, file: UploadFile = File(...)):
-    """Parse an uploaded résumé PDF/DOCX and store structured data."""
+    """
+    Upload a résumé (PDF / DOCX) and return structured JSON.
+
+    **Flow**
+    1. Validate file type.
+    2. Upload raw bytes to Google Cloud Storage.
+    3. Extract text and call Gemini 2.0 Flash for structured parsing.
+    4. Persist result in Firestore (keyed by *user_id*).
+    5. Return structured JSON.
+
+    **Query params**
+    - `user_id` — authenticated user's ID (required).
+
+    **Form data**
+    - `file` — the résumé file (PDF, DOCX, DOC, or TXT).
+    """
+    if not user_id or not user_id.strip():
+        raise HTTPException(status_code=400, detail="user_id must not be empty.")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in _ACCEPTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                f"Unsupported file type '{ext}'. "
+                f"Accepted extensions: {', '.join(sorted(_ACCEPTED_EXTENSIONS))}"
+            ),
+        )
+
     content = await file.read()
-    result = await app.state.resume_parser.parse(
-        file_bytes=content,
-        filename=file.filename,
-        user_id=user_id,
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > 10 * 1024 * 1024:  # 10 MB guard
+        raise HTTPException(status_code=413, detail="File exceeds the 10 MB size limit.")
+
+    try:
+        result = await app.state.resume_parser.parse(
+            file_bytes=content,
+            filename=file.filename,
+            user_id=user_id.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Resume parsing failed for user %s", user_id)
+        raise HTTPException(status_code=500, detail=f"Resume parsing failed: {exc}") from exc
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "user_id":     user_id,
+            "resume_id":   result.get("resume_id"),
+            "gcs_uri":     result.get("gcs_uri"),
+            "parsed_at":   result.get("parsed_at"),
+            "resume_data": result,
+        },
     )
-    return {"user_id": user_id, "resume_data": result}
+
+
+@app.get("/resume/{user_id}", tags=["resume"])
+async def get_resume(user_id: str):
+    """
+    Retrieve the most-recently parsed résumé for *user_id* from Firestore.
+
+    Returns 404 if no résumé has been parsed for this user yet.
+    """
+    try:
+        data = await app.state.resume_parser.get_resume(user_id)
+    except Exception as exc:
+        logger.exception("Firestore read failed for user %s", user_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No parsed résumé found for user '{user_id}'.",
+        )
+
+    return {"user_id": user_id, "resume_data": data}
 
 
 # ---------------------------------------------------------------------------
@@ -177,4 +273,12 @@ async def websocket_vision(websocket: WebSocket, session_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8080)), reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8080)),
+        reload=True,
+        # Only watch the agents package — main.py is always watched automatically.
+        # Do NOT include "." here; it would pull in .venv and trigger constant reloads.
+        reload_dirs=["agents"],
+    )

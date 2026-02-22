@@ -9,9 +9,13 @@ httpx>=0.27.0
 google-cloud-aiplatform==1.87.0
 google-generativeai==0.8.3
 google-adk==0.5.0
+google-cloud-core>=2.4.1          # GoogleCloudError base class
 google-cloud-firestore==2.19.0
 google-cloud-storage==2.18.2
 google-cloud-pubsub==2.27.1
+
+# google-adk missing transitive dep
+deprecated>=1.2.14
 
 # Data & validation
 pydantic==2.10.6
