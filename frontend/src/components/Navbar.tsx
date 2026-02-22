@@ -20,7 +20,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <Logo />
-          <span className="text-dark font-semibold text-lg tracking-tight">
+          <span className="text-dark font-semibold text-lg tracking-tight text-trim">
             Mock<span className="text-orange">Mate</span>
           </span>
         </Link>
