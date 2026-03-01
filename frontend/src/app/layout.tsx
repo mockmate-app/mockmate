@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ReactQueryProvider } from "@/lib/query-client";
+import { APP_DESCRIPTION, APP_NAME } from "@/constants/common";
 
 export const metadata: Metadata = {
-  title: "MockMate — Interview practice, without the nerves.",
+  title: APP_NAME,
   description:
-    "AI-powered mock interview platform that conducts real, adaptive interview sessions using voice, vision, and personalised question generation.",
+    APP_DESCRIPTION
 };
 
 export default function RootLayout({
@@ -25,7 +27,9 @@ export default function RootLayout({
       <body
         className="antialiased"
       >
-        {children}
+        <ReactQueryProvider>
+          {children}
+        </ReactQueryProvider>
       </body>
     </html>
   );

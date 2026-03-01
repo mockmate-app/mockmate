@@ -6,6 +6,7 @@ import {
   MailCheck,
   BarChart3,
 } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const FEATURES = [
   {
@@ -67,20 +68,20 @@ export default function Features() {
         {/* Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <div
+            <Card
               key={f.title}
-              className="group rounded-2xl border border-border bg-light p-8 transition-shadow hover:shadow-lg hover:shadow-dark/5"
+              className="group rounded-2xl border border-border bg-light transition-shadow hover:shadow-lg hover:shadow-dark/5 overflow-hidden"
             >
-              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-orange/10 text-orange">
-                {f.icon}
-              </div>
-              <h3 className="mb-3 text-base font-semibold text-dark">
-                {f.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted">
-                {f.description}
-              </p>
-            </div>
+              <CardHeader className="pt-6 gap-4">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-orange/10 text-orange">
+                  {f.icon}
+                </div>
+                <h3 className="text-base font-semibold text-dark">{f.title}</h3>
+              </CardHeader>
+              <CardContent className="px-6 pt-4 pb-6">
+                <p className="text-sm leading-relaxed text-muted">{f.description}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>

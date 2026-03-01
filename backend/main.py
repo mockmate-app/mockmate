@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -62,9 +62,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+_allow_origins: list[str] = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    if _raw_origins
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(","),
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,6 +91,10 @@ class SessionConfig(BaseModel):
 
 class FeedbackRequest(BaseModel):
     session_id: str
+
+
+class SessionEndRequest(BaseModel):
+    ended_by: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -191,9 +202,29 @@ async def get_resume(user_id: str):
     return {"user_id": user_id, "resume_data": data}
 
 
-# ---------------------------------------------------------------------------
-# Session
-# ---------------------------------------------------------------------------
+@app.get("/resume/{user_id}/file", tags=["resume"])
+async def get_resume_file(user_id: str):
+    """
+    Stream the raw uploaded résumé file (PDF / DOCX) from GCS.
+    Returns 404 if no résumé exists for this user.
+    """
+    try:
+        result = await app.state.resume_parser.get_resume_file(user_id)
+    except Exception as exc:
+        logger.exception("GCS download failed for user %s", user_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No résumé file found for user '{user_id}'.",
+        )
+    file_bytes, content_type = result
+    return StreamingResponse(
+        iter([file_bytes]),
+        media_type=content_type,
+        headers={"Content-Disposition": "inline"},
+    )
 
 @app.post("/session/start", tags=["session"])
 async def start_session(config: SessionConfig):
@@ -204,24 +235,67 @@ async def start_session(config: SessionConfig):
         job_role=config.job_role,
         difficulty=config.difficulty,
     )
-    session_id = await app.state.interview_engine.create_session(
+    session_meta = await app.state.interview_engine.create_session(
         user_id=config.user_id,
         questions=questions,
         persona=config.persona,
+        job_role=config.job_role,
     )
-    return {"session_id": session_id, "question_count": len(questions)}
+    return {
+        "session_id":     session_meta["session_id"],
+        "interviewer_name": session_meta["interviewer_name"],
+        "voice": session_meta["voice"],
+        "question_count": len(questions),
+        "questions":      questions,
+        "persona":        config.persona,
+        "job_role":       config.job_role,
+        "difficulty":     config.difficulty,
+    }
+
+
+@app.get("/session/{session_id}/questions", tags=["session"])
+async def get_session_questions(session_id: str):
+    """Retrieve the generated question set for an existing session."""
+    questions = await app.state.question_generator.get_questions(session_id)
+    if questions is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No questions found for session '{session_id}'.",
+        )
+    return {"session_id": session_id, "questions": questions, "question_count": len(questions)}
 
 
 @app.post("/session/{session_id}/end", tags=["session"])
-async def end_session(session_id: str):
+async def end_session(session_id: str, req: SessionEndRequest | None = None):
     """Mark a session as complete."""
-    await app.state.interview_engine.end_session(session_id)
+    await app.state.interview_engine.end_session(
+        session_id,
+        ended_by=req.ended_by if req else None,
+    )
     return {"session_id": session_id, "status": "ended"}
+
+
+@app.get("/sessions/user/{user_id}", tags=["session"])
+async def list_user_sessions(user_id: str, limit: int = 10):
+    """Return the most-recent sessions for a user (lightweight — no full transcript)."""
+    sessions = await app.state.interview_engine.get_user_sessions(user_id, limit=limit)
+    return {"user_id": user_id, "sessions": sessions, "count": len(sessions)}
 
 
 # ---------------------------------------------------------------------------
 # Feedback
 # ---------------------------------------------------------------------------
+
+@app.get("/feedback/{session_id}", tags=["feedback"])
+async def read_feedback(session_id: str):
+    """Return a previously compiled feedback report (does NOT regenerate)."""
+    report = await app.state.feedback_compiler.get_feedback(session_id)
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No feedback found for session '{session_id}'.",
+        )
+    return report
 
 @app.post("/feedback/generate", tags=["feedback"])
 async def generate_feedback(req: FeedbackRequest):
@@ -239,13 +313,15 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     """
     Streams audio chunks from the browser to the Gemini Live API and
     returns AI interviewer responses in real time.
+    run_live_session() fully manages the session lifecycle (including ending
+    it), so we do NOT call end_session() here on disconnect.
     """
     await websocket.accept()
     engine: InterviewEngineAgent = websocket.app.state.interview_engine
     try:
         await engine.run_live_session(websocket, session_id)
     except WebSocketDisconnect:
-        await engine.end_session(session_id)
+        pass  # run_live_session's finally block already ends the session
 
 
 # ---------------------------------------------------------------------------

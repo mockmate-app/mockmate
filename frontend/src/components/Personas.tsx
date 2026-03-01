@@ -2,10 +2,15 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 const PERSONAS = [
-  { name: "Startup Founder", tag: "Culture fit & ownership" },
-  { name: "Investment Banker", tag: "Precision & numbers" },
-  { name: "Tech Lead", tag: "Depth & trade-offs" },
-  { name: "HR Manager", tag: "Behavioural & values" },
+  { name: "Startup Founder",        tag: "Culture fit & ownership",       emoji: "🚀" },
+  { name: "Investment Banker",      tag: "Precision & numbers",           emoji: "📊" },
+  { name: "Tech Lead",              tag: "Depth & trade-offs",            emoji: "⚙️" },
+  { name: "HR Manager",             tag: "Behavioural & values",          emoji: "🤝" },
+  { name: "Product Manager",        tag: "User empathy & data",           emoji: "🗺️" },
+  { name: "VP of Engineering",      tag: "Leadership & scale",            emoji: "🏗️" },
+  { name: "Management Consultant",  tag: "Structure & frameworks",        emoji: "🧩" },
+  { name: "CTO",                    tag: "Tech strategy & vision",        emoji: "🔭" },
+  { name: "Recruiter",              tag: "Career narrative & fit",        emoji: "🎯" },
 ];
 
 export default function Personas() {
@@ -20,20 +25,20 @@ export default function Personas() {
             Choose your challenge
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
-            Each persona has a distinct questioning style. The experience is
-            fundamentally different depending on who you practise against.
+            Nine distinct interviewers. Each one pushes differently — from an
+            aggressive investment banker to a visionary CTO. The experience
+            changes entirely depending on who you practise against.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 max-w-4xl mx-auto">
           {PERSONAS.map((p) => (
             <div
               key={p.name}
               className="cursor-pointer rounded-2xl border border-border bg-light p-6 text-center transition-all hover:border-orange hover:shadow-lg hover:shadow-orange/10"
             >
-              {/* Avatar placeholder */}
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-dark text-2xl font-bold text-orange">
-                {p.name.charAt(0)}
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-dark text-2xl">
+                {p.emoji}
               </div>
               <h3 className="text-sm font-semibold text-dark">{p.name}</h3>
               <p className="mt-1 text-xs text-muted">{p.tag}</p>

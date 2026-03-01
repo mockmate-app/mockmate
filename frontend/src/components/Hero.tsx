@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Mic, Eye, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Hero() {
   return (
@@ -20,10 +22,13 @@ export default function Hero() {
 
       <div className="relative mx-auto max-w-7xl px-6 pt-36 pb-28 text-center">
         {/* Eyebrow pill */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-orange/30 bg-orange/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-orange mb-8">
+        <Badge
+          variant="outline"
+          className="border-orange/30 bg-orange/10 text-orange uppercase tracking-widest text-xs px-4 py-1.5 rounded-full mb-8 gap-2"
+        >
           <span className="h-1.5 w-1.5 rounded-full bg-orange animate-pulse" />
           AI-Powered Mock Interviews
-        </div>
+        </Badge>
 
         {/* Main headline */}
         <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-tight tracking-tight text-light sm:text-6xl lg:text-7xl">
@@ -41,19 +46,24 @@ export default function Hero() {
 
         {/* CTAs */}
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link
-            href="/login"
-            className="group inline-flex items-center gap-2 rounded-full bg-orange px-8 py-3.5 text-sm font-semibold text-light hover:opacity-90 transition-opacity"
+          <Button
+            asChild
+            size="lg"
+            className="group rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange transition-opacity px-8"
           >
-            Start your mock interview
-            <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-          </Link>
-          <Link
-            href="#how-it-works"
-            className="inline-flex items-center gap-2 rounded-full border border-light/20 px-8 py-3.5 text-sm font-semibold text-light hover:border-light/50 transition-colors"
+            <Link href="/login">
+              Start your mock interview
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="rounded-full border-light/20 text-light bg-transparent hover:bg-light/10 hover:text-light hover:border-light/50 px-8"
           >
-            See how it works
-          </Link>
+            <Link href="#how-it-works">See how it works</Link>
+          </Button>
         </div>
 
         {/* Trust line */}
@@ -68,13 +78,14 @@ export default function Hero() {
             { icon: <Eye size={14} />, label: "Real-time vision analysis" },
             { icon: <FileText size={14} />, label: "Résumé-personalised questions" },
           ].map((item) => (
-            <div
+            <Badge
               key={item.label}
-              className="flex items-center gap-2 rounded-full border border-light/10 bg-light/5 px-4 py-2 text-xs font-medium text-light/60"
+              variant="outline"
+              className="rounded-full border-light/10 bg-light/5 text-light/60 px-4 py-2 gap-2 text-xs font-medium hover:bg-light/5"
             >
               <span className="text-orange">{item.icon}</span>
               {item.label}
-            </div>
+            </Badge>
           ))}
         </div>
       </div>

@@ -113,8 +113,8 @@ Edit `.env` and fill in your values:
 
 ```dotenv
 # Google Cloud project
-GCP_PROJECT_ID=your-gcp-project-id
-GCP_REGION=us-central1
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
 
 # Cloud Storage — bucket must already exist
 GCS_BUCKET=mockmate-storage
@@ -313,7 +313,7 @@ gcloud run deploy mockmate-backend \
   --platform managed \
   --region us-central1 \
   --service-account your-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars GCP_PROJECT_ID=YOUR_PROJECT_ID,GCP_REGION=us-central1,GCS_BUCKET=mockmate-storage,FIRESTORE_DATABASE='(default)',ALLOWED_ORIGINS=https://your-frontend.com \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=mockmate-storage,FIRESTORE_DATABASE='(default)',ALLOWED_ORIGINS=https://your-frontend.com \
   --allow-unauthenticated
 ```
 

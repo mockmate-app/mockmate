@@ -49,8 +49,8 @@ def _require(var: str) -> str:
         )
     return val
 
-_PROJECT    = _require("GCP_PROJECT_ID")
-_REGION     = _require("GCP_REGION")
+_PROJECT    = _require("GOOGLE_CLOUD_PROJECT")
+_REGION     = _require("GOOGLE_CLOUD_LOCATION")
 _BUCKET     = _require("GCS_BUCKET")
 _COLLECTION = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")  # optional, sensible default
 _DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")          # optional, sensible default
@@ -217,6 +217,28 @@ class ResumeParserAgent:
         """Return the most-recently parsed resume for *user_id*, or None."""
         doc = await self._db.collection(_COLLECTION).document(user_id).get()
         return doc.to_dict() if doc.exists else None
+
+    async def get_resume_file(self, user_id: str) -> tuple[bytes, str] | None:
+        """Return (file_bytes, content_type) for the raw uploaded file, or None."""
+        data = await self.get_resume(user_id)
+        if not data:
+            return None
+        gcs_uri = data.get("gcs_uri", "")
+        filename = data.get("filename", "resume.pdf")
+        if not gcs_uri.startswith("gs://"):
+            return None
+        # Parse gs://bucket/blob_name
+        without_scheme = gcs_uri[5:]
+        bucket_name, _, blob_name = without_scheme.partition("/")
+        try:
+            bucket = self._storage.bucket(bucket_name)
+            blob   = bucket.blob(blob_name)
+            file_bytes = blob.download_as_bytes()
+            content_type = blob.content_type or _mime_for(filename)
+            return file_bytes, content_type
+        except GoogleCloudError as exc:
+            logger.error("GCS download failed for user %s: %s", user_id, exc)
+            return None
 
     # ------------------------------------------------------------------
     # Private helpers

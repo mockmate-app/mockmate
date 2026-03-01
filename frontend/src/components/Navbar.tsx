@@ -4,6 +4,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -40,25 +41,24 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <Link href="/login" className="text-sm font-medium text-dark hover:text-orange transition-colors">
-            Sign in
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-full bg-orange px-5 py-2 text-sm font-semibold text-light hover:opacity-90 transition-opacity"
-          >
-            Start free
-          </Link>
+          <Button variant="ghost" asChild className="text-dark hover:text-orange hover:bg-transparent">
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange transition-opacity">
+            <Link href="/login">Start free</Link>
+          </Button>
         </div>
 
         {/* Mobile menu toggle */}
-        <button
-          className="md:hidden p-1 text-dark"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden text-dark hover:bg-transparent"
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
         >
           {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        </Button>
       </div>
 
       {/* Mobile dropdown */}
@@ -74,13 +74,13 @@ export default function Navbar() {
               {l.label}
             </Link>
           ))}
-          <Link
-            href="/login"
+          <Button
+            asChild
+            className="mt-2 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange"
             onClick={() => setOpen(false)}
-            className="mt-2 rounded-full bg-orange px-5 py-2.5 text-center text-sm font-semibold text-light hover:opacity-90 transition-opacity"
           >
-            Start free
-          </Link>
+            <Link href="/login">Start free</Link>
+          </Button>
         </div>
       )}
     </header>

@@ -1,11 +1,17 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 
-const LINKS = {
-  Product: ["Features", "Personas", "How it works", "Pricing"],
-  Company: ["About", "Blog", "Careers", "Press"],
-  Legal: ["Privacy policy", "Terms of service", "Cookie policy"],
-};
+const PRODUCT_LINKS = [
+  { label: "Features",     href: "/#features" },
+  { label: "Personas",     href: "/#personas" },
+  { label: "How it works", href: "/#how-it-works" },
+];
+
+const LEGAL_LINKS = [
+  { label: "Privacy policy",   href: "/privacy" },
+  { label: "Terms of service", href: "/terms" },
+  { label: "Cookie policy",    href: "/cookies" },
+];
 
 export default function Footer() {
   return (
@@ -28,26 +34,36 @@ export default function Footer() {
           </div>
 
           {/* Link columns */}
-          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
-            {Object.entries(LINKS).map(([heading, items]) => (
-              <div key={heading}>
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-light">
-                  {heading}
-                </p>
-                <ul className="space-y-2.5">
-                  {items.map((item) => (
-                    <li key={item}>
-                      <Link
-                        href="#"
-                        className="text-sm hover:text-orange transition-colors"
-                      >
-                        {item}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-10">
+            <div>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-light">
+                Product
+              </p>
+              <ul className="space-y-2.5">
+                {PRODUCT_LINKS.map(({ label, href }) => (
+                  <li key={label}>
+                    <Link href={href} className="text-sm hover:text-orange transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-light">
+                Legal
+              </p>
+              <ul className="space-y-2.5">
+                {LEGAL_LINKS.map(({ label, href }) => (
+                  <li key={label}>
+                    <Link href={href} className="text-sm hover:text-orange transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 

@@ -1,3 +1,5 @@
+import { Card, CardContent } from "@/components/ui/card";
+
 const STEPS = [
   {
     step: "01",
@@ -42,21 +44,18 @@ export default function HowItWorks() {
         {/* Steps */}
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
-            <div key={s.step} className="relative">
-              {/* Step number */}
-              <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-dark text-light">
-                <span className="font-mono text-sm font-semibold text-orange">
-                  {s.step}
-                </span>
-              </div>
-
-              <h3 className="mb-3 text-base font-semibold text-dark">
-                {s.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted">
-                {s.description}
-              </p>
-            </div>
+            <Card key={s.step} className="relative border-border bg-surface rounded-2xl">
+              <CardContent>
+                {/* Step number */}
+                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-dark text-light">
+                  <span className="font-mono text-sm font-semibold text-orange">
+                    {s.step}
+                  </span>
+                </div>
+                <h3 className="mb-3 text-base font-semibold text-dark">{s.title}</h3>
+                <p className="text-sm leading-relaxed text-muted">{s.description}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
