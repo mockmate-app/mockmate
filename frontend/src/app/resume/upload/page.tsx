@@ -168,7 +168,7 @@ function ResumeContent({
         image={userImage}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12 flex flex-col gap-8">
+      <main className="flex-1 mx-auto w-full max-w-3xl px-4 sm:px-6 py-12 flex flex-col gap-8">
         {/* Breadcrumb */}
         <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
           ← {backLabel}

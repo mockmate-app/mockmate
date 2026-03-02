@@ -183,17 +183,12 @@ function DashboardContent() {
   const isNewUser = searchParams.get("newuser") === "1";
   const firstName = session.user.name?.split(" ")[0] ?? "there";
 
-  // Derived stats
-  const scoredSessions = sessions.filter(s => s.overall_score !== null);
-  const avgScore = scoredSessions.length
-    ? Math.round(scoredSessions.reduce((acc, s) => acc + (s.overall_score ?? 0), 0) / scoredSessions.length)
-    : null;
+  // Derived stats — use server-computed aggregates (from ALL sessions, not
+  // just the limited slice) so dashboard cards are always accurate.
+  const totalSessionCount = sessionsData?.total ?? sessions.length;
+  const avgScore: number | null = sessionsData?.avg_score ?? null;
   const lastSession = sessions[0] ?? null;
-  const thisMonth   = sessions.filter(s => {
-    const d = new Date(s.created_at);
-    const n = new Date();
-    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
-  }).length;
+  const thisMonth: number = sessionsData?.this_month ?? 0;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -205,7 +200,7 @@ function DashboardContent() {
       />
 
       {/* ── Main ── */}
-      <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-12">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-12">
 
         {/* New-user banner */}
         {isNewUser && (
@@ -247,7 +242,7 @@ function DashboardContent() {
           <StatCard
             icon={<BarChart2 size={18} className="text-orange" />}
             label="Total sessions"
-            value={sessions.length === 0 ? "—" : String(sessions.length)}
+            value={totalSessionCount === 0 ? "—" : String(totalSessionCount)}
           />
           <StatCard
             icon={<Award size={18} className="text-orange" />}
@@ -352,7 +347,7 @@ function DashboardContent() {
                               href={`/interview/feedback?session_id=${s.session_id}`}
                               className="text-xs text-orange hover:underline whitespace-nowrap inline-flex items-center gap-1"
                             >
-                              View <ChevronRight size={12} />
+                              Feedback <ChevronRight size={12} />
                             </Link>
                           ) : (
                             <span className="text-xs text-muted/40">—</span>

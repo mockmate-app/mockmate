@@ -264,7 +264,7 @@ function SetupContent({
         image={userImage}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12 flex flex-col gap-10">
+      <main className="flex-1 mx-auto w-full max-w-3xl px-4 sm:px-6 py-12 flex flex-col gap-10">
         {/* Breadcrumb */}
         <Link
           href={backHref}

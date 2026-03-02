@@ -290,8 +290,13 @@ async def end_session(session_id: str, req: SessionEndRequest | None = None):
 @app.get("/sessions/user/{user_id}", tags=["session"])
 async def list_user_sessions(user_id: str, limit: int = 10):
     """Return the most-recent sessions for a user (lightweight — no full transcript)."""
-    sessions = await app.state.interview_engine.get_user_sessions(user_id, limit=limit)
-    return {"user_id": user_id, "sessions": sessions, "count": len(sessions)}
+    sessions, stats = await app.state.interview_engine.get_user_sessions(user_id, limit=limit)
+    return {
+        "user_id": user_id,
+        "sessions": sessions,
+        "count": len(sessions),
+        **stats,
+    }
 
 
 @app.get("/transcript/{session_id}", tags=["session"])

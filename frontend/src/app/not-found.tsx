@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-dark px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-dark px-4 sm:px-6 text-center">
       {/* Subtle glow */}
       <div
         aria-hidden="true"

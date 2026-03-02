@@ -1198,7 +1198,7 @@ function LiveInterviewContent() {
                     }
                     className="flex items-center gap-2 bg-orange hover:bg-orange/85 text-white px-6 py-3 rounded-full font-medium transition-colors"
                   >
-                    View Feedback
+                    Get Feedback
                   </button>
                 )}
               </div>

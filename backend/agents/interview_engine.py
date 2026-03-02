@@ -481,11 +481,14 @@ class InterviewEngineAgent:
         self,
         user_id: str,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Return the most-recent sessions for *user_id* (newest first).
 
         Each entry includes lightweight metadata only — no full transcript body —
         so the payload stays small for dashboard rendering.
+
+        Returns (sessions_list, stats) where stats contains aggregate numbers
+        computed from ALL sessions (not just the limited slice).
         """
         # Use filter= keyword to suppress the positional-arg deprecation warning.
         # Composite indexes are not guaranteed in all environments, so we sort
@@ -494,7 +497,6 @@ class InterviewEngineAgent:
         query = (
             self._db.collection(_COLLECTION)
             .where(filter=firestore.FieldFilter("user_id", "==", user_id))
-            .limit(limit * 3)   # over-fetch so client-side sort+limit is accurate
         )
         results: list[dict[str, Any]] = []
         async for doc in query.stream():
@@ -513,9 +515,27 @@ class InterviewEngineAgent:
                 "overall_score":    data.get("overall_score"),
                 "feedback_ready":   data.get("feedback_ready", False),
             })
+
+        # ── Aggregate stats from ALL sessions ──
+        total = len(results)
+        scored = [s["overall_score"] for s in results if s["overall_score"] is not None]
+        avg_score = round(sum(scored) / len(scored)) if scored else None
+        now = datetime.now(timezone.utc)
+        this_month = sum(
+            1 for s in results
+            if s.get("created_at")
+            and datetime.fromisoformat(str(s["created_at"])).month == now.month
+            and datetime.fromisoformat(str(s["created_at"])).year == now.year
+        )
+        stats = {
+            "total": total,
+            "avg_score": avg_score,
+            "this_month": this_month,
+        }
+
         # Sort newest-first in Python, then trim to requested limit
         results.sort(key=lambda s: s.get("created_at") or "", reverse=True)
-        return results[:limit]
+        return results[:limit], stats
 
     async def get_transcript(self, session_id: str) -> dict[str, Any] | None:
         """Return the transcript document for *session_id*, or None."""

@@ -12,7 +12,7 @@ export default function TermsPage() {
     <>
       <Navbar />
       <main className="bg-light min-h-screen">
-        <div className="mx-auto max-w-3xl px-6 py-24">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-24">
           <p className="text-xs font-semibold uppercase tracking-widest text-orange mb-3">
             Legal
           </p>

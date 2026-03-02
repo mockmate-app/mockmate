@@ -131,11 +131,8 @@ function SessionsContent() {
     );
   });
 
-  const avgScore = (() => {
-    const scored = sessions.filter(s => s.overall_score !== null);
-    if (!scored.length) return null;
-    return Math.round(scored.reduce((a, s) => a + (s.overall_score ?? 0), 0) / scored.length);
-  })();
+  const totalSessionCount = data?.total ?? sessions.length;
+  const avgScore: number | null = data?.avg_score ?? null;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -146,7 +143,7 @@ function SessionsContent() {
         image={session.user.image}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-10 flex flex-col gap-8">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-10 flex flex-col gap-8">
         {/* Breadcrumb */}
         <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
           <ArrowLeft size={14} /> Back to dashboard
@@ -156,10 +153,10 @@ function SessionsContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">All sessions</h1>
-            <p className="mt-1 text-sm text-muted">{sessions.length} total interviews recorded</p>
+            <p className="mt-1 text-sm text-muted">{totalSessionCount} total interviews recorded</p>
           </div>
           <div className="flex gap-3">
-            {sessions.length > 0 && (
+            {totalSessionCount > 0 && (
               <Card className="rounded-xl border border-border">
                 <CardContent className="py-3 px-4 flex items-center gap-2.5">
                   <Award size={16} className="text-orange" />
@@ -277,7 +274,7 @@ function SessionsContent() {
                             href={`/interview/feedback?session_id=${s.session_id}`}
                             className="text-xs text-orange hover:underline whitespace-nowrap inline-flex items-center gap-1"
                           >
-                            View feedback <ChevronRight size={12} />
+                            Feedback <ChevronRight size={12} />
                           </Link>
                         ) : (
                           <span className="text-xs text-muted/40">—</span>
