@@ -312,9 +312,12 @@ gcloud run deploy mockmate-backend \
   --image gcr.io/YOUR_PROJECT_ID/mockmate-backend \
   --platform managed \
   --region us-central1 \
-  --service-account your-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=mockmate-storage,FIRESTORE_DATABASE='(default)',ALLOWED_ORIGINS=https://your-frontend.com \
+  --memory 1Gi \
+  --cpu 1 \
+  --env-vars-file cloudrun-env.yaml \
   --allow-unauthenticated
+
+> **Tip:** Create a `cloudrun-env.yaml` file (see `.env.example` for keys) and pass it via `--env-vars-file` to safely handle env vars containing commas (e.g. `ALLOWED_ORIGINS`). Keep this file out of source control.
 ```
 
 On Cloud Run the service account is attached directly — no `GOOGLE_APPLICATION_CREDENTIALS` key file is needed.
