@@ -12,7 +12,7 @@ google-adk==1.26.0
 mcp==1.23.0                       # 1.24+ removed server/session.py; adk requires <2.0.0
 google-cloud-core>=2.4.1          # GoogleCloudError base class
 google-cloud-firestore==2.19.0
-google-cloud-storage==2.18.2
+google-cloud-storage==3.0.0
 google-cloud-pubsub==2.27.1
 
 # google-adk missing transitive dep
@@ -30,7 +30,3 @@ passlib[bcrypt]==1.7.4
 # Resume parsing
 PyPDF2==3.0.1
 python-docx==1.1.2
-
-# Utilities
-numpy==1.26.4
-pillow==10.4.0

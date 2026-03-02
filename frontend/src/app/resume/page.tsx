@@ -1,142 +1,80 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
+import { useQuery } from "@tanstack/react-query";
 import Logo from "@/components/Logo";
 import UserMenu from "@/components/UserMenu";
-import { uploadResume, getResume } from "@/lib/api";
-import type { ParsedResume } from "@/lib/api";
 import {
-  Upload,
-  FileText,
-  CheckCircle,
-  XCircle,
-  ArrowRight,
-  Briefcase,
-  GraduationCap,
-  Star,
-  Cpu,
+  ArrowLeft, User, Briefcase, GraduationCap, Star, Cpu,
+  Upload, FileText, Mic, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+// ─── Types ────────────────────────────────────────────────────────────────────────────────
+
+interface ResumeData {
+  name: string;
+  email: string;
+  phone?: string;
+  summary?: string;
+  skills?: string[];
+  experience?: { title: string; company: string; duration: string; highlights?: string[] }[];
+  education?: { degree: string; institution: string; year: string }[];
+  certifications?: string[];
+  bold_claims?: string[];
+  filename?: string;
+  parsed_at?: string;
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────────────────
 
 export default function ResumePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-orange border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ResumeContent />
+    </Suspense>
+  );
+}
+
+function ResumeContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isPending && !session) router.replace("/login");
-  }, [session, isPending, router]);
+  const uid = session?.user?.id;
 
-  if (isPending) return <Spinner />;
-  if (!session) return null;
+  const { data: resumeData, isLoading: loading } = useQuery({
+    queryKey: ["resume", uid],
+    queryFn: () =>
+      fetch(`${API_BASE}/resume/${uid}`)
+        .then(r => r.ok ? r.json() : null),
+    enabled: !!uid,
+    staleTime: 10 * 60 * 1000,
+  });
 
-  return <ResumeContent userId={session.user.id} userName={session.user.name} userImage={session.user.image} userEmail={session.user.email} />;
-}
+  const resume: ResumeData | null = resumeData?.resume_data ?? null;
+  const pdfUrl = uid && resume ? `${API_BASE}/resume/${uid}/file` : null;
+  const [pdfLoaded, setPdfLoaded] = useState(false);
 
-// ---------------------------------------------------------------------------
-// Main content
-// ---------------------------------------------------------------------------
-
-type Stage = "idle" | "uploading" | "success" | "error";
-
-function ResumeContent({
-  userId,
-  userName,
-  userImage,
-  userEmail,
-}: {
-  userId: string;
-  userName?: string | null;
-  userImage?: string | null;
-  userEmail?: string | null;
-}) {
-  const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const [stage, setStage] = useState<Stage>("idle");
-  const [dragging, setDragging] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [resume, setResume] = useState<ParsedResume | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  // Fake incremental progress while waiting for the Gemini round-trip
-  useEffect(() => {
-    if (stage !== "uploading") return;
-    setProgress(5);
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 90) { clearInterval(interval); return 90; }
-        return p + Math.floor(Math.random() * 8) + 3;
-      });
-    }, 600);
-    return () => clearInterval(interval);
-  }, [stage]);
-
-  const handleFile = useCallback(
-    async (file: File) => {
-      const allowed = [".pdf", ".docx", ".doc", ".txt"];
-      const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-      if (!allowed.includes(ext)) {
-        setErrorMsg(`Unsupported file type "${ext}". Accepted: PDF, DOCX, DOC, TXT.`);
-        setStage("error");
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        setErrorMsg("File exceeds the 10 MB size limit.");
-        setStage("error");
-        return;
-      }
-
-      setSelectedFile(file);
-      setStage("uploading");
-      setErrorMsg("");
-
-      try {
-        const result = await uploadResume(userId, file);
-        setResume(result.resume_data);
-        setProgress(100);
-        setStage("success");
-      } catch (err) {
-        setErrorMsg(err instanceof Error ? err.message : "Upload failed. Please try again.");
-        setStage("error");
-      }
-    },
-    [userId],
-  );
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    },
-    [handleFile],
-  );
-
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  };
-
-  const reset = () => {
-    setStage("idle");
-    setProgress(0);
-    setResume(null);
-    setSelectedFile(null);
-    setErrorMsg("");
-    if (inputRef.current) inputRef.current.value = "";
-  };
+  if (isPending || (!session && !loading)) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-orange border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (!session) { router.replace("/login"); return null; }
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -148,278 +86,320 @@ function ResumeContent({
             Mock<span className="text-orange">Mate</span>
           </span>
         </Link>
-        <UserMenu name={userName} email={userEmail} image={userImage} />
+        <UserMenu name={session.user.name} email={session.user.email} image={session.user.image} />
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12 flex flex-col gap-8">
-        {/* Title */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">
-            Upload your résumé
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            MockMate uses your résumé to personalise every interview question to your
-            experience and skills.
-          </p>
+      <main className="flex-1 mx-auto w-full max-w-7xl px-6 py-10 flex flex-col gap-8">
+        {/* Breadcrumb + actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
+            <ArrowLeft size={14} /> Back to dashboard
+          </Link>
+          {resume && (
+            <div className="flex items-center gap-3">
+              <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange gap-2">
+                <Link href="/interview/setup?from=resume">
+                  <Mic size={14} /> Start interview
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full border-border text-dark hover:border-orange/50 gap-2">
+                <Link href="/resume/upload?from=resume">
+                  <Upload size={14} /> Upload new version
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Drop zone / upload area */}
-        {stage !== "success" && (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-            onClick={() => stage === "idle" && inputRef.current?.click()}
-            className={[
-              "relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-12 transition-colors",
-              stage === "idle"
-                ? dragging
-                  ? "border-orange bg-orange/5 cursor-copy"
-                  : "border-border bg-light hover:border-orange/50 cursor-pointer"
-                : "border-border bg-light",
-            ].join(" ")}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf,.docx,.doc,.txt"
-              className="hidden"
-              onChange={onInputChange}
-            />
+        {/* Title */}
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">My résumé</h1>
+          {resume?.filename && (
+            <p className="mt-1 text-sm text-muted">
+              {resume.filename}
+              {resume.parsed_at && (
+                <> · Uploaded {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(resume.parsed_at))}</>
+              )}
+            </p>
+          )}
+        </div>
 
-            {stage === "idle" && (
-              <>
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-orange/10">
-                  <Upload size={26} className="text-orange" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-dark">
-                    Drag &amp; drop your résumé here
-                  </p>
-                  <p className="text-xs text-muted mt-1">
-                    or click to browse — PDF, DOCX, DOC, TXT · max 10 MB
-                  </p>
-                </div>
-              </>
-            )}
-
-            {stage === "uploading" && (
-              <div className="w-full flex flex-col items-center gap-4">
-                <div className="h-12 w-12 rounded-full border-4 border-orange border-t-transparent animate-spin" />
-                <div className="w-full max-w-xs">
-                  <div className="flex justify-between text-xs text-muted mb-1.5">
-                    <span>Parsing with Gemini…</span>
-                    <span>{progress}%</span>
+        {loading ? (
+          <div className="grid gap-6 lg:grid-cols-5">
+            {/* Left: parsed data skeleton */}
+            <div className="lg:col-span-2 flex flex-col gap-5">
+              <Card className="rounded-xl border border-border">
+                <CardContent className="p-4 flex flex-col gap-3">
+                  <div className="flex items-start gap-3.5">
+                    <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                    <div className="flex-1 flex flex-col gap-2">
+                      <Skeleton className="h-4 w-32 rounded" />
+                      <Skeleton className="h-3 w-48 rounded" />
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden">
-                    <div
-                      className="h-full bg-orange rounded-full transition-all duration-500"
-                      style={{ width: `${progress}%` }}
+                  <Skeleton className="h-3 w-full rounded" />
+                  <Skeleton className="h-3 w-5/6 rounded" />
+                  <Skeleton className="h-3 w-4/6 rounded" />
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl border border-border">
+                <CardContent className="p-4 flex flex-col gap-3">
+                  <Skeleton className="h-3 w-16 rounded" />
+                  <div className="flex flex-wrap gap-1.5">
+                    {[80, 64, 96, 72, 56, 88].map((w, i) => (
+                      <Skeleton key={i} className="h-6 rounded-md" style={{ width: w }} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl border border-border">
+                <CardContent className="p-4 flex flex-col gap-4">
+                  <Skeleton className="h-3 w-20 rounded" />
+                  {[1, 2].map(i => (
+                    <div key={i} className="flex flex-col gap-1.5">
+                      <Skeleton className="h-3.5 w-40 rounded" />
+                      <Skeleton className="h-3 w-32 rounded" />
+                      <Skeleton className="h-3 w-full rounded" />
+                      <Skeleton className="h-3 w-5/6 rounded" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl border border-border">
+                <CardContent className="p-4 flex flex-col gap-3">
+                  <Skeleton className="h-3 w-20 rounded" />
+                  {[1, 2].map(i => (
+                    <div key={i} className="flex flex-col gap-1">
+                      <Skeleton className="h-3.5 w-48 rounded" />
+                      <Skeleton className="h-3 w-36 rounded" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right: document preview skeleton */}
+            <div className="lg:col-span-3">
+              <Card className="rounded-xl border border-border overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <Skeleton className="h-4 w-32 rounded" />
+                  <Skeleton className="h-4 w-24 rounded" />
+                </div>
+                <div
+                  className="w-full flex flex-col gap-3 p-5 bg-zinc-50"
+                  style={{ height: "calc(100vh - 220px)", minHeight: 500 }}
+                >
+                  <Skeleton className="h-6 w-48 rounded mb-2" />
+                  {Array.from({ length: 18 }).map((_, i) => (
+                    <Skeleton
+                      key={i}
+                      className="h-3 rounded"
+                      style={{ width: `${65 + ((i * 37) % 30)}%` }}
+                    />
+                  ))}
+                  <div className="mt-4" />
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <Skeleton
+                      key={`b${i}`}
+                      className="h-3 rounded"
+                      style={{ width: `${55 + ((i * 53) % 35)}%` }}
+                    />
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
+        ) : !resume ? (
+          /* No resume uploaded yet */
+          <div className="flex flex-col items-center justify-center py-24 text-center gap-5">
+            <FileText size={48} className="text-muted opacity-30" />
+            <div>
+              <p className="font-semibold text-dark">No résumé uploaded yet</p>
+              <p className="text-sm text-muted mt-1">Upload your résumé to get personalised interview questions.</p>
+            </div>
+            <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
+              <Link href="/resume/upload?from=resume">Upload résumé</Link>
+            </Button>
+          </div>
+        ) : (
+          /* Two-column layout: parsed data + PDF viewer */
+          <div className="grid gap-6 lg:grid-cols-5">
+
+            {/* ── Left: parsed data ── */}
+            <div className="lg:col-span-2 flex flex-col gap-5">
+
+              {/* Identity */}
+              <Section>
+                <div className="flex items-start gap-3.5">
+                  <div className="h-10 w-10 shrink-0 flex items-center justify-center rounded-full bg-orange/10">
+                    <User size={18} className="text-orange" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-dark text-base">{resume.name}</p>
+                    {resume.email && <p className="text-xs text-muted mt-0.5">{resume.email}</p>}
+                    {resume.phone && <p className="text-xs text-muted">{resume.phone}</p>}
+                  </div>
+                </div>
+                {resume.summary && (
+                  <p className="text-sm text-muted leading-relaxed mt-3">{resume.summary}</p>
+                )}
+              </Section>
+
+              {/* Skills */}
+              {resume.skills && resume.skills.length > 0 && (
+                <Section title="Skills" icon={<Cpu size={14} className="text-orange" />}>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {resume.skills.map(skill => (
+                      <Badge key={skill} variant="outline" className="rounded-md border-border text-dark text-xs px-2.5 py-1">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Bold claims */}
+              {resume.bold_claims && resume.bold_claims.length > 0 && (
+                <Section title="Key achievements" icon={<Star size={14} className="text-orange" />}>
+                  <ul className="mt-3 flex flex-col gap-1.5">
+                    {resume.bold_claims.map((claim, i) => (
+                      <li key={i} className="text-xs text-dark flex items-start gap-2">
+                        <span className="text-orange mt-0.5 shrink-0">•</span>
+                        {claim}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {/* Experience */}
+              {resume.experience && resume.experience.length > 0 && (
+                <Section title="Experience" icon={<Briefcase size={14} className="text-orange" />}>
+                  <div className="mt-3 flex flex-col gap-4">
+                    {resume.experience.map((exp, i) => (
+                      <div key={i}>
+                        <p className="text-sm font-semibold text-dark">{exp.title}</p>
+                        <p className="text-xs text-muted mt-0.5">{exp.company} · {exp.duration}</p>
+                        {exp.highlights && exp.highlights.length > 0 && (
+                          <ul className="mt-1.5 flex flex-col gap-1">
+                            {exp.highlights.map((h, j) => (
+                              <li key={j} className="text-xs text-muted flex items-start gap-1.5">
+                                <span className="text-orange mt-0.5 shrink-0">–</span>
+                                {h}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Education */}
+              {resume.education && resume.education.length > 0 && (
+                <Section title="Education" icon={<GraduationCap size={14} className="text-orange" />}>
+                  <div className="mt-3 flex flex-col gap-3">
+                    {resume.education.map((edu, i) => (
+                      <div key={i}>
+                        <p className="text-sm font-semibold text-dark">{edu.degree}</p>
+                        <p className="text-xs text-muted mt-0.5">{edu.institution} · {edu.year}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Certifications */}
+              {resume.certifications && resume.certifications.length > 0 && (
+                <Section title="Certifications" icon={<Star size={14} className="text-orange" />}>
+                  <ul className="mt-3 flex flex-col gap-1.5">
+                    {resume.certifications.map((cert, i) => (
+                      <li key={i} className="text-xs text-dark flex items-start gap-2">
+                        <span className="text-orange mt-0.5 shrink-0">•</span>
+                        {cert}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+            </div>
+
+            {/* ── Right: PDF viewer ── */}
+            <div className="lg:col-span-3">
+              <Card className="rounded-xl border border-border overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <p className="text-sm font-medium text-dark">Document preview</p>
+                  {pdfUrl && (
+                    <a
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-orange hover:underline"
+                    >
+                      Open in new tab <ExternalLink size={11} />
+                    </a>
+                  )}
+                </div>
+                {pdfUrl ? (
+                  <div className="relative w-full" style={{ height: "calc(100vh - 220px)", minHeight: 500 }}>
+                    {!pdfLoaded && (
+                      <div className="absolute inset-0 flex flex-col gap-3 p-5 bg-zinc-50 z-10">
+                        <Skeleton className="h-6 w-48 rounded mb-2" />
+                        {Array.from({ length: 18 }).map((_, i) => (
+                          <Skeleton key={i} className="h-3 rounded" style={{ width: `${65 + ((i * 37) % 30)}%` }} />
+                        ))}
+                        <div className="mt-4" />
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <Skeleton key={`b${i}`} className="h-3 rounded" style={{ width: `${55 + ((i * 53) % 35)}%` }} />
+                        ))}
+                      </div>
+                    )}
+                    <iframe
+                      src={pdfUrl}
+                      className="w-full h-full"
+                      title="Résumé preview"
+                      onLoad={() => setPdfLoaded(true)}
                     />
                   </div>
-                </div>
-                <p className="text-xs text-muted">
-                  Uploading <span className="font-medium text-dark">{selectedFile?.name}</span>
-                </p>
-              </div>
-            )}
-
-            {stage === "error" && (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <XCircle size={36} className="text-red-500" />
-                <p className="text-sm font-semibold text-dark">Upload failed</p>
-                <p className="text-xs text-muted max-w-xs">{errorMsg}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); reset(); }}
-                  className="mt-1 rounded-full border-border text-dark hover:border-orange hover:text-orange"
-                >
-                  Try again
-                </Button>
-              </div>
-            )}
+                ) : (
+                  <div className="flex items-center justify-center py-24 text-muted text-sm">
+                    Preview unavailable
+                  </div>
+                )}
+              </Card>
+            </div>
           </div>
-        )}
-
-        {/* Parsed résumé result */}
-        {stage === "success" && resume && (
-          <ParsedResumeCard resume={resume} onReplace={reset} onContinue={() => router.push("/interview/setup?from=resume")} />
         )}
       </main>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Parsed résumé display
-// ---------------------------------------------------------------------------
-
-function ParsedResumeCard({
-  resume,
-  onReplace,
-  onContinue,
-}: {
-  resume: ParsedResume;
-  onReplace: () => void;
-  onContinue: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Success banner */}
-      <Alert className="border-green-200 bg-green-50 rounded-xl">
-        <CheckCircle size={16} className="text-green-600" />
-        <AlertDescription>
-          <p className="text-sm font-semibold text-dark">Résumé parsed successfully</p>
-          <p className="text-xs text-muted mt-0.5">
-            {resume.filename} · parsed {new Date(resume.parsed_at).toLocaleString()}
-          </p>
-        </AlertDescription>
-      </Alert>
-
-      {/* Profile summary */}
-      <Card className="rounded-xl border border-border">
-        <CardContent className="p-5 flex flex-col gap-4">
-        <div>
-          <h2 className="text-base font-bold text-dark">{resume.name || "—"}</h2>
-          <p className="text-xs text-muted mt-0.5">
-            {[resume.email, resume.phone].filter(Boolean).join(" · ")}
-          </p>
-          {resume.summary && (
-            <p className="mt-3 text-sm text-dark/80 leading-relaxed">{resume.summary}</p>
-          )}
-        </div>
-
-        {/* Skills */}
-        {resume.skills?.length > 0 && (
-          <Section icon={<Cpu size={14} className="text-orange" />} title="Skills">
-            <div className="flex flex-wrap gap-2 mt-2">
-              {resume.skills.map((s) => (
-                <Badge
-                  key={s}
-                  variant="outline"
-                  className="rounded-full border-border text-dark text-xs px-3 py-1"
-                >
-                  {s}
-                </Badge>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Experience */}
-        {resume.experience?.length > 0 && (
-          <Section icon={<Briefcase size={14} className="text-orange" />} title="Experience">
-            <ul className="mt-2 flex flex-col gap-3">
-              {resume.experience.map((exp, i) => (
-                <li key={i} className="text-sm">
-                  <span className="font-medium text-dark">{exp.title}</span>
-                  {exp.company && (
-                    <span className="text-muted"> · {exp.company}</span>
-                  )}
-                  {exp.duration && (
-                    <span className="text-muted text-xs"> ({exp.duration})</span>
-                  )}
-                  {exp.highlights?.length > 0 && (
-                    <ul className="mt-1 ml-3 flex flex-col gap-0.5 list-disc list-inside">
-                      {exp.highlights.map((h, j) => (
-                        <li key={j} className="text-xs text-muted leading-relaxed">
-                          {h}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {/* Education */}
-        {resume.education?.length > 0 && (
-          <Section icon={<GraduationCap size={14} className="text-orange" />} title="Education">
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {resume.education.map((edu, i) => (
-                <li key={i} className="text-sm">
-                  <span className="font-medium text-dark">{edu.degree}</span>
-                  {edu.institution && (
-                    <span className="text-muted"> · {edu.institution}</span>
-                  )}
-                  {edu.year && (
-                    <span className="text-xs text-muted"> ({edu.year})</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {/* Bold claims */}
-        {resume.bold_claims?.length > 0 && (
-          <Section icon={<Star size={14} className="text-orange" />} title="Notable claims">
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {resume.bold_claims.map((c, i) => (
-                <li key={i} className="text-sm text-dark/80 flex gap-2">
-                  <span className="text-orange shrink-0">✦</span>
-                  {c}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={onReplace}
-          className="rounded-full border-border text-dark hover:border-orange hover:text-orange gap-2"
-        >
-          <FileText size={14} />
-          Replace résumé
-        </Button>
-        <Button
-          onClick={onContinue}
-          className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange gap-2"
-        >
-          Set up interview
-          <ArrowRight size={14} />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ─── Section card ────────────────────────────────────────────────────────────────────────────────
 
 function Section({
-  icon,
   title,
+  icon,
   children,
 }: {
-  icon: React.ReactNode;
-  title: string;
+  title?: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wider">
-        {icon}
-        {title}
-      </div>
-      {children}
-    </div>
+    <Card className="rounded-xl border border-border">
+      <CardContent className="p-4">
+        {title && (
+          <div className="flex items-center gap-1.5 mb-1">
+            {icon}
+            <p className="text-xs font-semibold text-dark uppercase tracking-wide">{title}</p>
+          </div>
+        )}
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
-function Spinner() {
-  return (
-    <div className="min-h-screen bg-surface flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-orange border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-}
+

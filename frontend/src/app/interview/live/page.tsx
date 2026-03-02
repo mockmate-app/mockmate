@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Mic, MicOff, PhoneOff, Loader2, User, Video, VideoOff } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
+import { useMutation } from "@tanstack/react-query";
 
 type InterviewStatus = "idle" | "connecting" | "active" | "ended" | "error";
 
@@ -222,7 +223,7 @@ export default function LiveInterviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-(--color-dark) flex items-center justify-center text-white/50">
+        <div className="min-h-screen bg-dark flex items-center justify-center text-white/50">
           Loading…
         </div>
       }
@@ -322,27 +323,31 @@ function LiveInterviewContent() {
     }, delayMs);
   }, []);
 
-  const persistSessionEnd = useCallback(
-    async (endedBy: "candidate" | "interviewer" | "system", finalTranscript: TranscriptEntry[]) => {
-      if (!sessionId) {
-        return;
-      }
-      try {
-        await fetch(`${API_BASE}/session/${encodeURIComponent(sessionId)}/end`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            ended_by: endedBy,
-            transcript: finalTranscript,
-          }),
-        });
-      } catch {
-        // best-effort persistence
-      }
+  const persistSessionEndMutation = useMutation({
+    mutationFn: async ({ endedBy, finalTranscript }: { endedBy: "candidate" | "interviewer" | "system"; finalTranscript: TranscriptEntry[] }) => {
+      if (!sessionId) return;
+      const res = await fetch(`${API_BASE}/session/${encodeURIComponent(sessionId)}/end`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          ended_by: endedBy,
+          transcript: finalTranscript,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
     },
+  });
+
+  const persistSessionEnd = useCallback(
+    (endedBy: "candidate" | "interviewer" | "system", finalTranscript: TranscriptEntry[]) => {
+      return persistSessionEndMutation.mutateAsync({ endedBy, finalTranscript }).catch(() => {
+        // best-effort persistence
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId],
   );
 
@@ -638,7 +643,7 @@ function LiveInterviewContent() {
     speechStreakRef.current = 0;
     await persistSessionEnd(endedBy, finalTranscript);
     // No automatic redirect — the user clicks "View Feedback" when ready.
-  }, [closeAudioContextSafely, persistSessionEnd, sessionId]);
+  }, [closeAudioContextSafely, persistSessionEnd]);
 
   const endInterviewRef = useRef(endInterview);
   useEffect(() => {
@@ -708,7 +713,7 @@ function LiveInterviewContent() {
   }, [closeAudioContextSafely]);
 
   return (
-    <div className="h-screen bg-(--color-dark) text-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-dark text-white flex flex-col overflow-hidden">
       <header className="border-b border-white/10 px-5 sm:px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <h1 className="font-semibold text-base sm:text-lg">Live Interview</h1>

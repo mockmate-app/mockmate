@@ -212,9 +212,6 @@ function SessionsContent() {
                 <>
                   <BarChart2 size={36} className="text-muted opacity-30" />
                   <p className="text-sm text-muted">No interviews yet. Start your first one!</p>
-                  <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
-                    <Link href="/interview/setup?from=sessions">Start interview</Link>
-                  </Button>
                 </>
               ) : (
                 <p className="text-sm text-muted">No sessions match your search.</p>

@@ -225,7 +225,7 @@ function DashboardContent() {
                 </p>
               </div>
               <Button asChild className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
-                <Link href="/resume">Start onboarding</Link>
+                <Link href="/resume/upload?from=dashboard">Start onboarding</Link>
               </Button>
             </AlertDescription>
           </Alert>
@@ -242,8 +242,8 @@ function DashboardContent() {
             className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange gap-2 hidden sm:inline-flex"
             disabled={loadingResume}
           >
-            <Link href={!loadingResume && !resume ? "/resume" : "/interview/setup?from=dashboard"}>
-              <Mic size={15} />
+            <Link href={!loadingResume && !resume ? "/resume/upload?from=dashboard" : "/interview/setup?from=dashboard"}>
+              {!loadingResume && !resume ? <FileText size={15} /> : <Mic size={15} />}
               {!loadingResume && !resume ? "Upload résumé" : "Start interview"}
             </Link>
           </Button>
@@ -288,12 +288,12 @@ function DashboardContent() {
             asChild
             className="w-full rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2"
           >
-            <Link href={!loadingResume && !resume ? "/resume" : "/interview/setup?from=dashboard"}>
-              <Mic size={15} />
+            <Link href={!loadingResume && !resume ? "/resume/upload?from=dashboard" : "/interview/setup?from=dashboard"}>
+              {!loadingResume && !resume ? <FileText size={15} /> : <Mic size={15} />}
               {!loadingResume && !resume ? "Upload résumé to start" : "Start interview"}
             </Link>
           </Button>
-          <QuickLink href="/resume" icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
+          <QuickLink href="/resume/upload?from=dashboard" icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
           <QuickLink href="/sessions" icon={<BarChart2 size={15} className="text-orange" />} label="View all sessions" />
         </div>
 
@@ -315,9 +315,6 @@ function DashboardContent() {
                 <div className="flex flex-col items-center justify-center py-16 text-center gap-3 px-6">
                   <Mic size={32} className="text-muted opacity-40" />
                   <p className="text-sm text-muted">No sessions yet.</p>
-                  <Button asChild size="sm" className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange text-xs">
-                    <Link href="/interview/setup">Start your first interview</Link>
-                  </Button>
                 </div>
               ) : (
                 <Table>
@@ -378,7 +375,7 @@ function DashboardContent() {
 
             {/* Résumé card */}
             <div className="flex flex-col gap-3">
-            <SectionHeader title="Your résumé" href="/resumes" />
+            <SectionHeader title="Your résumé" href="/resume" />
               <Card className="rounded-xl border border-border">
                 <CardContent className="p-4">
                 {loadingResume ? (
@@ -452,7 +449,7 @@ function DashboardContent() {
                     )}
 
                     <Link
-                      href="/resumes"
+                      href="/resume"
                       className="text-xs text-orange hover:underline inline-flex items-center gap-1"
                     >
                       View résumé <ChevronRight size={12} />
@@ -462,9 +459,6 @@ function DashboardContent() {
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
                     <FileText size={28} className="text-muted opacity-40" />
                     <p className="text-sm text-muted">No résumé uploaded yet.</p>
-                    <Button asChild size="sm" className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange text-xs">
-                      <Link href="/resume">Upload résumé</Link>
-                    </Button>
                   </div>
                 )}
                 </CardContent>
@@ -475,7 +469,7 @@ function DashboardContent() {
             <div className="hidden lg:flex flex-col gap-3">
               <p className="text-sm font-semibold text-dark">Quick actions</p>
               <div className="flex flex-col gap-2">
-                <QuickLink href="/resume"          icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
+                <QuickLink href="/resume/upload?from=dashboard"   icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
                 <QuickLink href="/sessions"        icon={<BarChart2 size={15} className="text-orange" />} label="View all sessions" />
               </div>
             </div>
@@ -540,7 +534,7 @@ function QuickLink({ href, icon, label, disabled }: { href: string; icon: React.
         className="w-full justify-start gap-3 rounded-lg border-border opacity-50 hover:opacity-70 h-auto px-4 py-3"
         title="Upload your résumé first"
       >
-        <Link href="/resume">
+        <Link href="/resume/upload?from=dashboard">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange/10 shrink-0">
             {icon}
           </span>

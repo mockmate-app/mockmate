@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Logo from "@/components/Logo";
 import UserMenu from "@/components/UserMenu";
 import { startSession } from "@/lib/api";
@@ -198,54 +199,55 @@ function SetupContent({
   const [persona, setPersona]       = useState("neutral");
   const [jobRole, setJobRole]       = useState("");
   const [difficulty, setDifficulty] = useState("medium");
-  const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
-  const [hasResume, setHasResume]   = useState<boolean | null>(null); // null = loading
 
   // Check if the user has a resume
-  useEffect(() => {
-    fetch(`${API_BASE}/resume/${userId}`)
-      .then(r => { setHasResume(r.ok); })
-      .catch(() => setHasResume(false));
-  }, [userId]);
+  const { data: resumeCheckData, isLoading: resumeLoading } = useQuery({
+    queryKey: ["resume", userId],
+    queryFn: () =>
+      fetch(`${API_BASE}/resume/${userId}`)
+        .then(r => r.ok ? r.json() : null),
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000,
+  });
+  const hasResume = resumeLoading ? null : (resumeCheckData !== null && resumeCheckData !== undefined);
 
-  // Back link based on where we came from
-  const backHref =
-    from === "resume" || from === "resumes" ? `/${from}` :
-    from === "sessions" ? "/sessions" :
-    "/dashboard";
-  const backLabel =
-    from === "resume"   ? "Back to résumé" :
-    from === "resumes"  ? "Back to résumé" :
-    from === "sessions" ? "Back to sessions" :
-    "Back to dashboard";
-
-  const canSubmit = jobRole.trim().length > 0 && !loading && hasResume === true;
-
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    setError("");
-    try {
-      const result = await startSession({
-        user_id: userId,
-        persona,
-        job_role: jobRole.trim(),
-        difficulty,
-      });
-
-      // Questions are stored as context in the session (Firestore).
-      // Skip the questions preview page — go straight into the live interview.
+  const startSessionMutation = useMutation({
+    mutationFn: startSession,
+    onSuccess: (result) => {
       router.push(
         `/interview/live?session_id=${result.session_id}` +
         `&persona=${encodeURIComponent(persona)}` +
         `&job_role=${encodeURIComponent(jobRole.trim())}` +
         `&interviewer_name=${encodeURIComponent(result.interviewer_name ?? "Alex")}`,
       );
-    } catch (err) {
+    },
+    onError: (err) => {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-      setLoading(false);
-    }
+    },
+  });
+
+  // Back link based on where we came from
+  const backHref =
+    from === "resume" ? "/resume" :
+    from === "sessions" ? "/sessions" :
+    "/dashboard";
+  const backLabel =
+    from === "resume"   ? "Back to résumé" :
+    from === "sessions" ? "Back to sessions" :
+    "Back to dashboard";
+
+  const canSubmit = jobRole.trim().length > 0 && !startSessionMutation.isPending && hasResume === true;
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    setError("");
+    startSessionMutation.mutate({
+      user_id: userId,
+      persona,
+      job_role: jobRole.trim(),
+      difficulty,
+    });
   };
 
   return (
@@ -285,7 +287,7 @@ function SetupContent({
                 </p>
               </div>
               <Button asChild className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
-                <Link href="/resume">Upload résumé</Link>
+                <Link href="/resume/upload?from=setup">Upload résumé</Link>
               </Button>
             </AlertDescription>
           </Alert>
@@ -357,7 +359,7 @@ function SetupContent({
             disabled={!canSubmit}
             className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange disabled:opacity-40 px-6"
           >
-            {loading ? (
+            {startSessionMutation.isPending ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
                 Generating questions…
