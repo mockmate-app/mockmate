@@ -66,6 +66,19 @@ Target role context (apply before scoring anything):
 - In decision_letter, explicitly state the assumed YoE bar for the role and
   explain whether the candidate met, exceeded, or fell short of it.
 
+CRITICAL — speaker attribution (MUST enforce):
+- The transcript labels each line as CANDIDATE or INTERVIEWER.
+- You are evaluating the CANDIDATE ONLY. The INTERVIEWER is the AI — ignore
+  their words entirely when assessing vocabulary, technical depth, tone, etc.
+- NEVER attribute something the INTERVIEWER said to the candidate. For example,
+  if the INTERVIEWER mentions a technology, project, or metric, that does NOT
+  count as the candidate demonstrating knowledge of it — unless the CANDIDATE
+  also independently discusses it in their own turns.
+- When citing specific words, phrases, or examples in your feedback, double-check
+  the speaker label. If it says INTERVIEWER, it is NOT the candidate's language.
+- Vocabulary calibration and domain_vocabulary scoring must be based EXCLUSIVELY
+  on words the CANDIDATE actually spoke.
+
 Scoring rules (enforce strictly):
 - communication  : clarity, articulation, active listening, professional tone.
   Deduct heavily for interrupting, rudeness, hostility, dismissiveness.
@@ -73,8 +86,11 @@ Scoring rules (enforce strictly):
 - structure      : organised, logical answers (STAR / clear reasoning).
 - technical_depth: depth and accuracy of domain knowledge demonstrated,
   evaluated against the depth expected for the target role's seniority.
+  Only count knowledge the CANDIDATE demonstrated — not topics the INTERVIEWER
+  introduced or referenced from the résumé.
 - domain_vocabulary: correct and sophisticated use of role-appropriate
   terminology; senior/specialist roles demand higher precision.
+  Score based ONLY on vocabulary the CANDIDATE used in their own turns.
 - posture_presence: based solely on posture data provided.
 - overall_score  : weighted average reflecting the whole picture faithfully,
   anchored to the target role's expectations.

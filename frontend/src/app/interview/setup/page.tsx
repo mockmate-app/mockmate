@@ -27,6 +27,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -367,6 +373,30 @@ function SetupContent({
             )}
           </Button>
         </div>
+
+        {/* Blocking modal — prevents navigation while questions are being generated */}
+        <Dialog open={startSessionMutation.isPending}>
+          <DialogContent
+            className="sm:max-w-md rounded-2xl border-border bg-light [&>button]:hidden"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <div className="flex flex-col items-center gap-5 py-4">
+              <div className="relative flex items-center justify-center">
+                <div className="h-14 w-14 rounded-full border-[3px] border-orange/20 border-t-orange animate-spin" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <DialogTitle className="text-lg font-bold text-dark">
+                  Setting up your interview
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted">
+                  Generating tailored questions based on your résumé and selected role.
+                  This usually takes a few seconds — please don&apos;t close this page.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

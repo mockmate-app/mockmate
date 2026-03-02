@@ -258,12 +258,18 @@ function SessionsContent() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={`text-xs font-medium rounded-full ${s.status === "ended" ? "bg-zinc-100 text-zinc-500"
-                            : s.status === "active" ? "bg-green-100 text-green-600"
-                              : "bg-yellow-100 text-yellow-600"
-                          }`}>
-                          {s.status}
-                        </Badge>
+                        {!s.feedback_ready && s.status !== "active" ? (
+                          <Badge variant="secondary" className="text-xs font-medium rounded-full bg-red-100 text-red-600">
+                            Abandoned
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className={`text-xs font-medium rounded-full ${s.status === "ended" ? "bg-zinc-100 text-zinc-500"
+                              : s.status === "active" ? "bg-green-100 text-green-600"
+                                : "bg-yellow-100 text-yellow-600"
+                            }`}>
+                            {s.status === "ended" ? "Completed" : s.status}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {s.feedback_ready ? (

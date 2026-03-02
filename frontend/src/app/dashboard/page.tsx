@@ -336,10 +336,14 @@ function DashboardContent() {
                             <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>
                               {s.overall_score}
                             </Badge>
-                          ) : s.status === "ended" ? (
-                            <span className="text-xs text-muted italic">No report</span>
-                          ) : (
+                          ) : !s.feedback_ready && s.status !== "active" ? (
+                            <Badge variant="secondary" className="text-xs font-medium bg-red-100 text-red-600 rounded-full">
+                              Abandoned
+                            </Badge>
+                          ) : s.status === "active" ? (
                             <span className="text-xs text-muted italic">In progress</span>
+                          ) : (
+                            <span className="text-xs text-muted/40">—</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">

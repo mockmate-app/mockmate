@@ -24,6 +24,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 /* ── Data fetchers ─────────────────────────────────────────────────────── */
 
+async function fetchSessionMeta(sessionId: string): Promise<SessionMeta> {
+  const res = await fetch(`${API_BASE}/session/${sessionId}`);
+  if (!res.ok) throw new Error("Session not found");
+  return res.json();
+}
+
 async function generateFeedback(sessionId: string): Promise<FeedbackReport> {
   const res = await fetch(`${API_BASE}/feedback/generate`, {
     method: "POST",
@@ -82,6 +88,33 @@ interface TranscriptData {
   turns: TranscriptTurn[];
   saved_at?: string;
 }
+
+interface SessionMeta {
+  session_id: string;
+  persona: string;
+  job_role: string;
+  interviewer_name: string;
+  status: string;
+  ended_by: string | null;
+  created_at: string;
+  ended_at: string | null;
+  question_count: number;
+  overall_score: number | null;
+  feedback_ready: boolean;
+}
+
+const PERSONA_LABELS: Record<string, string> = {
+  neutral:              "Professional",
+  startup_founder:      "Startup Founder",
+  investment_banker:    "Investment Banker",
+  tech_lead:            "Tech Lead",
+  hr_manager:           "HR Manager",
+  product_manager:      "Product Manager",
+  vp_engineering:       "VP of Engineering",
+  management_consultant:"Consultant",
+  cto:                  "CTO",
+  recruiter:            "Recruiter",
+};
 
 /* ── Small components ──────────────────────────────────────────────────── */
 
@@ -185,6 +218,13 @@ function FeedbackContent() {
     retry: false,
   });
 
+  const { data: sessionMeta } = useQuery({
+    queryKey: ["session-meta", sessionId],
+    queryFn: () => fetchSessionMeta(sessionId),
+    enabled: !!sessionId,
+    retry: false,
+  });
+
   const turns = transcript?.turns ?? [];
 
   const error = !sessionId
@@ -207,7 +247,17 @@ function FeedbackContent() {
         <div className="flex-1 min-w-0 max-w-3xl flex flex-col gap-5">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
-            <p className="text-white/40 text-xs mt-1">Session: {sessionId || "N/A"}</p>
+            {sessionMeta ? (
+              <p className="text-white/40 text-xs mt-1">
+                {PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
+                {" · "}
+                {sessionMeta.job_role}
+                {" · Interviewer: "}
+                {sessionMeta.interviewer_name}
+              </p>
+            ) : (
+              <p className="text-white/40 text-xs mt-1">Loading session info…</p>
+            )}
           </div>
 
           {loading && (

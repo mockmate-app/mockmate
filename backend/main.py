@@ -265,6 +265,18 @@ async def get_session_questions(session_id: str):
     return {"session_id": session_id, "questions": questions, "question_count": len(questions)}
 
 
+@app.get("/session/{session_id}", tags=["session"])
+async def get_session(session_id: str):
+    """Return lightweight metadata for a single session."""
+    data = await app.state.interview_engine.get_session(session_id)
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Session '{session_id}' not found.",
+        )
+    return data
+
+
 @app.post("/session/{session_id}/end", tags=["session"])
 async def end_session(session_id: str, req: SessionEndRequest | None = None):
     """Mark a session as complete."""

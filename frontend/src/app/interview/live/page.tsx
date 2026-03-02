@@ -448,6 +448,9 @@ function LiveInterviewContent() {
       audio: {
         channelCount: 1,               // mono — required by Live API
         sampleRate: { ideal: MIC_SAMPLE_RATE },
+        echoCancellation: true,         // suppress AI audio fed back via speakers
+        noiseSuppression: true,
+        autoGainControl: true,
         ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
       },
       video: false,
@@ -562,18 +565,19 @@ function LiveInterviewContent() {
         if ((msg.type === "input_transcription" || msg.type === "output_transcription") && msg.text?.trim()) {
           const text = msg.text.trim();
           const speaker = msg.type === "input_transcription" ? "you" : "interviewer";
-          const finished = msg.finished ?? true;
+          const finished = msg.finished ?? false;
 
-          // ADK sends CUMULATIVE text per transcription event (not a delta).
-          // Replace the in-progress entry in-place; only create a new entry
-          // when the speaker changes or the previous turn is marked finished.
+          // Only add to transcript once the utterance is complete.
+          // Partials cause flickering word-by-word display and fragment
+          // bubbles ("oo", "about") — the typing indicator already gives
+          // visual feedback that someone is speaking.
+          if (!finished) {
+            if (speaker === "interviewer") setYourTurn(false);
+            return;
+          }
+
           setTranscript((prev) => {
-            const last = prev[prev.length - 1];
-            const isOngoing = last?.speaker === speaker && !last.finished;
-            if (isOngoing) {
-              return [...prev.slice(0, -1), { ...last, text, finished, ts: Date.now() }];
-            }
-            return [...prev, { speaker, text, finished, ts: Date.now() }];
+            return [...prev, { speaker, text, finished: true, ts: Date.now() }];
           });
 
           if (speaker === "interviewer") setYourTurn(false);
@@ -614,6 +618,41 @@ function LiveInterviewContent() {
           ];
           if (endPhrases.some((p) => lower.includes(p))) {
             pendingInterviewerEndRef.current = true;
+          }
+        }
+
+        // Detect candidate requesting to end and trigger end directly
+        if (msg.type === "input_transcription" && msg.finished && msg.text) {
+          const lower = msg.text.toLowerCase();
+          const userEndPhrases = [
+            "end the call",
+            "end the interview",
+            "stop the interview",
+            "end this",
+            "hang up",
+            "i want to stop",
+            "please stop",
+            "let's stop",
+            "let's end",
+            "can we stop",
+            "can we end",
+          ];
+          if (userEndPhrases.some((p) => lower.includes(p))) {
+            // Show a brief message before disconnecting so the user sees
+            // confirmation that the call is ending.
+            setTranscript((prev) => [
+              ...prev,
+              {
+                speaker: "system" as const,
+                kind: "stage" as const,
+                text: "Ending the interview…",
+                ts: Date.now(),
+              },
+            ]);
+            // Small delay so the message is visible before teardown
+            window.setTimeout(() => {
+              endInterviewRef.current?.("candidate");
+            }, 600);
           }
         }
       } catch {
@@ -884,7 +923,7 @@ function LiveInterviewContent() {
       </header>
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-        <aside className="lg:w-85 xl:w-95 border-b lg:border-b-0 lg:border-r border-white/10 p-4 shrink-0 overflow-x-auto lg:overflow-x-visible">
+        <aside className="lg:w-85 xl:w-95 border-b lg:border-b-0 lg:border-r border-white/10 p-4 shrink-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto">
           <div className="flex lg:flex-col gap-3 min-w-max lg:min-w-0">
             <ParticipantCard
               title={interviewerName}
@@ -908,7 +947,15 @@ function LiveInterviewContent() {
           {isActive && cameraOn && (
             <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-2">
               <video
-                ref={camVideoRef}
+                ref={(node) => {
+                  camVideoRef.current = node;
+                  // Only assign srcObject if it changed — avoids re-triggering
+                  // play() on every React re-render which causes flickering.
+                  if (node && camStreamRef.current && node.srcObject !== camStreamRef.current) {
+                    node.srcObject = camStreamRef.current;
+                    void node.play().catch(() => undefined);
+                  }
+                }}
                 autoPlay
                 muted
                 playsInline
@@ -1107,14 +1154,14 @@ function LiveInterviewContent() {
                   }`}
                   title={cameraOn ? "Disable webcam" : "Enable webcam"}
                 >
-                  {cameraOn ? <VideoOff size={18} /> : <Video size={18} />}
+                  {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
                 </button>
 
                 <button
                   onClick={toggleMute}
                   className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                    muted
-                      ? "bg-red-500/20 text-red-400 border-red-500/30"
+                    !muted
+                      ? "bg-orange/20 text-orange border-orange/40"
                       : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
                   }`}
                   title={muted ? "Unmute" : "Mute"}
