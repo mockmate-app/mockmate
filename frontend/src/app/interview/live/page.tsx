@@ -439,7 +439,11 @@ function LiveInterviewContent() {
     stopMicCapture();
 
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      audio: {
+        channelCount: 1,               // mono — required by Live API
+        sampleRate: { ideal: MIC_SAMPLE_RATE },
+        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+      },
       video: false,
     });
     mediaStreamRef.current = stream;
@@ -464,7 +468,10 @@ function LiveInterviewContent() {
     workletNodeRef.current = worklet;
 
     worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-      if (!muted && wsRef.current?.readyState === WebSocket.OPEN && !aiSpeakingRef.current) {
+      // Always stream audio to server — VAD is handled server-side.
+      // Speech indicators run regardless of AI speaking state so the
+      // user always sees visual feedback for their own voice.
+      if (!muted && wsRef.current?.readyState === WebSocket.OPEN) {
         const samples = new Int16Array(e.data);
         let sumSquares = 0;
         for (let i = 0; i < samples.length; i++) {

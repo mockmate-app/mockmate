@@ -18,11 +18,12 @@ import os
 import random
 import uuid
 import pathlib
+import warnings
 from datetime import datetime, timezone
 from typing import Any
 
 import vertexai
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from google.cloud import firestore, pubsub_v1
 from google.adk.agents import Agent
 from google.adk.agents.run_config import RunConfig, StreamingMode
@@ -30,6 +31,8 @@ from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
+from google.genai.errors import APIError
+from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
 
@@ -488,14 +491,16 @@ class InterviewEngineAgent:
             # (gemini-live-2.5-flash-native-audio supports both on Vertex AI)
             proactivity=genai_types.ProactivityConfig(proactive_audio=True),
             enable_affective_dialog=True,
-            # Server-side VAD: interrupt on speech start, tight silence window
+            # Server-side VAD: interrupt on speech start, generous silence
+            # window so the model waits for the candidate to finish their full
+            # sentence before responding (avoids mid-sentence interruption).
             realtime_input_config=genai_types.RealtimeInputConfig(
                 activity_handling=genai_types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
-                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_HIGH,
-                    silence_duration_ms=800,   # cut turn quickly on silence
-                    prefix_padding_ms=200,     # minimal lead-in before activity counts
+                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
+                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
+                    prefix_padding_ms=300,     # capture speech onset with padding
                 ),
             ),
             # Session resumption: ADK auto-reconnects on the ~10-min Vertex AI
@@ -522,6 +527,30 @@ class InterviewEngineAgent:
         )
 
         # ── Phase 3: bidirectional streaming ─────────────────────────────────
+        # Track whether the browser WebSocket is still open so downstream
+        # doesn't attempt to send on a closed connection.
+        _ws_open = True
+
+        async def _safe_send_bytes(data: bytes) -> None:
+            """Send binary data to the browser, ignoring send-after-close."""
+            nonlocal _ws_open
+            if not _ws_open:
+                return
+            try:
+                await websocket.send_bytes(data)
+            except Exception:
+                _ws_open = False
+
+        async def _safe_send_text(data: str) -> None:
+            """Send text data to the browser, ignoring send-after-close."""
+            nonlocal _ws_open
+            if not _ws_open:
+                return
+            try:
+                await websocket.send_text(data)
+            except Exception:
+                _ws_open = False
+
         async def _upstream() -> None:
             """Receive mixed browser frames (text control + binary PCM) → Gemini."""
             try:
@@ -558,9 +587,12 @@ class InterviewEngineAgent:
                                 data=chunk,
                             )
                         )
+            except WebSocketDisconnect:
+                logger.debug("Browser disconnected (upstream).")
             except Exception as exc:
-                logger.warning("Upstream task ended: %s", exc)
+                logger.warning("Upstream task ended unexpectedly: %s", exc)
             finally:
+                _ws_open = False
                 live_request_queue.close()
 
         # Transcript turns accumulated in memory across downstream events.
@@ -569,74 +601,104 @@ class InterviewEngineAgent:
         async def _downstream() -> None:
             """Receive ADK events → forward to browser, accumulate transcript."""
             try:
-                async for event in runner.run_live(
-                    session=adk_session,
-                    live_request_queue=live_request_queue,
-                    run_config=run_config,
-                ):
-                    # ── Audio output ──────────────────────────────────────────
-                    # Forward raw PCM bytes (24 kHz, 16-bit mono) to the browser
-                    # for playback via its AudioWorklet ring buffer.
-                    if event.content and event.content.parts:
-                        for part in event.content.parts:
-                            if hasattr(part, "inline_data") and part.inline_data:
-                                if part.inline_data.mime_type.startswith("audio/pcm"):
-                                    await websocket.send_bytes(part.inline_data.data)
+                # Suppress the Pydantic serializer warning for response_modalities
+                # enum — this is a known cosmetic issue in google-genai/ADK 
+                # when AUDIO is passed as a string instead of the enum variant.
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message=".*PydanticSerializationUnexpectedValue.*response_modalities.*",
+                        category=UserWarning,
+                    )
+                    async for event in runner.run_live(
+                        session=adk_session,
+                        live_request_queue=live_request_queue,
+                        run_config=run_config,
+                    ):
+                        # ── Audio output ──────────────────────────────────────────
+                        if event.content and event.content.parts:
+                            for part in event.content.parts:
+                                if hasattr(part, "inline_data") and part.inline_data:
+                                    if part.inline_data.mime_type.startswith("audio/pcm"):
+                                        await _safe_send_bytes(part.inline_data.data)
 
-                    # ── Input transcription (user speech → text) ──────────────
-                    # ADK delivers these via event.input_transcription when
-                    # RunConfig.input_audio_transcription is configured.
-                    if event.input_transcription:
-                        text = event.input_transcription.text
-                        finished = event.input_transcription.finished
-                        if text and text.strip():
-                            await websocket.send_text(
+                        # ── Input transcription (user speech → text) ──────────────
+                        if event.input_transcription:
+                            text = event.input_transcription.text
+                            finished = event.input_transcription.finished
+                            if text and text.strip():
+                                await _safe_send_text(
+                                    json.dumps({
+                                        "type": "input_transcription",
+                                        "text": text,
+                                        "finished": finished,
+                                    })
+                                )
+                                if finished:
+                                    _transcript_turns.append({
+                                        "speaker": "user",
+                                        "text": text,
+                                        "ts": datetime.now(timezone.utc).isoformat(),
+                                    })
+
+                        # ── Output transcription (interviewer audio → text) ────────
+                        if event.output_transcription:
+                            text = event.output_transcription.text
+                            finished = event.output_transcription.finished
+                            if text and text.strip():
+                                await _safe_send_text(
+                                    json.dumps({
+                                        "type": "output_transcription",
+                                        "text": text,
+                                        "finished": finished,
+                                    })
+                                )
+                                if finished:
+                                    _transcript_turns.append({
+                                        "speaker": "interviewer",
+                                        "text": text,
+                                        "ts": datetime.now(timezone.utc).isoformat(),
+                                    })
+
+                        # ── Turn control signals ───────────────────────────────────
+                        if event.turn_complete or event.interrupted:
+                            await _safe_send_text(
                                 json.dumps({
-                                    "type": "input_transcription",
-                                    "text": text,
-                                    "finished": finished,
+                                    "type": "control",
+                                    "turn_complete": bool(event.turn_complete),
+                                    "interrupted": bool(event.interrupted),
                                 })
                             )
-                            # Only append to transcript when the turn is final
-                            if finished:
-                                _transcript_turns.append({
-                                    "speaker": "user",
-                                    "text": text,
-                                    "ts": datetime.now(timezone.utc).isoformat(),
-                                })
-
-                    # ── Output transcription (interviewer audio → text) ────────
-                    # ADK delivers these via event.output_transcription when
-                    # RunConfig.output_audio_transcription is configured.
-                    if event.output_transcription:
-                        text = event.output_transcription.text
-                        finished = event.output_transcription.finished
-                        if text and text.strip():
-                            await websocket.send_text(
-                                json.dumps({
-                                    "type": "output_transcription",
-                                    "text": text,
-                                    "finished": finished,
-                                })
-                            )
-                            if finished:
-                                _transcript_turns.append({
-                                    "speaker": "interviewer",
-                                    "text": text,
-                                    "ts": datetime.now(timezone.utc).isoformat(),
-                                })
-
-                    # ── Turn control signals ───────────────────────────────────
-                    if event.turn_complete or event.interrupted:
-                        await websocket.send_text(
-                            json.dumps({
-                                "type": "control",
-                                "turn_complete": bool(event.turn_complete),
-                                "interrupted": bool(event.interrupted),
-                            })
-                        )
+            except APIError as exc:
+                # Status 1000 = normal WebSocket close (OK). This is expected
+                # when the user ends the interview or the session times out.
+                if exc.status == 1000:
+                    logger.info(
+                        "Live connection closed normally (1000) — session_id=%s",
+                        session_id,
+                    )
+                else:
+                    logger.error(
+                        "Gemini Live API error in downstream — session_id=%s  status=%s  message=%s",
+                        session_id, exc.status, exc.message,
+                    )
+            except ConnectionClosed as exc:
+                # Underlying websockets lib close — check if clean (1000/1001)
+                if exc.rcvd and exc.rcvd.code in (1000, 1001):
+                    logger.info(
+                        "Gemini WS closed cleanly (%d) — session_id=%s",
+                        exc.rcvd.code, session_id,
+                    )
+                else:
+                    logger.warning(
+                        "Gemini WS closed unexpectedly — session_id=%s  exc=%s",
+                        session_id, exc,
+                    )
             except Exception as exc:
-                logger.warning("Downstream task ended: %s", exc)
+                logger.error(
+                    "Unexpected error in downstream — session_id=%s  %s: %s",
+                    session_id, type(exc).__name__, exc,
+                )
 
         # ── Phase 3: run concurrently ─────────────────────────────────────────
         # FastAPI/Starlette WebSocket can only have one concurrent reader.
@@ -646,6 +708,11 @@ class InterviewEngineAgent:
                 _upstream(),
                 _downstream(),
                 return_exceptions=True,
+            )
+        except Exception as exc:
+            logger.error(
+                "Unexpected error in live session gather — session_id=%s  %s: %s",
+                session_id, type(exc).__name__, exc,
             )
         finally:
             # ── Phase 4: terminate ────────────────────────────────────────────

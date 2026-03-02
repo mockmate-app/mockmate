@@ -321,7 +321,12 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     try:
         await engine.run_live_session(websocket, session_id)
     except WebSocketDisconnect:
-        pass  # run_live_session's finally block already ends the session
+        logger.debug("Browser disconnected from /ws/interview/%s", session_id)
+    except Exception as exc:
+        logger.error(
+            "Unhandled error in /ws/interview/%s — %s: %s",
+            session_id, type(exc).__name__, exc,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -368,7 +368,7 @@ function DashboardContent() {
 
             {/* Résumé card */}
             <div className="flex flex-col gap-3">
-            <SectionHeader title="Your résumé" href="/resume" />
+            <SectionHeader title="Your résumé" />
               <Card className="rounded-xl border border-border">
                 <CardContent className="p-4">
                 {loadingResume ? (
@@ -507,13 +507,15 @@ function StatCard({
   );
 }
 
-function SectionHeader({ title, href }: { title: string; href: string }) {
+function SectionHeader({ title, href }: { title: string; href?: string }) {
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm font-semibold text-dark">{title}</p>
-      <Link href={href} className="text-xs text-orange hover:underline inline-flex items-center gap-0.5">
-        View all <ChevronRight size={12} />
-      </Link>
+      {href && (
+        <Link href={href} className="text-xs text-orange hover:underline inline-flex items-center gap-0.5">
+          View all <ChevronRight size={12} />
+        </Link>
+      )}
     </div>
   );
 }
