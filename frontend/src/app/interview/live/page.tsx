@@ -34,8 +34,13 @@ interface AdkEvent {
   interrupted?: boolean;
 }
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+// Derive WebSocket base from the API URL so the protocol matches automatically:
+//   http://  → ws://   (local dev)
+//   https:// → wss://  (production — avoids Mixed Content block)
+// NEXT_PUBLIC_WS_URL can still override if needed.
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? API_BASE.replace(/^http/, "ws");
 const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
 
@@ -642,7 +647,16 @@ function LiveInterviewContent() {
     micCtxRef.current = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
 
     try {
-      const ws = new WebSocket(`${WS_BASE}/ws/interview/${sessionId}`);
+      // Runtime guard: if the page is served over HTTPS but the configured
+      // WS_BASE still uses ws://, upgrade to wss:// to avoid Mixed Content
+      // blocks (browsers throw SecurityError / silent onerror on mobile).
+      const safeWsBase =
+        typeof window !== "undefined" &&
+        window.location.protocol === "https:" &&
+        WS_BASE.startsWith("ws://")
+          ? WS_BASE.replace("ws://", "wss://")
+          : WS_BASE;
+      const ws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}`);
       wsRef.current = ws;
       ws.binaryType = "arraybuffer";
 
@@ -661,7 +675,12 @@ function LiveInterviewContent() {
       ws.onmessage = handleMessage;
 
       ws.onerror = () => {
-        setError("WebSocket connection error. Ensure backend is running.");
+        // SecurityError (ws:// from https://) and network errors both surface here.
+        const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+        const msg = isHttps
+          ? "Connection failed. Make sure NEXT_PUBLIC_API_URL is set to an https:// address in your deployment environment."
+          : "WebSocket connection error. Ensure the backend is running and reachable.";
+        setError(msg);
         setStatus("error");
       };
 
