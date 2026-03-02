@@ -17,9 +17,11 @@ interface UserMenuProps {
   name?: string | null;
   email?: string | null;
   image?: string | null;
+  variant?: "light" | "dark";
 }
 
-export default function UserMenu({ name, email, image }: UserMenuProps) {
+export default function UserMenu({ name, email, image, variant = "light" }: UserMenuProps) {
+  const isDark = variant === "dark";
   const router = useRouter();
 
   const initials = name
@@ -34,7 +36,9 @@ export default function UserMenu({ name, email, image }: UserMenuProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex items-center gap-2 rounded-full border border-border bg-light pl-1 pr-3 py-1 hover:border-orange/50 transition-colors outline-none"
+          className={`flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 hover:border-orange/50 transition-colors outline-none ${
+            isDark ? "border-white/10 bg-white/10" : "border-border bg-light"
+          }`}
           aria-label="User menu"
         >
           <Avatar className="w-7 h-7">
@@ -48,7 +52,7 @@ export default function UserMenu({ name, email, image }: UserMenuProps) {
             height="6"
             viewBox="0 0 10 6"
             fill="none"
-            className="text-muted"
+            className={isDark ? "text-white/60" : "text-muted"}
             aria-hidden="true"
           >
             <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

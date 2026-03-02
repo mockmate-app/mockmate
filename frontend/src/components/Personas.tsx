@@ -59,7 +59,7 @@ export default function Personas() {
             href="/login"
             className="group mt-8 inline-flex items-center gap-2 rounded-full bg-orange px-8 py-3.5 text-sm font-semibold text-light hover:opacity-90 transition-opacity"
           >
-            Start your free session
+            Start your mock interview
             <ArrowRight
               size={16}
               className="transition-transform group-hover:translate-x-1"

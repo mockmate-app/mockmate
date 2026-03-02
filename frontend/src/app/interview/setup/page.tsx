@@ -5,8 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Logo from "@/components/Logo";
-import UserMenu from "@/components/UserMenu";
+import AppHeader from "@/components/AppHeader";
 import { startSession } from "@/lib/api";
 import {
   ArrowLeft,
@@ -252,16 +251,12 @@ function SetupContent({
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      {/* Header */}
-      <header className="bg-light border-b border-border h-16 px-6 flex items-center justify-between shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <Logo />
-          <span className="text-dark font-semibold text-lg tracking-tight">
-            Mock<span className="text-orange">Mate</span>
-          </span>
-        </Link>
-        <UserMenu name={userName} email={userEmail} image={userImage} />
-      </header>
+      <AppHeader
+        homeHref="/dashboard"
+        name={userName}
+        email={userEmail}
+        image={userImage}
+      />
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12 flex flex-col gap-10">
         {/* Breadcrumb */}

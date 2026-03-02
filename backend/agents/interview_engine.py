@@ -472,7 +472,7 @@ class InterviewEngineAgent:
 
         run_config = RunConfig(
             streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],
+            response_modalities=[genai_types.Modality.AUDIO],
             # Voice selection — per-session persona profile
             speech_config=genai_types.SpeechConfig(
                 voice_config=genai_types.VoiceConfig(
@@ -523,46 +523,43 @@ class InterviewEngineAgent:
 
         # ── Phase 3: bidirectional streaming ─────────────────────────────────
         async def _upstream() -> None:
-            """Receive from browser → forward to Gemini."""
+            """Receive mixed browser frames (text control + binary PCM) → Gemini."""
             try:
-                async for message in websocket.iter_text():
-                    # JSON control messages from the browser
-                    try:
-                        payload = json.loads(message)
-                    except json.JSONDecodeError:
+                while True:
+                    message = await websocket.receive()
+                    msg_type = message.get("type")
+
+                    if msg_type == "websocket.disconnect":
+                        break
+
+                    text_data = message.get("text")
+                    if text_data is not None:
+                        try:
+                            payload = json.loads(text_data)
+                        except json.JSONDecodeError:
+                            continue
+
+                        if payload.get("type") == "end":
+                            break
+                        if payload.get("type") == "text":
+                            live_request_queue.send_content(
+                                genai_types.Content(
+                                    role="user",
+                                    parts=[genai_types.Part(text=payload.get("text", ""))],
+                                )
+                            )
                         continue
 
-                    if payload.get("type") == "audio":
-                        # Base64-free path: browser sends binary separately
-                        # (handled in the bytes branch below)
-                        continue
-                    elif payload.get("type") == "end":
-                        break
-                    # Optionally: handle text messages as live content
-                    elif payload.get("type") == "text":
-                        live_request_queue.send_content(
-                            genai_types.Content(
-                                role="user",
-                                parts=[genai_types.Part(text=payload.get("text", ""))],
+                    chunk = message.get("bytes")
+                    if chunk:
+                        live_request_queue.send_realtime(
+                            genai_types.Blob(
+                                mime_type="audio/pcm;rate=16000",
+                                data=chunk,
                             )
                         )
             except Exception as exc:
                 logger.warning("Upstream task ended: %s", exc)
-            finally:
-                live_request_queue.close()
-
-        async def _upstream_audio() -> None:
-            """Receive raw binary audio from browser → enqueue as PCM blob."""
-            try:
-                async for chunk in websocket.iter_bytes():
-                    live_request_queue.send_realtime(
-                        genai_types.Blob(
-                            mime_type="audio/pcm;rate=16000",
-                            data=chunk,
-                        )
-                    )
-            except Exception as exc:
-                logger.warning("Audio upstream task ended: %s", exc)
             finally:
                 live_request_queue.close()
 
@@ -642,13 +639,11 @@ class InterviewEngineAgent:
                 logger.warning("Downstream task ended: %s", exc)
 
         # ── Phase 3: run concurrently ─────────────────────────────────────────
-        # FastAPI/Starlette WebSocket can only have one concurrent reader,
-        # so we do NOT run _upstream and _upstream_audio together.
-        # The browser should send EITHER text-framed OR binary-framed audio.
-        # Default: binary PCM frames.
+        # FastAPI/Starlette WebSocket can only have one concurrent reader.
+        # _upstream handles both text control frames and binary PCM audio.
         try:
             await asyncio.gather(
-                _upstream_audio(),
+                _upstream(),
                 _downstream(),
                 return_exceptions=True,
             )

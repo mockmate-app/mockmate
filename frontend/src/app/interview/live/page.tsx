@@ -3,9 +3,18 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, MicOff, PhoneOff, Loader2, User, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, User, Video, VideoOff, ChevronDown } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { useMutation } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type InterviewStatus = "idle" | "connecting" | "active" | "ended" | "error";
 
@@ -255,6 +264,10 @@ function LiveInterviewContent() {
   const [youSpeaking, setYouSpeaking] = useState(false);
   const [yourTurn, setYourTurn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>("");
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const isActive = status === "active";
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -275,6 +288,7 @@ function LiveInterviewContent() {
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
+  const micWorkletLoadedRef = useRef(false);
 
   useEffect(() => {
     aiSpeakingRef.current = aiSpeaking;
@@ -308,6 +322,62 @@ function LiveInterviewContent() {
       void ctx.close().catch(() => undefined);
     }
   }, []);
+
+  const refreshMediaDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter((d) => d.kind === "audioinput");
+      const cams = devices.filter((d) => d.kind === "videoinput");
+      setAudioInputs(mics);
+      setVideoInputs(cams);
+    } catch {
+      // best effort only
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshMediaDevices();
+    if (!navigator.mediaDevices?.addEventListener) return;
+
+    const onDeviceChange = () => {
+      void refreshMediaDevices();
+    };
+    navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+    };
+  }, [refreshMediaDevices]);
+
+  const stopMicCapture = useCallback(() => {
+    workletNodeRef.current?.disconnect();
+    workletNodeRef.current = null;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  }, []);
+
+  const startCameraStream = useCallback(
+    async (deviceId?: string) => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false,
+      });
+
+      camStreamRef.current?.getTracks().forEach((track) => track.stop());
+      camStreamRef.current = stream;
+
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = stream;
+        void camVideoRef.current.play().catch(() => undefined);
+      }
+
+      const actualDeviceId = stream.getVideoTracks()?.[0]?.getSettings()?.deviceId;
+      if (actualDeviceId) setSelectedCameraId(actualDeviceId);
+      setCameraOn(true);
+      await refreshMediaDevices();
+    },
+    [refreshMediaDevices],
+  );
 
   const scheduleInterviewerEnd = useCallback((delayMs: number = 1200) => {
     if (interviewerEndedRef.current) {
@@ -365,14 +435,29 @@ function LiveInterviewContent() {
     sendChunkRef.current = sendAudioChunk;
   }, [sendAudioChunk]);
 
-  const startMic = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  const startMic = useCallback(async (deviceId?: string) => {
+    stopMicCapture();
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      video: false,
+    });
     mediaStreamRef.current = stream;
+
+    const actualDeviceId = stream.getAudioTracks()?.[0]?.getSettings()?.deviceId;
+    if (actualDeviceId) setSelectedMicId(actualDeviceId);
+
+    if (!micCtxRef.current || micCtxRef.current.state === "closed") {
+      micCtxRef.current = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+    }
 
     const ctx = micCtxRef.current!;
     if (ctx.state === "suspended") await ctx.resume();
 
-    await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
+    if (!micWorkletLoadedRef.current) {
+      await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
+      micWorkletLoadedRef.current = true;
+    }
 
     const source = ctx.createMediaStreamSource(stream);
     const worklet = new AudioWorkletNode(ctx, "pcm-capture-processor");
@@ -416,7 +501,8 @@ function LiveInterviewContent() {
 
     source.connect(worklet);
     worklet.connect(ctx.destination);
-  }, [muted]);
+    await refreshMediaDevices();
+  }, [muted, refreshMediaDevices, stopMicCapture]);
 
   const playPcmChunk = useCallback((buffer: ArrayBuffer) => {
     if (!outCtxRef.current) {
@@ -562,7 +648,7 @@ function LiveInterviewContent() {
         setStatus("active");
         appendStage("Interview started");
         try {
-          await startMic();
+          await startMic(selectedMicId || undefined);
         } catch {
           setError("Microphone access denied. Please allow microphone and retry.");
           setStatus("error");
@@ -595,7 +681,7 @@ function LiveInterviewContent() {
       setError(String(err));
       setStatus("error");
     }
-  }, [sessionId, handleMessage, startMic, appendStage]);
+  }, [sessionId, handleMessage, startMic, appendStage, selectedMicId]);
 
   const endInterview = useCallback(async (endedBy: "candidate" | "interviewer" | "system" = "candidate") => {
     if (endingRef.current) {
@@ -618,10 +704,15 @@ function LiveInterviewContent() {
     const finalTranscript = [...transcriptRef.current, stageEntry];
     setTranscript(finalTranscript);
 
-    // Prevent double-ending
+    // Graceful shutdown: signal end first, then fallback close if backend
+    // hasn't closed the socket shortly after.
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "end" }));
-      wsRef.current.close(1000);
+      window.setTimeout(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.close(1000);
+        }
+      }, 350);
     }
 
     workletNodeRef.current?.disconnect();
@@ -675,17 +766,37 @@ function LiveInterviewContent() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      camStreamRef.current = stream;
-      if (camVideoRef.current) {
-        camVideoRef.current.srcObject = stream;
-        void camVideoRef.current.play().catch(() => undefined);
-      }
-      setCameraOn(true);
+      await startCameraStream(selectedCameraId || undefined);
     } catch {
       setError("Camera access denied. Please allow webcam access and retry.");
     }
-  }, [cameraOn]);
+  }, [cameraOn, selectedCameraId, startCameraStream]);
+
+  const handleMicDeviceChange = useCallback(
+    async (deviceId: string) => {
+      setSelectedMicId(deviceId);
+      if (!isActive) return;
+      try {
+        await startMic(deviceId || undefined);
+      } catch {
+        setError("Could not switch microphone. Please check permissions and retry.");
+      }
+    },
+    [isActive, startMic],
+  );
+
+  const handleCameraDeviceChange = useCallback(
+    async (deviceId: string) => {
+      setSelectedCameraId(deviceId);
+      if (!isActive || !cameraOn) return;
+      try {
+        await startCameraStream(deviceId || undefined);
+      } catch {
+        setError("Could not switch camera. Please check permissions and retry.");
+      }
+    },
+    [cameraOn, isActive, startCameraStream],
+  );
 
   const statusLabel = useMemo(() => {
     if (status === "active") return "Live";
@@ -694,6 +805,20 @@ function LiveInterviewContent() {
     if (status === "error") return "Error";
     return "Ready";
   }, [status]);
+
+  const selectedMicLabel = useMemo(() => {
+    if (!audioInputs.length) return "No microphones found";
+    if (!selectedMicId) return "System default microphone";
+    const selected = audioInputs.find((device) => device.deviceId === selectedMicId);
+    return selected?.label || "Selected microphone";
+  }, [audioInputs, selectedMicId]);
+
+  const selectedCameraLabel = useMemo(() => {
+    if (!videoInputs.length) return "No cameras found";
+    if (!selectedCameraId) return "System default camera";
+    const selected = videoInputs.find((device) => device.deviceId === selectedCameraId);
+    return selected?.label || "Selected camera";
+  }, [videoInputs, selectedCameraId]);
 
   useEffect(() => {
     return () => {
@@ -704,17 +829,16 @@ function LiveInterviewContent() {
         window.clearTimeout(interviewerEndTimeoutRef.current);
       }
       wsRef.current?.close();
-      workletNodeRef.current?.disconnect();
-      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      stopMicCapture();
       camStreamRef.current?.getTracks().forEach((track) => track.stop());
       closeAudioContextSafely(micCtxRef.current);
       closeAudioContextSafely(outCtxRef.current);
     };
-  }, [closeAudioContextSafely]);
+  }, [closeAudioContextSafely, stopMicCapture]);
 
   return (
     <div className="h-screen bg-dark text-white flex flex-col overflow-hidden">
-      <header className="border-b border-white/10 px-5 sm:px-6 py-3 flex items-center justify-between shrink-0">
+      <header className="sticky top-0 z-30 bg-dark border-b border-white/10 px-5 sm:px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <h1 className="font-semibold text-base sm:text-lg">Live Interview</h1>
           <p className="text-xs sm:text-sm text-white/45">
@@ -851,7 +975,86 @@ function LiveInterviewContent() {
             <div ref={transcriptEndRef} />
           </div>
 
-          <div className="shrink-0 border-t border-white/10 px-4 sm:px-6 py-4 flex items-center justify-center gap-4">
+          <div className="shrink-0 border-t border-white/10 px-4 sm:px-6 py-4 flex flex-col items-center gap-3">
+            {(status === "idle" || status === "error" || status === "connecting" || isActive) && (
+              <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      disabled={status === "connecting" || audioInputs.length === 0}
+                      className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
+                    >
+                      <Mic size={14} className="text-white/60" />
+                      <span className="shrink-0">Mic</span>
+                      <span className="ml-auto min-w-0 truncate text-left">{selectedMicLabel}</span>
+                      <ChevronDown size={14} className="text-white/60 shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white">
+                    <DropdownMenuLabel className="text-white/60">Microphones</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuRadioGroup
+                      value={selectedMicId}
+                      onValueChange={(value) => {
+                        void handleMicDeviceChange(value);
+                      }}
+                    >
+                      <DropdownMenuRadioItem value="" className="text-white/85 focus:bg-white/10 focus:text-white">
+                        System default microphone
+                      </DropdownMenuRadioItem>
+                      {audioInputs.map((device, index) => (
+                        <DropdownMenuRadioItem
+                          key={device.deviceId}
+                          value={device.deviceId}
+                          className="text-white/85 focus:bg-white/10 focus:text-white"
+                        >
+                          {device.label || `Microphone ${index + 1}`}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      disabled={status === "connecting" || videoInputs.length === 0}
+                      className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
+                    >
+                      <Video size={14} className="text-white/60" />
+                      <span className="shrink-0">Camera</span>
+                      <span className="ml-auto min-w-0 truncate text-left">{selectedCameraLabel}</span>
+                      <ChevronDown size={14} className="text-white/60 shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white">
+                    <DropdownMenuLabel className="text-white/60">Cameras</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuRadioGroup
+                      value={selectedCameraId}
+                      onValueChange={(value) => {
+                        void handleCameraDeviceChange(value);
+                      }}
+                    >
+                      <DropdownMenuRadioItem value="" className="text-white/85 focus:bg-white/10 focus:text-white">
+                        System default camera
+                      </DropdownMenuRadioItem>
+                      {videoInputs.map((device, index) => (
+                        <DropdownMenuRadioItem
+                          key={device.deviceId}
+                          value={device.deviceId}
+                          className="text-white/85 focus:bg-white/10 focus:text-white"
+                        >
+                          {device.label || `Camera ${index + 1}`}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-4">
             {(status === "idle" || status === "error") && (
               <button
                 onClick={startInterview}
@@ -932,6 +1135,7 @@ function LiveInterviewContent() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </main>
       </div>

@@ -51,15 +51,33 @@ in what actually happened in the transcript below. Do NOT invent positives
 or soften negatives — if the candidate was rude, disrespectful, incoherent,
 or unprofessional, say so directly and reflect it in every relevant score.
 
+Target role context (apply before scoring anything):
+- The candidate is interviewing for: {job_role}
+- Infer the typical years of experience (YoE) a competitive hire for this role
+  would have (e.g. Junior SWE ≈ 0-2 yrs, Senior SWE ≈ 5+ yrs, Staff ≈ 8+ yrs,
+  VP/Director ≈ 12+ yrs). State that assumed YoE range in your feedback.
+- Calibrate every dimension score against the bar expected for THAT role at THAT
+  seniority level — not against a generic standard.
+  * A junior candidate who gives textbook answers for their level should score
+    well, even if a senior engineer would have gone deeper.
+  * A candidate interviewing for a senior/principal/director role who gives
+    shallow or junior-level answers should score poorly, even if those answers
+    would be acceptable for an early-career hire.
+- In decision_letter, explicitly state the assumed YoE bar for the role and
+  explain whether the candidate met, exceeded, or fell short of it.
+
 Scoring rules (enforce strictly):
 - communication  : clarity, articulation, active listening, professional tone.
   Deduct heavily for interrupting, rudeness, hostility, dismissiveness.
 - confidence     : calm, grounded delivery — NOT arrogance or aggression.
 - structure      : organised, logical answers (STAR / clear reasoning).
-- technical_depth: depth and accuracy of domain knowledge demonstrated.
-- domain_vocabulary: correct use of relevant terminology.
+- technical_depth: depth and accuracy of domain knowledge demonstrated,
+  evaluated against the depth expected for the target role's seniority.
+- domain_vocabulary: correct and sophisticated use of role-appropriate
+  terminology; senior/specialist roles demand higher precision.
 - posture_presence: based solely on posture data provided.
-- overall_score  : weighted average reflecting the whole picture faithfully.
+- overall_score  : weighted average reflecting the whole picture faithfully,
+  anchored to the target role's expectations.
 
 Tone & professionalism:
 - If the candidate was rude, sarcastic, hostile, dismissive, or used
@@ -181,11 +199,14 @@ class FeedbackCompilerAgent:
         meta = {
             "user_id": session.get("user_id"),
             "persona": session.get("persona"),
+            "job_role": session.get("job_role", "Software Engineer"),
             "questions_count": len(session.get("questions", [])),
             "status": session.get("status"),
             "created_at": session.get("created_at"),
             "ended_at": session.get("ended_at"),
         }
+
+        job_role = meta["job_role"]
 
         # Build transcript text — turns are {speaker: user|interviewer, text, ts}
         if transcript_turns:
@@ -201,6 +222,7 @@ class FeedbackCompilerAgent:
             transcript_text = "(no transcript recorded — do not fabricate content; set all scores to 0)"
 
         prompt = FEEDBACK_PROMPT.format(
+            job_role=job_role,
             session_meta=json.dumps(meta, indent=2),
             transcript=transcript_text,
             posture_summary=json.dumps(posture_avg, indent=2),

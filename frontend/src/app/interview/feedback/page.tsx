@@ -3,6 +3,8 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import AppHeader from "@/components/AppHeader";
+import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -96,6 +98,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function FeedbackContent() {
   const params = useSearchParams();
   const router = useRouter();
+  const { data: session } = useSession();
   const sessionId = params.get("session_id") ?? "";
 
   const { data: report, isLoading: loading, error: queryError } = useQuery({
@@ -111,8 +114,16 @@ function FeedbackContent() {
     : queryError instanceof Error ? queryError.message : queryError ? "Failed to generate feedback." : null;
 
   return (
-    <div className="min-h-screen bg-(--color-dark) text-white px-4 sm:px-6 py-10">
-      <div className="mx-auto max-w-3xl flex flex-col gap-5">
+    <div className="min-h-screen bg-dark text-white">
+      <AppHeader
+        homeHref="/dashboard"
+        variant="dark"
+        name={session?.user?.name}
+        email={session?.user?.email}
+        image={session?.user?.image}
+      />
+
+      <div className="mx-auto max-w-3xl flex flex-col gap-5 px-4 sm:px-6 py-10">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
           <p className="text-white/40 text-xs mt-1">Session: {sessionId || "N/A"}</p>
@@ -239,7 +250,7 @@ export default function FeedbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-(--color-dark) text-white flex items-center justify-center">
+        <div className="min-h-screen bg-dark text-white flex items-center justify-center">
           Loading feedback…
         </div>
       }

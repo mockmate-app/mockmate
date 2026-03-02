@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
-import Logo from "@/components/Logo";
-import UserMenu from "@/components/UserMenu";
+import AppHeader from "@/components/AppHeader";
 import {
   Mic, ChevronRight, Award, ArrowLeft,
   Search, BarChart2,
@@ -140,16 +139,12 @@ function SessionsContent() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      {/* Header */}
-      <header className="bg-light border-b border-border h-16 px-6 flex items-center justify-between shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <Logo />
-          <span className="text-dark font-semibold text-lg tracking-tight">
-            Mock<span className="text-orange">Mate</span>
-          </span>
-        </Link>
-        <UserMenu name={session.user.name} email={session.user.email} image={session.user.image} />
-      </header>
+      <AppHeader
+        homeHref="/dashboard"
+        name={session.user.name}
+        email={session.user.email}
+        image={session.user.image}
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-10 flex flex-col gap-8">
         {/* Breadcrumb */}

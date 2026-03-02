@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import Logo from "@/components/Logo";
 import { useState, useEffect } from "react";
 import { signIn, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -31,15 +31,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      {/* Top bar */}
-      <header className="bg-light border-b border-border px-6 h-16 flex items-center">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Logo />
-          <span className="text-dark font-semibold text-lg tracking-tight">
-            Mock<span className="text-orange">Mate</span>
-          </span>
-        </Link>
-      </header>
+      <AppHeader homeHref="/" showUserMenu={false} />
 
       {/* Centered card */}
       <main className="flex-1 flex items-center justify-center px-4">
