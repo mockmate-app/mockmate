@@ -156,7 +156,7 @@ function SessionsContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">All sessions</h1>
-            <p className="mt-1 text-sm text-muted">{sessions.length} total interviews recorded.</p>
+            <p className="mt-1 text-sm text-muted">{sessions.length} total interviews recorded</p>
           </div>
           <div className="flex gap-3">
             {sessions.length > 0 && (
@@ -172,11 +172,11 @@ function SessionsContent() {
                 </CardContent>
               </Card>
             )}
-            <Button asChild className="rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2">
+            {/* <Button asChild className="rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2">
               <Link href="/interview/setup?from=sessions">
                 <Mic size={15} /> New interview
               </Link>
-            </Button>
+            </Button> */}
           </div>
         </div>
 

@@ -22,6 +22,7 @@ interface TranscriptEntry {
   speaker: "you" | "interviewer" | "system";
   kind?: "message" | "stage";
   text: string;
+  finished?: boolean;
   ts: number;
 }
 
@@ -556,24 +557,18 @@ function LiveInterviewContent() {
         if ((msg.type === "input_transcription" || msg.type === "output_transcription") && msg.text?.trim()) {
           const text = msg.text.trim();
           const speaker = msg.type === "input_transcription" ? "you" : "interviewer";
+          const finished = msg.finished ?? true;
 
+          // ADK sends CUMULATIVE text per transcription event (not a delta).
+          // Replace the in-progress entry in-place; only create a new entry
+          // when the speaker changes or the previous turn is marked finished.
           setTranscript((prev) => {
             const last = prev[prev.length - 1];
-
-            if (last?.speaker === speaker) {
-              const normalizedLast = last.text.trim().toLowerCase();
-              const normalizedText = text.toLowerCase();
-
-              if (normalizedLast === normalizedText || normalizedLast.endsWith(normalizedText)) {
-                return prev;
-              }
+            const isOngoing = last?.speaker === speaker && !last.finished;
+            if (isOngoing) {
+              return [...prev.slice(0, -1), { ...last, text, finished, ts: Date.now() }];
             }
-
-            if (last?.speaker === speaker && Date.now() - last.ts < 2000) {
-              return [...prev.slice(0, -1), { ...last, text: `${last.text} ${text}`, ts: Date.now() }];
-            }
-
-            return [...prev, { speaker, text, ts: Date.now() }];
+            return [...prev, { speaker, text, finished, ts: Date.now() }];
           });
 
           if (speaker === "interviewer") setYourTurn(false);

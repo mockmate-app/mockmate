@@ -61,6 +61,95 @@ _PUBSUB_TOPIC = os.getenv("PUBSUB_TOPIC_SESSION_END", "session-end")
 _DEFAULT_VOICE = "Aoede"
 
 # ---------------------------------------------------------------------------
+# Per-session flavor randomization
+# Each pool has 3 options → 3^5 = 243 unique style combinations per session.
+# Flavor is injected into SYSTEM_PROMPT_TEMPLATE at session start.
+# ---------------------------------------------------------------------------
+
+_FLAVOR_SKEPTICISM = [
+    "Maintain a mildly skeptical default — probe impressive-sounding claims; reward specificity.",
+    "Be genuinely curious and open — assume competence unless evidence says otherwise.",
+    "Default to neutral; only push back when an answer is provably vague or contradictory.",
+]
+_FLAVOR_PACING = [
+    "Keep a brisk, efficient pace — move on quickly once you have what you need.",
+    "Allow comfortable pauses and silence; let the candidate breathe and think.",
+    "Vary the energy — start relaxed, build intensity as the interview progresses.",
+]
+_FLAVOR_DEBATE = [
+    "When the candidate makes a strong claim, politely challenge it once before accepting it.",
+    "Prefer to explore ideas collaboratively — challenge sparingly, only on clear overstatements.",
+    "Challenge once per session only, and only on the most pivotal answer.",
+]
+_FLAVOR_CURVEBALL = [
+    "Inject one unexpected hypothetical ('What if the opposite were true?') mid-interview.",
+    "Add one stress test: give a tight time constraint ('Give me the 30-second version').",
+    "Ask one deeply personal career question to break the professional veneer.",
+]
+_FLAVOR_WARMTH = [
+    "Run professionally warm — an occasional genuine laugh or light joke is fine.",
+    "Stay polished and measured — warmth through listening, not banter.",
+    "Start cool and formal; warm up noticeably only after a strong first answer.",
+]
+
+# Six opening packs — randomized per session to vary greeting energy + small talk hook.
+_FLAVOR_OPENING = [
+    {
+        "greeting_energy": "upbeat and warm",
+        "small_talk_hook": "ask how their week's been going or how they've been lately",
+        "transition_phrase": "Alright, let's get into it!",
+    },
+    {
+        "greeting_energy": "cool and professional",
+        "small_talk_hook": "ask casually if they've been doing many of these interviews lately",
+        "transition_phrase": "Right — let's get started.",
+    },
+    {
+        "greeting_energy": "casually curious",
+        "small_talk_hook": "ask where they're joining from and what they've been keeping busy with lately",
+        "transition_phrase": "Cool — let's jump in then.",
+    },
+    {
+        "greeting_energy": "light and energetic",
+        "small_talk_hook": "make a brief friendly comment about the day before asking how they're doing",
+        "transition_phrase": "Okay, shall we get into it?",
+    },
+    {
+        "greeting_energy": "understated and dry",
+        "small_talk_hook": "make one short deadpan observation then ask a low-key question",
+        "transition_phrase": "Alright, let's get going.",
+    },
+    {
+        "greeting_energy": "direct but personable",
+        "small_talk_hook": "briefly acknowledge you've had a glance at their background then ask what drew them to the role",
+        "transition_phrase": "Great — let's dive in.",
+    },
+]
+
+
+def _build_session_flavor() -> str:
+    """Pick one option from each flavor pool and return as prompt instructions."""
+    return "\n".join([
+        f"Skepticism stance: {random.choice(_FLAVOR_SKEPTICISM)}",
+        f"Pacing style: {random.choice(_FLAVOR_PACING)}",
+        f"Challenge/debate approach: {random.choice(_FLAVOR_DEBATE)}",
+        f"Curveball strategy: {random.choice(_FLAVOR_CURVEBALL)}",
+        f"Warmth register: {random.choice(_FLAVOR_WARMTH)}",
+    ])
+
+
+def _build_opening_flavor(pack: dict) -> str:
+    """Render one opening pack as a prompt instruction block."""
+    return (
+        f"Opening energy for this session: {pack['greeting_energy']}. "
+        f"Small-talk hook: {pack['small_talk_hook']}. "
+        f"Transition phrase inspiration (do NOT copy verbatim — adapt naturally): "
+        f"\"{pack['transition_phrase']}\". "
+        f"Use these only as a tonal guide — never read them word-for-word."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Persona registry — loaded from personas.json at import time.
 # To add or edit a persona, update personas.json — no Python changes needed.
 # ---------------------------------------------------------------------------
@@ -102,6 +191,9 @@ The candidate is interviewing for: {job_role}
 
 {conversation_guidance}
 
+━━━ SESSION STYLE (per-session — overrides defaults where they conflict) ━━━
+{session_flavor}
+
 INTERNAL QUESTION BANK — NEVER read aloud or acknowledge this list exists.
 Use it only as a private competency coverage checklist:
 {questions_json}
@@ -110,15 +202,14 @@ Use it only as a private competency coverage checklist:
 
 1. Greet the candidate warmly. Introduce yourself naturally:
    "Hey, I'm {interviewer_name}." or "Hi there — I'm {interviewer_name}, nice to meet you."
-2. Make exactly 2-3 exchanges of genuine small talk BEFORE anything interview-related:
-     • Ask something low-key: "How's your day going?" / "How's your week been so far?" /
-         "Have you been doing many of these lately?" / "Where are you joining from today?"
-   • Actually listen and react to what they say — don't rush past it.
+2. Make exactly 2-3 exchanges of genuine small talk BEFORE anything interview-related.
+   Use this session-specific opening as your tonal guide (NOT a script — adapt it naturally):
+     {session_opening}
+   • Actually listen to and react to what they say — don't rush past it.
    • Match the small talk tone to your PERSONALITY above.
-    • If your personality says minimal/formal small talk (e.g., investment_banker), do only 1 short exchange.
-3. Transition naturally (not robotically):
-   "Alright, shall we get into it?" / "Cool — let's jump in then." / "Right, let's get started."
-   Do NOT say "Let's begin the interview" or anything that sounds scripted.
+   • If your personality says minimal/formal small talk (e.g., investment_banker), do only 1 short exchange.
+3. Transition naturally (not robotically) — draw on the transition phrase inspiration from the guide above.
+   Do NOT say "Let's begin the interview" or anything scripted.
 
 ━━━ PHASE 2: INTRODUCTION (mandatory — always do this after small talk) ━━━
 
@@ -465,6 +556,8 @@ class InterviewEngineAgent:
             personality_guidance=personality_guidance,
             conversation_guidance=conversation_guidance,
             questions_json=json.dumps(session_data.get("questions", []), indent=2),
+            session_flavor=_build_session_flavor(),
+            session_opening=_build_opening_flavor(random.choice(_FLAVOR_OPENING)),
         )
 
         # ── Phase 1: init ADK runner (per-session; system prompt is dynamic) ──

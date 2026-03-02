@@ -147,7 +147,7 @@ function DashboardContent() {
   const { data: sessionsData, isLoading: loadingSessions } = useQuery({
     queryKey: ["sessions", uid],
     queryFn: () =>
-      fetch(`${API_BASE}/sessions/user/${uid}?limit=8`)
+      fetch(`${API_BASE}/sessions/user/${uid}?limit=5`)
         .then(r => r.ok ? r.json() : null),
     enabled: !!uid,
   });
