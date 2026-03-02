@@ -402,6 +402,18 @@ class InterviewEngineAgent:
         results.sort(key=lambda s: s.get("created_at") or "", reverse=True)
         return results[:limit]
 
+    async def get_transcript(self, session_id: str) -> dict[str, Any] | None:
+        """Return the transcript document for *session_id*, or None."""
+        doc = await (
+            self._db
+            .collection(_TRANSCRIPT_COLLECTION)
+            .document(session_id)
+            .get()
+        )
+        if not doc.exists:
+            return None
+        return doc.to_dict()
+
     # ------------------------------------------------------------------
     # Live streaming  (ADK bidirectional streaming)
     # ------------------------------------------------------------------

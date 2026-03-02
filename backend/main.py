@@ -282,6 +282,15 @@ async def list_user_sessions(user_id: str, limit: int = 10):
     return {"user_id": user_id, "sessions": sessions, "count": len(sessions)}
 
 
+@app.get("/transcript/{session_id}", tags=["session"])
+async def get_transcript(session_id: str):
+    """Return the full transcript (list of turns) for a session."""
+    data = await app.state.interview_engine.get_transcript(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Transcript not found.")
+    return data
+
+
 # ---------------------------------------------------------------------------
 # Feedback
 # ---------------------------------------------------------------------------
