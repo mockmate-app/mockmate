@@ -215,13 +215,16 @@ function FeedbackContent() {
     staleTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 10000),
   });
 
   const { data: transcript, isLoading: transcriptLoading } = useQuery({
     queryKey: ["transcript", sessionId],
     queryFn: () => fetchTranscript(sessionId),
     enabled: !!sessionId,
-    retry: false,
+    retry: 2,
+    retryDelay: 2000,
   });
 
   const { data: sessionMeta } = useQuery({
@@ -254,12 +257,12 @@ function FeedbackContent() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
-              <p className="text-white/40 text-xs mt-1">
-                {sessionMeta.job_role}
-                {" · Persona: "}
-                {PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
-                {" · Interviewer: "}
-                {sessionMeta.interviewer_name}
+              <p className="text-white/40 text-xs md:text-sm mt-1">
+                <span className="text-primary">Job role </span>{sessionMeta.job_role}
+                {" · "}
+                <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
+                {" · "}
+                <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
               </p>
             ) : (
               <p className="text-white/40 text-xs mt-1">Loading session info…</p>
@@ -388,7 +391,7 @@ function FeedbackContent() {
               Transcript
             </h2>
             {turns.length > 0 && (
-              <span className="text-[10px] text-white/30 ml-auto">{turns.length} turns</span>
+              <span className="text-sm text-white/30 ml-auto">{turns.length} turns</span>
             )}
           </div>
           <Card className="flex-1 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
@@ -441,7 +444,7 @@ function FeedbackContent() {
               </SheetTitle>
             </SheetHeader>
             <ScrollArea className="flex-1 min-h-0">
-              <div className="px-5 py-4">
+              <div className="px-4 pb-6">
                 {transcriptLoading ? (
                   <div className="flex flex-col gap-3">
                     <Skeleton className="h-10 w-full rounded-lg bg-white/10" />

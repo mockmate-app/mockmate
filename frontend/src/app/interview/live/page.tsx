@@ -270,6 +270,7 @@ function LiveInterviewContent() {
   const [youSpeaking, setYouSpeaking] = useState(false);
   const [yourTurn, setYourTurn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [feedbackReady, setFeedbackReady] = useState(false);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState<string>("");
@@ -584,11 +585,8 @@ function LiveInterviewContent() {
         }
 
         if (msg.type === "control") {
-          if (msg.interrupted) {
-            setAiSpeaking(false);
-            setYourTurn(true);
-          }
           if (msg.turn_complete) {
+            setAiSpeaking(false);
             setYourTurn(true);
             // If an end phrase was detected, wait for audio to fully drain
             // before ending — prevents cutting off the interviewer mid-sentence.
@@ -793,7 +791,10 @@ function LiveInterviewContent() {
     setYourTurn(false);
     speechStreakRef.current = 0;
     await persistSessionEnd(endedBy, finalTranscript);
-    // No automatic redirect — the user clicks "View Feedback" when ready.
+    // Give the backend time to save transcript in the WebSocket finally block
+    // (the WS close triggers transcript persistence on the server side).
+    await new Promise((r) => setTimeout(r, 2500));
+    setFeedbackReady(true);
   }, [closeAudioContextSafely, persistSessionEnd]);
 
   const endInterviewRef = useRef(endInterview);
@@ -942,27 +943,25 @@ function LiveInterviewContent() {
               ended={status === "ended"}
               active={isActive}
             />
-          </div>
 
-          {isActive && cameraOn && (
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-2">
-              <video
-                ref={(node) => {
-                  camVideoRef.current = node;
-                  // Only assign srcObject if it changed — avoids re-triggering
-                  // play() on every React re-render which causes flickering.
-                  if (node && camStreamRef.current && node.srcObject !== camStreamRef.current) {
-                    node.srcObject = camStreamRef.current;
-                    void node.play().catch(() => undefined);
-                  }
-                }}
-                autoPlay
-                muted
-                playsInline
-                className="w-full rounded-lg border border-white/10"
-              />
-            </div>
-          )}
+            {isActive && cameraOn && (
+              <div className="min-w-45 max-w-45 lg:min-w-0 lg:max-w-none rounded-xl border border-white/10 bg-white/5 p-2 shrink-0">
+                <video
+                  ref={(node) => {
+                    camVideoRef.current = node;
+                    if (node && camStreamRef.current && node.srcObject !== camStreamRef.current) {
+                      node.srcObject = camStreamRef.current;
+                      void node.play().catch(() => undefined);
+                    }
+                  }}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full aspect-4/3 object-cover rounded-lg border border-white/10"
+                />
+              </div>
+            )}
+          </div>
         </aside>
 
         <main className="flex-1 min-h-0 flex flex-col">
@@ -1189,7 +1188,16 @@ function LiveInterviewContent() {
                 >
                   Dashboard
                 </button>
-                {sessionId && (
+                {sessionId && !feedbackReady && (
+                  <button
+                    disabled
+                    className="flex items-center gap-2 bg-white/10 text-white/50 px-6 py-3 rounded-full font-medium cursor-not-allowed"
+                  >
+                    <Loader2 size={16} className="animate-spin" />
+                    Preparing…
+                  </button>
+                )}
+                {sessionId && feedbackReady && (
                   <button
                     onClick={() =>
                       router.push(

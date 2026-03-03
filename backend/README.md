@@ -312,7 +312,7 @@ gcloud run deploy mockmate-backend \
   --image gcr.io/YOUR_PROJECT_ID/mockmate-backend \
   --platform managed \
   --region us-central1 \
-  --memory 1Gi \
+  --memory 2Gi \
   --cpu 1 \
   --env-vars-file cloudrun-env.yaml \
   --allow-unauthenticated

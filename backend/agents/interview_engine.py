@@ -661,11 +661,13 @@ class InterviewEngineAgent:
             # (gemini-live-2.5-flash-native-audio supports both on Vertex AI)
             proactivity=genai_types.ProactivityConfig(proactive_audio=True),
             enable_affective_dialog=True,
-            # Server-side VAD: interrupt on speech start, generous silence
-            # window so the model waits for the candidate to finish their full
-            # sentence before responding (avoids mid-sentence interruption).
+            # Server-side VAD: do NOT interrupt AI output when user speech is
+            # detected.  On mobile speakers the AI's own audio playback is picked
+            # up by the mic, triggering false "user interruption" events that
+            # break the conversation flow.  With NO_INTERRUPTION the model simply
+            # queues the user's input and responds after it finishes speaking.
             realtime_input_config=genai_types.RealtimeInputConfig(
-                activity_handling=genai_types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+                activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
                     end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
