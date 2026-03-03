@@ -775,15 +775,15 @@ function LiveInterviewContent() {
     setFeedbackReady(false);
 
     try {
-      // Pre-check: reject sessions that are not in "ready" state.
+      // Pre-check: reject sessions that ended and already have feedback.
       const checkRes = await fetch(
         `${API_BASE}/session/${encodeURIComponent(sessionId)}`,
       );
       if (checkRes.ok) {
         const sessionData = await checkRes.json();
-        if (sessionData.status && sessionData.status !== "ready") {
+        if (sessionData.status === "ended" && sessionData.feedback_ready) {
           setError(
-            "This session has already been used. Please create a new interview from the setup page.",
+            "This session has already been completed. Please create a new interview from the setup page.",
           );
           setStatus("error");
           return;

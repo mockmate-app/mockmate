@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import {
   Mic, FileText, BarChart2, ChevronRight,
-  Calendar, Award, Clock, User, Briefcase, Loader2,
+  Calendar, Award, Clock, User, Briefcase, RotateCcw,
 } from "lucide-react";import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -349,8 +349,15 @@ function DashboardContent() {
                             >
                               Feedback <ChevronRight size={12} />
                             </Link>
+                          ) : s.status === "active" ? (
+                            <span className="text-xs text-muted italic">In progress</span>
                           ) : (
-                            <span className="text-xs text-muted/40">—</span>
+                            <Link
+                              href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}`}
+                              className="text-xs text-orange hover:underline whitespace-nowrap inline-flex items-center gap-1"
+                            >
+                              <RotateCcw size={12} /> Retry
+                            </Link>
                           )}
                         </TableCell>
                       </TableRow>

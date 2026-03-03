@@ -670,11 +670,15 @@ class InterviewEngineAgent:
             return
 
         session_data = session_doc.to_dict()
-        session_status = session_data.get("status", "ready")
-        if session_status != "ready":
+        session_status = session_data.get("status", "created")
+        # Only block sessions that finished AND already have feedback generated.
+        # Sessions in "created" or "ready" are brand-new.  Sessions that are
+        # "active" or "ended" without feedback may have been abandoned/crashed,
+        # so we allow retrying those as well.
+        if session_status == "ended" and session_data.get("feedback_ready", False):
             await websocket.close(
                 code=4409,
-                reason=f"Session already {session_status}. Start a new interview instead.",
+                reason="Session already completed with feedback. Start a new interview instead.",
             )
             return
 
