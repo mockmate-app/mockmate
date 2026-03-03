@@ -1,11 +1,37 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, MicOff, PhoneOff, Loader2, User, Video, VideoOff, ChevronDown } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  PhoneOff,
+  Loader2,
+  User,
+  Video,
+  VideoOff,
+  ChevronDown,
+} from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { useMutation } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 type InterviewStatus = "idle" | "connecting" | "active" | "ended" | "error";
 
@@ -40,7 +67,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 //   http://  → ws://   (local dev)
 //   https:// → wss://  (production — avoids Mixed Content block)
 // NEXT_PUBLIC_WS_URL can still override if needed.
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? API_BASE.replace(/^http/, "ws");
+const WS_BASE =
+  process.env.NEXT_PUBLIC_WS_URL ?? API_BASE.replace(/^http/, "ws");
 const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
 
@@ -100,7 +128,7 @@ function ProfileAvatar({
         alt={fallback}
         width={88}
         height={88}
-        className="w-22 h-22 rounded-full border border-white/15 object-cover"
+        className="w-28 h-28 rounded-full border border-white/15 object-cover"
       />
     );
   }
@@ -109,12 +137,14 @@ function ProfileAvatar({
 
   return (
     <div
-      className={`w-22 h-22 rounded-full border border-white/15 flex items-center justify-center ${
+      className={`w-28 h-28 rounded-full border border-white/15 flex items-center justify-center ${
         ai ? "bg-orange/20" : "bg-white/10"
       }`}
     >
       {ai ? (
-        <span className="text-orange text-2xl font-bold select-none">{initial}</span>
+        <span className="text-orange text-4xl font-bold select-none">
+          {initial}
+        </span>
       ) : (
         <User size={34} className="text-white/70" />
       )}
@@ -131,6 +161,8 @@ function ParticipantCard({
   ai,
   ended,
   active,
+  videoRef,
+  showVideo,
 }: {
   title: string;
   subtitle: string;
@@ -140,23 +172,42 @@ function ParticipantCard({
   ai?: boolean;
   ended?: boolean;
   active?: boolean;
+  videoRef?: React.RefCallback<HTMLVideoElement>;
+  showVideo?: boolean;
 }) {
-  const initials = title
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((t) => t[0]?.toUpperCase())
-    .join("") || (ai ? "AI" : "U");
+  const initials =
+    title
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((t) => t[0]?.toUpperCase())
+      .join("") || (ai ? "AI" : "U");
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col items-center gap-3 min-w-45">
-      <div
-        className={`rounded-full p-1.5 transition-all duration-200 ${
-          speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
-        }`}
-      >
-        <ProfileAvatar image={image} fallback={title} ai={ai} />
-      </div>
+      {showVideo ? (
+        <div
+          className={`rounded-xl overflow-hidden m-1 transition-all duration-200 ${
+            speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
+          }`}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-28 h-28 object-cover rounded-lg bg-black"
+          />
+        </div>
+      ) : (
+        <div
+          className={`rounded-full p-1.5 transition-all duration-200 ${
+            speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
+          }`}
+        >
+          <ProfileAvatar image={image} fallback={title} ai={ai} />
+        </div>
+      )}
 
       <div className="text-center">
         <p className="text-white font-semibold text-sm">{title}</p>
@@ -200,7 +251,9 @@ function TypingBubble({
     <div className={`flex gap-3 ${isAI ? "" : "flex-row-reverse"}`}>
       {isAI ? (
         <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
-          <span className="text-white/60 text-xs font-bold select-none">{interviewerInitial}</span>
+          <span className="text-white/60 text-xs font-bold select-none">
+            {interviewerInitial}
+          </span>
         </div>
       ) : userImage ? (
         <Image
@@ -217,9 +270,7 @@ function TypingBubble({
       )}
       <div
         className={`px-4 py-3 rounded-2xl border flex items-center gap-1.5 ${
-          isAI
-            ? "bg-white/5 border-white/10"
-            : "bg-orange/15 border-orange/20"
+          isAI ? "bg-white/5 border-white/10" : "bg-orange/15 border-orange/20"
         }`}
       >
         {[0, 150, 300].map((delay) => (
@@ -271,6 +322,7 @@ function LiveInterviewContent() {
   const [yourTurn, setYourTurn] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [feedbackReady, setFeedbackReady] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState<string>("");
@@ -352,7 +404,10 @@ function LiveInterviewContent() {
     };
     navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
     return () => {
-      navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+      navigator.mediaDevices.removeEventListener(
+        "devicechange",
+        onDeviceChange,
+      );
     };
   }, [refreshMediaDevices]);
 
@@ -378,7 +433,9 @@ function LiveInterviewContent() {
         void camVideoRef.current.play().catch(() => undefined);
       }
 
-      const actualDeviceId = stream.getVideoTracks()?.[0]?.getSettings()?.deviceId;
+      const actualDeviceId = stream
+        .getVideoTracks()?.[0]
+        ?.getSettings()?.deviceId;
       if (actualDeviceId) setSelectedCameraId(actualDeviceId);
       setCameraOn(true);
       await refreshMediaDevices();
@@ -401,28 +458,42 @@ function LiveInterviewContent() {
   }, []);
 
   const persistSessionEndMutation = useMutation({
-    mutationFn: async ({ endedBy, finalTranscript }: { endedBy: "candidate" | "interviewer" | "system"; finalTranscript: TranscriptEntry[] }) => {
+    mutationFn: async ({
+      endedBy,
+      finalTranscript,
+    }: {
+      endedBy: "candidate" | "interviewer" | "system";
+      finalTranscript: TranscriptEntry[];
+    }) => {
       if (!sessionId) return;
-      const res = await fetch(`${API_BASE}/session/${encodeURIComponent(sessionId)}/end`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
+      const res = await fetch(
+        `${API_BASE}/session/${encodeURIComponent(sessionId)}/end`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            ended_by: endedBy,
+            transcript: finalTranscript,
+          }),
         },
-        body: JSON.stringify({
-          ended_by: endedBy,
-          transcript: finalTranscript,
-        }),
-      });
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     },
   });
 
   const persistSessionEnd = useCallback(
-    (endedBy: "candidate" | "interviewer" | "system", finalTranscript: TranscriptEntry[]) => {
-      return persistSessionEndMutation.mutateAsync({ endedBy, finalTranscript }).catch(() => {
-        // best-effort persistence
-      });
+    (
+      endedBy: "candidate" | "interviewer" | "system",
+      finalTranscript: TranscriptEntry[],
+    ) => {
+      return persistSessionEndMutation
+        .mutateAsync({ endedBy, finalTranscript })
+        .catch(() => {
+          // best-effort persistence
+        });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId],
@@ -442,84 +513,89 @@ function LiveInterviewContent() {
     sendChunkRef.current = sendAudioChunk;
   }, [sendAudioChunk]);
 
-  const startMic = useCallback(async (deviceId?: string) => {
-    stopMicCapture();
+  const startMic = useCallback(
+    async (deviceId?: string) => {
+      stopMicCapture();
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,               // mono — required by Live API
-        sampleRate: { ideal: MIC_SAMPLE_RATE },
-        echoCancellation: true,         // suppress AI audio fed back via speakers
-        noiseSuppression: true,
-        autoGainControl: true,
-        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-      },
-      video: false,
-    });
-    mediaStreamRef.current = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1, // mono — required by Live API
+          sampleRate: { ideal: MIC_SAMPLE_RATE },
+          echoCancellation: true, // suppress AI audio fed back via speakers
+          noiseSuppression: true,
+          autoGainControl: true,
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        },
+        video: false,
+      });
+      mediaStreamRef.current = stream;
 
-    const actualDeviceId = stream.getAudioTracks()?.[0]?.getSettings()?.deviceId;
-    if (actualDeviceId) setSelectedMicId(actualDeviceId);
+      const actualDeviceId = stream
+        .getAudioTracks()?.[0]
+        ?.getSettings()?.deviceId;
+      if (actualDeviceId) setSelectedMicId(actualDeviceId);
 
-    if (!micCtxRef.current || micCtxRef.current.state === "closed") {
-      micCtxRef.current = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
-    }
-
-    const ctx = micCtxRef.current!;
-    if (ctx.state === "suspended") await ctx.resume();
-
-    if (!micWorkletLoadedRef.current) {
-      await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
-      micWorkletLoadedRef.current = true;
-    }
-
-    const source = ctx.createMediaStreamSource(stream);
-    const worklet = new AudioWorkletNode(ctx, "pcm-capture-processor");
-    workletNodeRef.current = worklet;
-
-    worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-      // Always stream audio to server — VAD is handled server-side.
-      // Speech indicators run regardless of AI speaking state so the
-      // user always sees visual feedback for their own voice.
-      if (!muted && wsRef.current?.readyState === WebSocket.OPEN) {
-        const samples = new Int16Array(e.data);
-        let sumSquares = 0;
-        for (let i = 0; i < samples.length; i++) {
-          const normalized = samples[i] / 0x8000;
-          sumSquares += normalized * normalized;
-        }
-        const rms = Math.sqrt(sumSquares / Math.max(samples.length, 1));
-        noiseFloorRef.current =
-          noiseFloorRef.current === 0
-            ? rms
-            : noiseFloorRef.current * 0.92 + rms * 0.08;
-
-        const dynamicThreshold = Math.max(0.02, noiseFloorRef.current * 2.4);
-
-        if (rms > dynamicThreshold) {
-          speechStreakRef.current += 1;
-        } else {
-          speechStreakRef.current = 0;
-        }
-
-        if (speechStreakRef.current >= 2) {
-          setYouSpeaking(true);
-          setYourTurn(true);
-          if (userSpeakingTimeoutRef.current) {
-            window.clearTimeout(userSpeakingTimeoutRef.current);
-          }
-          userSpeakingTimeoutRef.current = window.setTimeout(() => {
-            setYouSpeaking(false);
-          }, 1800);
-        }
+      if (!micCtxRef.current || micCtxRef.current.state === "closed") {
+        micCtxRef.current = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
       }
-      sendChunkRef.current(e.data);
-    };
 
-    source.connect(worklet);
-    worklet.connect(ctx.destination);
-    await refreshMediaDevices();
-  }, [muted, refreshMediaDevices, stopMicCapture]);
+      const ctx = micCtxRef.current!;
+      if (ctx.state === "suspended") await ctx.resume();
+
+      if (!micWorkletLoadedRef.current) {
+        await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
+        micWorkletLoadedRef.current = true;
+      }
+
+      const source = ctx.createMediaStreamSource(stream);
+      const worklet = new AudioWorkletNode(ctx, "pcm-capture-processor");
+      workletNodeRef.current = worklet;
+
+      worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+        // Always stream audio to server — VAD is handled server-side.
+        // Speech indicators run regardless of AI speaking state so the
+        // user always sees visual feedback for their own voice.
+        if (!muted && wsRef.current?.readyState === WebSocket.OPEN) {
+          const samples = new Int16Array(e.data);
+          let sumSquares = 0;
+          for (let i = 0; i < samples.length; i++) {
+            const normalized = samples[i] / 0x8000;
+            sumSquares += normalized * normalized;
+          }
+          const rms = Math.sqrt(sumSquares / Math.max(samples.length, 1));
+          noiseFloorRef.current =
+            noiseFloorRef.current === 0
+              ? rms
+              : noiseFloorRef.current * 0.92 + rms * 0.08;
+
+          const dynamicThreshold = Math.max(0.02, noiseFloorRef.current * 2.4);
+
+          if (rms > dynamicThreshold) {
+            speechStreakRef.current += 1;
+          } else {
+            speechStreakRef.current = 0;
+          }
+
+          if (speechStreakRef.current >= 2) {
+            setYouSpeaking(true);
+            setYourTurn(true);
+            if (userSpeakingTimeoutRef.current) {
+              window.clearTimeout(userSpeakingTimeoutRef.current);
+            }
+            userSpeakingTimeoutRef.current = window.setTimeout(() => {
+              setYouSpeaking(false);
+            }, 1800);
+          }
+        }
+        sendChunkRef.current(e.data);
+      };
+
+      source.connect(worklet);
+      worklet.connect(ctx.destination);
+      await refreshMediaDevices();
+    },
+    [muted, refreshMediaDevices, stopMicCapture],
+  );
 
   const playPcmChunk = useCallback((buffer: ArrayBuffer) => {
     if (!outCtxRef.current) {
@@ -563,9 +639,14 @@ function LiveInterviewContent() {
       try {
         const msg: AdkEvent = JSON.parse(event.data as string);
 
-        if ((msg.type === "input_transcription" || msg.type === "output_transcription") && msg.text?.trim()) {
+        if (
+          (msg.type === "input_transcription" ||
+            msg.type === "output_transcription") &&
+          msg.text?.trim()
+        ) {
           const text = msg.text.trim();
-          const speaker = msg.type === "input_transcription" ? "you" : "interviewer";
+          const speaker =
+            msg.type === "input_transcription" ? "you" : "interviewer";
           const finished = msg.finished ?? false;
 
           // Only add to transcript once the utterance is complete.
@@ -594,7 +675,10 @@ function LiveInterviewContent() {
               pendingInterviewerEndRef.current = false;
               const ctx = outCtxRef.current;
               const drainMs = ctx
-                ? Math.max(0, (nextPlayTimeRef.current - ctx.currentTime) * 1000) + 400
+                ? Math.max(
+                    0,
+                    (nextPlayTimeRef.current - ctx.currentTime) * 1000,
+                  ) + 400
                 : 800;
               scheduleInterviewerEnd(drainMs);
             }
@@ -681,9 +765,31 @@ function LiveInterviewContent() {
     noiseFloorRef.current = 0;
     speechStreakRef.current = 0;
 
-    micCtxRef.current = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+    // Clean up any stale resources from a previous failed attempt so
+    // the retry starts fresh (avoids orphaned AudioContexts and lets
+    // the worklet be loaded on the new context).
+    stopMicCapture();
+    closeAudioContextSafely(micCtxRef.current);
+    micCtxRef.current = null;
+    micWorkletLoadedRef.current = false;
+    setFeedbackReady(false);
 
     try {
+      // Pre-check: reject sessions that are not in "ready" state.
+      const checkRes = await fetch(
+        `${API_BASE}/session/${encodeURIComponent(sessionId)}`,
+      );
+      if (checkRes.ok) {
+        const sessionData = await checkRes.json();
+        if (sessionData.status && sessionData.status !== "ready") {
+          setError(
+            "This session has already been used. Please create a new interview from the setup page.",
+          );
+          setStatus("error");
+          return;
+        }
+      }
+
       // Runtime guard: if the page is served over HTTPS but the configured
       // WS_BASE still uses ws://, upgrade to wss:// to avoid Mixed Content
       // blocks (browsers throw SecurityError / silent onerror on mobile).
@@ -702,8 +808,16 @@ function LiveInterviewContent() {
         appendStage("Interview started");
         try {
           await startMic(selectedMicId || undefined);
-        } catch {
-          setError("Microphone access denied. Please allow microphone and retry.");
+        } catch (micErr: unknown) {
+          const isDenied =
+            micErr instanceof DOMException &&
+            (micErr.name === "NotAllowedError" ||
+              micErr.name === "PermissionDeniedError");
+          setError(
+            isDenied
+              ? "Microphone access was blocked. Please reset the permission in your browser's address bar (click the lock/camera icon), then try again."
+              : "Could not access the microphone. Please check your device settings and try again.",
+          );
           setStatus("error");
           ws.close();
         }
@@ -713,7 +827,9 @@ function LiveInterviewContent() {
 
       ws.onerror = () => {
         // SecurityError (ws:// from https://) and network errors both surface here.
-        const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+        const isHttps =
+          typeof window !== "undefined" &&
+          window.location.protocol === "https:";
         const msg = isHttps
           ? "Connection failed. Make sure NEXT_PUBLIC_API_URL is set to an https:// address in your deployment environment."
           : "WebSocket connection error. Ensure the backend is running and reachable.";
@@ -724,6 +840,11 @@ function LiveInterviewContent() {
       ws.onclose = (e) => {
         if (e.code === 4404) {
           setError("Session not found. Please start a new interview.");
+          setStatus("error");
+        } else if (e.code === 4409) {
+          setError(
+            "This session has already been used. Please create a new interview from the setup page.",
+          );
           setStatus("error");
         } else {
           setStatus((prev) => {
@@ -739,63 +860,74 @@ function LiveInterviewContent() {
       setError(String(err));
       setStatus("error");
     }
-  }, [sessionId, handleMessage, startMic, appendStage, selectedMicId]);
+  }, [
+    sessionId,
+    handleMessage,
+    startMic,
+    appendStage,
+    selectedMicId,
+    closeAudioContextSafely,
+    stopMicCapture,
+  ]);
 
-  const endInterview = useCallback(async (endedBy: "candidate" | "interviewer" | "system" = "candidate") => {
-    if (endingRef.current) {
-      return;
-    }
-    endingRef.current = true;
+  const endInterview = useCallback(
+    async (endedBy: "candidate" | "interviewer" | "system" = "candidate") => {
+      if (endingRef.current) {
+        return;
+      }
+      endingRef.current = true;
 
-    const stageText =
-      endedBy === "interviewer"
-        ? "Interview ended by interviewer"
-        : endedBy === "candidate"
-          ? "Interview ended by candidate"
-          : "Interview ended";
-    const stageEntry: TranscriptEntry = {
-      speaker: "system",
-      kind: "stage",
-      text: stageText,
-      ts: Date.now(),
-    };
-    const finalTranscript = [...transcriptRef.current, stageEntry];
-    setTranscript(finalTranscript);
+      const stageText =
+        endedBy === "interviewer"
+          ? "Interview ended by interviewer"
+          : endedBy === "candidate"
+            ? "Interview ended by candidate"
+            : "Interview ended";
+      const stageEntry: TranscriptEntry = {
+        speaker: "system",
+        kind: "stage",
+        text: stageText,
+        ts: Date.now(),
+      };
+      const finalTranscript = [...transcriptRef.current, stageEntry];
+      setTranscript(finalTranscript);
 
-    // Graceful shutdown: signal end first, then fallback close if backend
-    // hasn't closed the socket shortly after.
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "end" }));
-      window.setTimeout(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.close(1000);
-        }
-      }, 350);
-    }
+      // Graceful shutdown: signal end first, then fallback close if backend
+      // hasn't closed the socket shortly after.
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "end" }));
+        window.setTimeout(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.close(1000);
+          }
+        }, 350);
+      }
 
-    workletNodeRef.current?.disconnect();
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    camStreamRef.current?.getTracks().forEach((track) => track.stop());
-    camStreamRef.current = null;
-    setCameraOn(false);
-    closeAudioContextSafely(micCtxRef.current);
-    closeAudioContextSafely(outCtxRef.current);
-    if (interviewerEndTimeoutRef.current) {
-      window.clearTimeout(interviewerEndTimeoutRef.current);
-      interviewerEndTimeoutRef.current = null;
-    }
+      workletNodeRef.current?.disconnect();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      camStreamRef.current?.getTracks().forEach((track) => track.stop());
+      camStreamRef.current = null;
+      setCameraOn(false);
+      closeAudioContextSafely(micCtxRef.current);
+      closeAudioContextSafely(outCtxRef.current);
+      if (interviewerEndTimeoutRef.current) {
+        window.clearTimeout(interviewerEndTimeoutRef.current);
+        interviewerEndTimeoutRef.current = null;
+      }
 
-    setStatus("ended");
-    setAiSpeaking(false);
-    setYouSpeaking(false);
-    setYourTurn(false);
-    speechStreakRef.current = 0;
-    await persistSessionEnd(endedBy, finalTranscript);
-    // Give the backend time to save transcript in the WebSocket finally block
-    // (the WS close triggers transcript persistence on the server side).
-    await new Promise((r) => setTimeout(r, 2500));
-    setFeedbackReady(true);
-  }, [closeAudioContextSafely, persistSessionEnd]);
+      setStatus("ended");
+      setAiSpeaking(false);
+      setYouSpeaking(false);
+      setYourTurn(false);
+      speechStreakRef.current = 0;
+      await persistSessionEnd(endedBy, finalTranscript);
+      // Give the backend time to save transcript in the WebSocket finally block
+      // (the WS close triggers transcript persistence on the server side).
+      await new Promise((r) => setTimeout(r, 2500));
+      setFeedbackReady(true);
+    },
+    [closeAudioContextSafely, persistSessionEnd],
+  );
 
   const endInterviewRef = useRef(endInterview);
   useEffect(() => {
@@ -840,7 +972,9 @@ function LiveInterviewContent() {
       try {
         await startMic(deviceId || undefined);
       } catch {
-        setError("Could not switch microphone. Please check permissions and retry.");
+        setError(
+          "Could not switch microphone. Please check permissions and retry.",
+        );
       }
     },
     [isActive, startMic],
@@ -853,7 +987,9 @@ function LiveInterviewContent() {
       try {
         await startCameraStream(deviceId || undefined);
       } catch {
-        setError("Could not switch camera. Please check permissions and retry.");
+        setError(
+          "Could not switch camera. Please check permissions and retry.",
+        );
       }
     },
     [cameraOn, isActive, startCameraStream],
@@ -870,16 +1006,33 @@ function LiveInterviewContent() {
   const selectedMicLabel = useMemo(() => {
     if (!audioInputs.length) return "No microphones found";
     if (!selectedMicId) return "System default microphone";
-    const selected = audioInputs.find((device) => device.deviceId === selectedMicId);
+    const selected = audioInputs.find(
+      (device) => device.deviceId === selectedMicId,
+    );
     return selected?.label || "Selected microphone";
   }, [audioInputs, selectedMicId]);
 
   const selectedCameraLabel = useMemo(() => {
     if (!videoInputs.length) return "No cameras found";
     if (!selectedCameraId) return "System default camera";
-    const selected = videoInputs.find((device) => device.deviceId === selectedCameraId);
+    const selected = videoInputs.find(
+      (device) => device.deviceId === selectedCameraId,
+    );
     return selected?.label || "Selected camera";
   }, [videoInputs, selectedCameraId]);
+
+  // Safety net: sync camera stream → video element whenever cameraOn toggles.
+  // The inline ref callback handles the initial attach, but React can call it
+  // with null on re-renders (since it's a new function identity each time).
+  // This effect guarantees the stream is re-attached after any re-render cycle.
+  useEffect(() => {
+    const el = camVideoRef.current;
+    const stream = camStreamRef.current;
+    if (isActive && cameraOn && el && stream && el.srcObject !== stream) {
+      el.srcObject = stream;
+      void el.play().catch(() => undefined);
+    }
+  }, [cameraOn, isActive]);
 
   useEffect(() => {
     return () => {
@@ -903,7 +1056,8 @@ function LiveInterviewContent() {
         <div>
           <h1 className="font-semibold text-base sm:text-lg">Live Interview</h1>
           <p className="text-xs sm:text-sm text-white/45">
-            {personaLabel} · {jobRole}
+            <span className="text-primary">Job role </span> {jobRole} ·
+            <span className="text-primary">Persona </span> {personaLabel}
           </p>
         </div>
         <span
@@ -942,25 +1096,19 @@ function LiveInterviewContent() {
               muted={muted}
               ended={status === "ended"}
               active={isActive}
+              showVideo={isActive && cameraOn}
+              videoRef={(node) => {
+                camVideoRef.current = node;
+                if (
+                  node &&
+                  camStreamRef.current &&
+                  node.srcObject !== camStreamRef.current
+                ) {
+                  node.srcObject = camStreamRef.current;
+                  void node.play().catch(() => undefined);
+                }
+              }}
             />
-
-            {isActive && cameraOn && (
-              <div className="min-w-45 max-w-45 lg:min-w-0 lg:max-w-none rounded-xl border border-white/10 bg-white/5 p-2 shrink-0">
-                <video
-                  ref={(node) => {
-                    camVideoRef.current = node;
-                    if (node && camStreamRef.current && node.srcObject !== camStreamRef.current) {
-                      node.srcObject = camStreamRef.current;
-                      void node.play().catch(() => undefined);
-                    }
-                  }}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full aspect-4/3 object-cover rounded-lg border border-white/10"
-                />
-              </div>
-            )}
           </div>
         </aside>
 
@@ -968,29 +1116,49 @@ function LiveInterviewContent() {
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 flex flex-col gap-3">
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
-                {error}
+                {error}{error.includes("session has already been used") ? <Link href="/interview/setup?from=dashboard" className="underline ml-1">Go to setup page</Link> : null}
               </div>
             )}
 
             {transcript.length === 0 && isActive && aiSpeaking && (
-              <TypingBubble speaker="interviewer" interviewerInitial={interviewerInitial} userImage={userImage} />
+              <TypingBubble
+                speaker="interviewer"
+                interviewerInitial={interviewerInitial}
+                userImage={userImage}
+              />
             )}
-            {transcript.length === 0 && isActive && (youSpeaking || (yourTurn && !aiSpeaking)) && !muted && (
-              <TypingBubble speaker="you" interviewerInitial={interviewerInitial} userImage={userImage} />
-            )}
+            {transcript.length === 0 &&
+              isActive &&
+              (youSpeaking || (yourTurn && !aiSpeaking)) &&
+              !muted && (
+                <TypingBubble
+                  speaker="you"
+                  interviewerInitial={interviewerInitial}
+                  userImage={userImage}
+                />
+              )}
 
-            {transcript.length === 0 && !error && !aiSpeaking && !youSpeaking && !(yourTurn && !muted) && (
-              <div className="flex-1 flex items-center justify-center text-white/35 text-sm text-center">
-                {status === "idle" && "Click Start Interview to begin."}
-                {status === "connecting" && "Connecting to your interviewer…"}
-                {status === "active" && "The conversation transcript will appear here."}
-                {status === "ended" && "Interview complete. Feedback is being compiled."}
-              </div>
-            )}
+            {transcript.length === 0 &&
+              !error &&
+              !aiSpeaking &&
+              !youSpeaking &&
+              !(yourTurn && !muted) && (
+                <div className="flex-1 flex items-center justify-center text-white/35 text-sm text-center">
+                  {status === "idle" && "Click Start Interview to begin."}
+                  {status === "connecting" && "Connecting to your interviewer…"}
+                  {status === "active" &&
+                    "The conversation transcript will appear here."}
+                  {status === "ended" &&
+                    "Interview complete. Feedback is being compiled."}
+                </div>
+              )}
 
-            {transcript.map((entry, i) => (
+            {transcript.map((entry, i) =>
               entry.kind === "stage" ? (
-                <div key={`${entry.ts}-${i}`} className="flex justify-center py-1">
+                <div
+                  key={`${entry.ts}-${i}`}
+                  className="flex justify-center py-1"
+                >
                   <div className="px-3 py-1 rounded-full border border-white/15 bg-white/5 text-white/55 text-xs">
                     {entry.text}
                   </div>
@@ -1002,7 +1170,9 @@ function LiveInterviewContent() {
                 >
                   {entry.speaker === "interviewer" ? (
                     <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
-                      <span className="text-white/70 text-xs font-bold select-none">{interviewerInitial}</span>
+                      <span className="text-white/70 text-xs font-bold select-none">
+                        {interviewerInitial}
+                      </span>
                     </div>
                   ) : userImage ? (
                     <Image
@@ -1028,37 +1198,63 @@ function LiveInterviewContent() {
                     {entry.text}
                   </div>
                 </div>
-              )
-            ))}
+              ),
+            )}
 
             {/* Typing indicator — anchored at bottom once transcript has started */}
             {isActive && transcript.length > 0 && aiSpeaking && (
-              <TypingBubble speaker="interviewer" interviewerInitial={interviewerInitial} userImage={userImage} />
+              <TypingBubble
+                speaker="interviewer"
+                interviewerInitial={interviewerInitial}
+                userImage={userImage}
+              />
             )}
-            {isActive && transcript.length > 0 && (youSpeaking || (yourTurn && !aiSpeaking)) && !muted && (
-              <TypingBubble speaker="you" interviewerInitial={interviewerInitial} userImage={userImage} />
-            )}
+            {isActive &&
+              transcript.length > 0 &&
+              (youSpeaking || (yourTurn && !aiSpeaking)) &&
+              !muted && (
+                <TypingBubble
+                  speaker="you"
+                  interviewerInitial={interviewerInitial}
+                  userImage={userImage}
+                />
+              )}
 
             <div ref={transcriptEndRef} />
           </div>
 
           <div className="shrink-0 border-t border-white/10 px-4 sm:px-6 py-4 flex flex-col items-center gap-3">
-            {(status === "idle" || status === "error" || status === "connecting" || isActive) && (
+            {(status === "idle" ||
+              status === "error" ||
+              status === "connecting" ||
+              isActive) && (
               <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      disabled={status === "connecting" || audioInputs.length === 0}
+                      disabled={
+                        status === "connecting" || audioInputs.length === 0
+                      }
                       className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
                     >
                       <Mic size={14} className="text-white/60" />
                       <span className="shrink-0">Mic</span>
-                      <span className="ml-auto min-w-0 truncate text-left">{selectedMicLabel}</span>
-                      <ChevronDown size={14} className="text-white/60 shrink-0" />
+                      <span className="ml-auto min-w-0 truncate text-left">
+                        {selectedMicLabel}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className="text-white/60 shrink-0"
+                      />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white">
-                    <DropdownMenuLabel className="text-white/60">Microphones</DropdownMenuLabel>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
+                  >
+                    <DropdownMenuLabel className="text-white/60">
+                      Microphones
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuRadioGroup
                       value={selectedMicId}
@@ -1066,7 +1262,10 @@ function LiveInterviewContent() {
                         void handleMicDeviceChange(value);
                       }}
                     >
-                      <DropdownMenuRadioItem value="" className="text-white/85 focus:bg-white/10 focus:text-white">
+                      <DropdownMenuRadioItem
+                        value=""
+                        className="text-white/85 focus:bg-white/10 focus:text-white"
+                      >
                         System default microphone
                       </DropdownMenuRadioItem>
                       {audioInputs.map((device, index) => (
@@ -1085,17 +1284,29 @@ function LiveInterviewContent() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      disabled={status === "connecting" || videoInputs.length === 0}
+                      disabled={
+                        status === "connecting" || videoInputs.length === 0
+                      }
                       className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
                     >
                       <Video size={14} className="text-white/60" />
                       <span className="shrink-0">Camera</span>
-                      <span className="ml-auto min-w-0 truncate text-left">{selectedCameraLabel}</span>
-                      <ChevronDown size={14} className="text-white/60 shrink-0" />
+                      <span className="ml-auto min-w-0 truncate text-left">
+                        {selectedCameraLabel}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className="text-white/60 shrink-0"
+                      />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white">
-                    <DropdownMenuLabel className="text-white/60">Cameras</DropdownMenuLabel>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
+                  >
+                    <DropdownMenuLabel className="text-white/60">
+                      Cameras
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuRadioGroup
                       value={selectedCameraId}
@@ -1103,7 +1314,10 @@ function LiveInterviewContent() {
                         void handleCameraDeviceChange(value);
                       }}
                     >
-                      <DropdownMenuRadioItem value="" className="text-white/85 focus:bg-white/10 focus:text-white">
+                      <DropdownMenuRadioItem
+                        value=""
+                        className="text-white/85 focus:bg-white/10 focus:text-white"
+                      >
                         System default camera
                       </DropdownMenuRadioItem>
                       {videoInputs.map((device, index) => (
@@ -1122,95 +1336,124 @@ function LiveInterviewContent() {
             )}
 
             <div className="flex items-center justify-center gap-4">
-            {(status === "idle" || status === "error") && (
-              <button
-                onClick={startInterview}
-                className="flex items-center gap-2 bg-orange hover:bg-orange-500 text-white px-6 py-3 rounded-full font-medium"
-              >
-                <Mic size={18} />
-                Start Interview
-              </button>
-            )}
-
-            {status === "connecting" && (
-              <button
-                disabled
-                className="flex items-center gap-2 bg-white/10 text-white/50 px-6 py-3 rounded-full font-medium cursor-not-allowed"
-              >
-                <Loader2 size={18} className="animate-spin" />
-                Connecting…
-              </button>
-            )}
-
-            {isActive && (
-              <>
+              {(status === "idle" || status === "error") && (
                 <button
-                  onClick={toggleCamera}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                    cameraOn
-                      ? "bg-orange/20 text-orange border-orange/40"
-                      : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
-                  }`}
-                  title={cameraOn ? "Disable webcam" : "Enable webcam"}
+                  onClick={startInterview}
+                  className="flex items-center gap-2 bg-orange hover:bg-orange-500 text-white px-6 py-3 rounded-full font-medium"
                 >
-                  {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
+                  <Mic size={18} />
+                  Start Interview
                 </button>
+              )}
 
+              {status === "connecting" && (
                 <button
-                  onClick={toggleMute}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                    !muted
-                      ? "bg-orange/20 text-orange border-orange/40"
-                      : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
-                  }`}
-                  title={muted ? "Unmute" : "Mute"}
+                  disabled
+                  className="flex items-center gap-2 bg-white/10 text-white/50 px-6 py-3 rounded-full font-medium cursor-not-allowed"
                 >
-                  {muted ? <MicOff size={18} /> : <Mic size={18} />}
+                  <Loader2 size={18} className="animate-spin" />
+                  Connecting…
                 </button>
+              )}
 
-                <button
-                  onClick={() => {
-                    void endInterview("candidate");
-                  }}
-                  className="flex items-center gap-2 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/20 px-6 py-3 rounded-full font-medium"
-                >
-                  <PhoneOff size={18} />
-                  End Interview
-                </button>
-              </>
-            )}
-
-            {status === "ended" && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 border border-white/10 px-5 py-3 rounded-full font-medium transition-colors"
-                >
-                  Dashboard
-                </button>
-                {sessionId && !feedbackReady && (
+              {isActive && (
+                <>
                   <button
-                    disabled
-                    className="flex items-center gap-2 bg-white/10 text-white/50 px-6 py-3 rounded-full font-medium cursor-not-allowed"
+                    onClick={toggleCamera}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
+                      cameraOn
+                        ? "bg-orange/20 text-orange border-orange/40"
+                        : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
+                    }`}
+                    title={cameraOn ? "Disable webcam" : "Enable webcam"}
                   >
-                    <Loader2 size={16} className="animate-spin" />
-                    Preparing…
+                    {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
                   </button>
-                )}
-                {sessionId && feedbackReady && (
+
                   <button
-                    onClick={() =>
-                      router.push(
-                        `/interview/feedback?session_id=${encodeURIComponent(sessionId)}`,
-                      )
-                    }
-                    className="flex items-center gap-2 bg-orange hover:bg-orange/85 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                    onClick={toggleMute}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
+                      !muted
+                        ? "bg-orange/20 text-orange border-orange/40"
+                        : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
+                    }`}
+                    title={muted ? "Unmute" : "Mute"}
                   >
-                    Get Feedback
+                    {muted ? <MicOff size={18} /> : <Mic size={18} />}
                   </button>
-                )}
-              </div>
-            )}
+
+                  <button
+                    onClick={() => setShowEndConfirm(true)}
+                    className="flex items-center gap-2 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/20 px-6 py-3 rounded-full font-medium"
+                  >
+                    <PhoneOff size={18} />
+                    End Interview
+                  </button>
+
+                  <AlertDialog
+                    open={showEndConfirm}
+                    onOpenChange={setShowEndConfirm}
+                  >
+                    <AlertDialogContent className="bg-zinc-900 border-white/15 text-white max-w-sm">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">
+                          End interview?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/55">
+                          Are you sure you want to end this interview session?
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-white/10 text-white/80 border-white/10 hover:bg-white/15 hover:text-white">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-500/80 text-white hover:bg-red-500"
+                          onClick={() => {
+                            setShowEndConfirm(false);
+                            void endInterview("candidate");
+                          }}
+                        >
+                          End Interview
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+
+              {status === "ended" && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 border border-white/10 px-5 py-3 rounded-full font-medium transition-colors"
+                  >
+                    Dashboard
+                  </button>
+                  {sessionId && !feedbackReady && (
+                    <button
+                      disabled
+                      className="flex items-center gap-2 bg-white/10 text-white/50 px-6 py-3 rounded-full font-medium cursor-not-allowed"
+                    >
+                      <Loader2 size={16} className="animate-spin" />
+                      Preparing…
+                    </button>
+                  )}
+                  {sessionId && feedbackReady && (
+                    <button
+                      onClick={() =>
+                        router.push(
+                          `/interview/feedback?session_id=${encodeURIComponent(sessionId)}`,
+                        )
+                      }
+                      className="flex items-center gap-2 bg-orange hover:bg-orange/85 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                    >
+                      Get Feedback
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </main>

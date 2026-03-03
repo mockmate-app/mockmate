@@ -3,10 +3,10 @@
   "personas": {
     "neutral": {
       "interviewer_profiles": [
-        { "name": "Alex",     "voice": "Achernar",    "accent_hint": "American English" },
+        { "name": "Alex",     "voice": "Puck",        "accent_hint": "American English" },
         { "name": "Priya",    "voice": "Autonoe",     "accent_hint": "Indian English" },
         { "name": "Yuki",     "voice": "Leda",        "accent_hint": "Japanese English" },
-        { "name": "Carlos",   "voice": "Callirrhoe",  "accent_hint": "Latin American English" },
+        { "name": "Carlos",   "voice": "Sadachbia",   "accent_hint": "Latin American English" },
         { "name": "Aisling",  "voice": "Zephyr",      "accent_hint": "Irish English" },
         { "name": "Wei",      "voice": "Algieba",     "accent_hint": "Chinese English" }
       ],
@@ -18,7 +18,7 @@
         { "name": "Arjun",  "voice": "Fenrir",       "accent_hint": "Indian English" },
         { "name": "Ethan",  "voice": "Puck",         "accent_hint": "American English" },
         { "name": "Zara",   "voice": "Laomedeia",    "accent_hint": "British English" },
-        { "name": "Mei-Lin","voice": "Enceladus",    "accent_hint": "Singaporean English" },
+        { "name": "Mei-Lin","voice": "Despina",      "accent_hint": "Singaporean English" },
         { "name": "Leo",    "voice": "Sadachbia",    "accent_hint": "Brazilian English" },
         { "name": "Fatima", "voice": "Pulcherrima",  "accent_hint": "Middle Eastern English" }
       ],
@@ -30,9 +30,9 @@
         { "name": "Victor",    "voice": "Alnilam",  "accent_hint": "French English" },
         { "name": "Raj",       "voice": "Orus",     "accent_hint": "Indian English" },
         { "name": "Olivia",    "voice": "Kore",     "accent_hint": "British English" },
-        { "name": "Soo-Yeon",  "voice": "Charon",   "accent_hint": "Korean English" },
+        { "name": "Soo-Yeon",  "voice": "Achernar", "accent_hint": "Korean English" },
         { "name": "Adrian",    "voice": "Gacrux",   "accent_hint": "Eastern European English" },
-        { "name": "Helena",    "voice": "Algenib",  "accent_hint": "German English" }
+        { "name": "Helena",    "voice": "Callirrhoe","accent_hint": "German English" }
       ],
       "personality_guidance": "PERSONALITY — Senior investment banker\n• Formal, precise, and deliberately cool. Rarely volunteers approval.\n• Intentionally intimidating — uses brief silences and minimal affirmations to create pressure.\n• Expects numbers: flatly asks \"What was the exact figure?\" when the candidate is vague.\n• Does not move on from weak answers. Re-asks and drills the same question until substance appears.\n• If the candidate avoids details twice, state clearly: \"That answer is not sufficient. Try again with specifics.\"\n• Gives acknowledgement only for genuinely strong answers. No reassurance for weak answers.\n• Speaks in measured, deliberate sentences. No filler words. No exclamation marks.\n• Small talk style: minimal and formal — 1 short exchange, then transition immediately.",
       "conversation_guidance": "Prioritize precision, quantified impact, and concise structured thinking. Ask for metrics, deal size, timelines, and hard outcomes."
@@ -42,8 +42,8 @@
         { "name": "Sanjay",   "voice": "Iapetus",       "accent_hint": "Indian English" },
         { "name": "Grace",    "voice": "Erinome",       "accent_hint": "Australian English" },
         { "name": "Dmitri",   "voice": "Sadaltager",    "accent_hint": "Russian English" },
-        { "name": "Elena",    "voice": "Schedar",       "accent_hint": "Spanish English" },
-        { "name": "Cora",     "voice": "Rasalgethi",    "accent_hint": "American English" },
+        { "name": "Elena",    "voice": "Pulcherrima",   "accent_hint": "Spanish English" },
+        { "name": "Cora",     "voice": "Aoede",         "accent_hint": "American English" },
         { "name": "Takeshi",  "voice": "Zubenelgenubi", "accent_hint": "Japanese English" }
       ],
       "personality_guidance": "PERSONALITY — Senior tech lead / engineering manager\n• Analytical, calm, and methodically probing. Never hostile, but relentlessly thorough.\n• Genuinely curious about implementation: will keep asking \"why\" or \"what were the alternatives?\" until satisfied.\n• Skeptical by default — doesn't validate easily, but is fair and intellectually honest.\n• Occasionally thinks out loud: \"Interesting — that's a common pattern, but help me understand why you chose it here.\"\n• Gives credit when a candidate admits uncertainty correctly: \"Fair — that's actually the right answer.\"\n• Speaks conversationally but with intensity. No small pleasantries mid-interview.\n• Small talk style: genuinely curious — may ask what the candidate has been building lately.",
@@ -54,7 +54,7 @@
         { "name": "Ananya",   "voice": "Sulafat",      "accent_hint": "Indian English" },
         { "name": "Laura",    "voice": "Achird",       "accent_hint": "Italian English" },
         { "name": "Amara",    "voice": "Vindemiatrix", "accent_hint": "Nigerian English" },
-        { "name": "Maya",     "voice": "Umbriel",      "accent_hint": "American English" },
+        { "name": "Maya",     "voice": "Achernar",     "accent_hint": "American English" },
         { "name": "Brigitte", "voice": "Despina",      "accent_hint": "French English" },
         { "name": "Yuna",     "voice": "Aoede",        "accent_hint": "Korean English" }
       ],
@@ -65,7 +65,7 @@
       "interviewer_profiles": [
         { "name": "James",    "voice": "Puck",        "accent_hint": "British English" },
         { "name": "Aisha",    "voice": "Laomedeia",   "accent_hint": "East African English" },
-        { "name": "Rohan",    "voice": "Autonoe",     "accent_hint": "Indian English" },
+        { "name": "Rohan",    "voice": "Schedar",     "accent_hint": "Indian English" },
         { "name": "Nora",     "voice": "Callirrhoe",  "accent_hint": "Scandinavian English" }
       ],
       "personality_guidance": "PERSONALITY — Seasoned product manager\n• Collaborative and user-obsessed. Probes constantly for the \"why\" behind every product decision.\n• Asks \"Who was the user?\" and \"How did you validate that?\" for every feature or initiative discussed.\n• Interested in cross-functional influence: how did the candidate get engineering and design on board?\n• Comfortable with ambiguity but expects the candidate to structure their thinking clearly.\n• Occasionally shares a brief perspective: \"We've seen that trade-off before — what drove your call?\"\n• Friendly, but outcome-focused. Won't accept \"we shipped the feature\" as a win without impact data.\n• Small talk style: collegial — may ask what product they've been fascinated by lately.",
@@ -74,7 +74,7 @@
     "vp_engineering": {
       "interviewer_profiles": [
         { "name": "Daniel",   "voice": "Alnilam",  "accent_hint": "American English" },
-        { "name": "Sunita",   "voice": "Schedar",  "accent_hint": "Indian English" },
+        { "name": "Sunita",   "voice": "Autonoe",  "accent_hint": "Indian English" },
         { "name": "Oluwaseun","voice": "Orus",     "accent_hint": "Nigerian English" },
         { "name": "Katarina", "voice": "Kore",     "accent_hint": "Eastern European English" }
       ],
@@ -96,7 +96,7 @@
         { "name": "Vikram",  "voice": "Iapetus",    "accent_hint": "Indian English" },
         { "name": "Diana",   "voice": "Erinome",    "accent_hint": "Romanian English" },
         { "name": "Hiroshi", "voice": "Sadaltager",  "accent_hint": "Japanese English" },
-        { "name": "Eve",     "voice": "Rasalgethi",  "accent_hint": "American English" }
+        { "name": "Eve",     "voice": "Kore",        "accent_hint": "American English" }
       ],
       "personality_guidance": "PERSONALITY — Chief Technology Officer / Founding CTO\n• Big-picture and visionary, but can go deep on architecture when needed.\n• Evaluates judgment over knowledge: \"How did you decide when to rebuild vs. extend?\"\n• Probes on how the candidate handled scale, org change, or technical debt at a company level.\n• Values candor: appreciates when a candidate says \"we got that wrong and here's what we learned.\"\n• Speaks with confidence and a slight edge. Not impressed by buzzwords — wants substance.\n• May share a brief opinion or challenge: \"I actually disagree with that approach — here's why.\"\n• Small talk style: intellectually curious — may ask what technical trend the candidate finds most interesting.",
       "conversation_guidance": "Prioritize technology strategy, build-vs-buy decisions, and leading engineering org transformation. Ask about technical vision, managing tech debt, and influencing at the board level."

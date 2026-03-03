@@ -125,7 +125,7 @@ Difficulty level    : {difficulty}  (easy | medium | hard)
 
 The target job role is **{job_role}**. This MUST drive the majority of your question design:
 
-1. At least 6 out of 12 questions MUST be directly relevant to the day-to-day
+1. At least 4 out of 8 questions MUST be directly relevant to the day-to-day
    responsibilities, skills, and challenges of a {job_role}.
    - For example, if the role is "DevOps Engineer", ask about CI/CD pipelines,
      infrastructure-as-code, monitoring, incident response, container orchestration, etc.
@@ -148,7 +148,7 @@ The target job role is **{job_role}**. This MUST drive the majority of your ques
 
 ━━━ GENERAL RULES ━━━
 
-Generate exactly 12 interview questions as a JSON array. Each element must have:
+Generate exactly 8 interview questions as a JSON array. Each element must have:
 {{
   "id"        : <1-based integer>,
   "type"      : "behavioural" | "technical" | "situational" | "curveball",
@@ -162,7 +162,7 @@ Rules (strictly enforced):
   (e.g. a named project, technology, company, or metric the candidate listed).
 - At least 2 questions MUST be curveballs — unexpected angle or provocative
   challenge designed to test composure and original thinking.
-- Questions MUST escalate in difficulty from id 1 → 12.
+- Questions MUST escalate in difficulty from id 1 → 8.
 - Tone and phrasing MUST match the persona described above.
 - If difficulty is "easy", avoid highly technical deep-dives but still keep questions role-relevant.
 - If difficulty is "hard", include at least 3 technical / system-design questions
@@ -214,7 +214,7 @@ class QuestionGeneratorAgent:
 
         Returns
         -------
-        list[dict]  The 12 generated question objects.
+        list[dict]  The 8 generated question objects.
 
         Raises
         ------
