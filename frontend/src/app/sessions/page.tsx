@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import {
   Mic, ChevronRight, Award, ArrowLeft,
-  Search, BarChart2,
+  Search, BarChart2, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const PAGE_SIZE = 10;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,15 @@ interface SessionSummary {
   question_count: number;
   overall_score: number | null;
   feedback_ready: boolean;
+}
+
+interface SessionsPage {
+  sessions: SessionSummary[];
+  count: number;
+  has_more: boolean;
+  total: number;
+  avg_score: number | null;
+  this_month: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -101,16 +111,55 @@ function SessionsContent() {
 
   const uid = session?.user?.id;
 
-  const { data, isLoading: loading } = useQuery({
+  const {
+    data,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<SessionsPage>({
     queryKey: ["sessions-all", uid],
-    queryFn: () =>
-      fetch(`${API_BASE}/sessions/user/${uid}?limit=200`)
-        .then(r => r.ok ? r.json() : null),
+    queryFn: ({ pageParam }) =>
+      fetch(`${API_BASE}/sessions/user/${uid}?limit=${PAGE_SIZE}&offset=${pageParam}`)
+        .then(r => {
+          if (!r.ok) throw new Error("Failed to load sessions");
+          return r.json();
+        }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.has_more ? (lastPageParam as number) + PAGE_SIZE : undefined,
     enabled: !!uid,
     staleTime: 5 * 60 * 1000,
   });
 
-  const sessions: SessionSummary[] = data?.sessions ?? [];
+  // Flatten all pages into a single array
+  const sessions: SessionSummary[] = data?.pages.flatMap(p => p.sessions) ?? [];
+  const firstPage = data?.pages[0];
+
+  // ── IntersectionObserver sentinel ──
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const handleObserver = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage],
+  );
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(handleObserver, {
+      root: null,
+      rootMargin: "200px",
+      threshold: 0,
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [handleObserver]);
 
   if (isPending || (!session && !loading)) {
     return (
@@ -131,8 +180,8 @@ function SessionsContent() {
     );
   });
 
-  const totalSessionCount = data?.total ?? sessions.length;
-  const avgScore: number | null = data?.avg_score ?? null;
+  const totalSessionCount = firstPage?.total ?? sessions.length;
+  const avgScore: number | null = firstPage?.avg_score ?? null;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -287,6 +336,14 @@ function SessionsContent() {
             </div>
           )}
         </Card>
+
+        {/* Infinite-scroll sentinel */}
+        <div ref={sentinelRef} className="h-1" />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-4">
+            <Loader2 size={20} className="animate-spin text-orange" />
+          </div>
+        )}
       </main>
     </div>
   );

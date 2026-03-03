@@ -9,7 +9,7 @@ const STEPS = [
   },
   {
     step: "02",
-    title: "Choose your interviewer",
+    title: "Choose an interviewer persona",
     description:
       "Pick a persona and difficulty level. An aggressive investment banker hits different from a supportive startup founder — your choice, your challenge.",
   },

@@ -481,6 +481,7 @@ class InterviewEngineAgent:
         self,
         user_id: str,
         limit: int = 10,
+        offset: int = 0,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Return the most-recent sessions for *user_id* (newest first).
 
@@ -533,9 +534,9 @@ class InterviewEngineAgent:
             "this_month": this_month,
         }
 
-        # Sort newest-first in Python, then trim to requested limit
+        # Sort newest-first in Python, then page the slice
         results.sort(key=lambda s: s.get("created_at") or "", reverse=True)
-        return results[:limit], stats
+        return results[offset:offset + limit], stats
 
     async def get_transcript(self, session_id: str) -> dict[str, Any] | None:
         """Return the transcript document for *session_id*, or None."""

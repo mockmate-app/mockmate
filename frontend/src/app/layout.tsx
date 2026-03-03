@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/query-client";
 import { APP_DESCRIPTION, APP_NAME } from "@/constants/common";
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -25,7 +29,7 @@ export default function RootLayout({
         <link rel="manifest" href="/favicons/site.webmanifest" />
       </head>
       <body
-        className="antialiased"
+        className="antialiased pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
       >
         <ReactQueryProvider>
           {children}

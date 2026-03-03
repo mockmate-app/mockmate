@@ -318,7 +318,7 @@ function SetupContent({
 
         {/* Step 2 — Persona */}
         <section className="flex flex-col gap-3">
-          <SectionLabel step={2} label="Choose your interviewer" />
+          <SectionLabel step={2} label="Choose interviewer persona" />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PERSONAS.map((p) => (
               <PersonaCard

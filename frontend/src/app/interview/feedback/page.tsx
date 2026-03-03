@@ -30,7 +30,12 @@ async function fetchSessionMeta(sessionId: string): Promise<SessionMeta> {
   return res.json();
 }
 
-async function generateFeedback(sessionId: string): Promise<FeedbackReport> {
+async function fetchOrGenerateFeedback(sessionId: string): Promise<FeedbackReport> {
+  // Try fetching previously generated feedback first
+  const getRes = await fetch(`${API_BASE}/feedback/${sessionId}`);
+  if (getRes.ok) return getRes.json();
+
+  // Not found — generate it
   const res = await fetch(`${API_BASE}/feedback/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -205,10 +210,11 @@ function FeedbackContent() {
 
   const { data: report, isLoading: loading, error: queryError } = useQuery({
     queryKey: ["feedback", sessionId],
-    queryFn: () => generateFeedback(sessionId),
+    queryFn: () => fetchOrGenerateFeedback(sessionId),
     enabled: !!sessionId,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: transcript, isLoading: transcriptLoading } = useQuery({
@@ -249,9 +255,9 @@ function FeedbackContent() {
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
               <p className="text-white/40 text-xs mt-1">
-                {PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
-                {" · "}
                 {sessionMeta.job_role}
+                {" · Persona: "}
+                {PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
                 {" · Interviewer: "}
                 {sessionMeta.interviewer_name}
               </p>
