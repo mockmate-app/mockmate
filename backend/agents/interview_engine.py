@@ -778,17 +778,12 @@ class InterviewEngineAgent:
 
         live_request_queue = LiveRequestQueue()  # one per session, never reused
 
-        # ── Kickstart: send an initial user turn so the AI greets first ───────
-        # proactive_audio only controls whether the AI stays silent on irrelevant
-        # audio — it does NOT make the model speak unprompted.  Sending a brief
-        # trigger message causes the model to follow its PHASE 1 instructions
-        # and greet the candidate immediately.
-        live_request_queue.send_content(
-            genai_types.Content(
-                role="user",
-                parts=[genai_types.Part(text="[The candidate has joined the interview. Please begin.]")],
-            )
-        )
+        # NOTE: The kickstart message ("[The candidate has joined the
+        # interview. Please begin.]") is now sent by the frontend AFTER
+        # the user grants microphone access, so the AI doesn't start
+        # speaking before the candidate can hear / respond.
+        # The upstream handler forwards {"type":"text"} payloads to the
+        # live_request_queue automatically.
 
         await self._db.collection(_COLLECTION).document(session_id).update(
             {"status": "active"}

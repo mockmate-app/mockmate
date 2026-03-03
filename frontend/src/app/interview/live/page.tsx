@@ -343,6 +343,7 @@ function LiveInterviewContent() {
   const pendingInterviewerEndRef = useRef(false);
   const interviewerEndTimeoutRef = useRef<number | null>(null);
   const endingRef = useRef(false);
+  const wasEverActiveRef = useRef(false);
   const aiSpeakingRef = useRef(false);
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
@@ -757,6 +758,7 @@ function LiveInterviewContent() {
     interviewerEndedRef.current = false;
     pendingInterviewerEndRef.current = false;
     endingRef.current = false;
+    wasEverActiveRef.current = false;
     if (interviewerEndTimeoutRef.current) {
       window.clearTimeout(interviewerEndTimeoutRef.current);
       interviewerEndTimeoutRef.current = null;
@@ -790,6 +792,26 @@ function LiveInterviewContent() {
         }
       }
 
+      // Request microphone access BEFORE opening the WebSocket so the AI
+      // doesn't start speaking while the permission dialog is still open.
+      // If the user denies access, we bail out without opening the connection
+      // (session stays "created" and can be retried immediately).
+      try {
+        await startMic(selectedMicId || undefined);
+      } catch (micErr: unknown) {
+        const isDenied =
+          micErr instanceof DOMException &&
+          (micErr.name === "NotAllowedError" ||
+            micErr.name === "PermissionDeniedError");
+        setError(
+          isDenied
+            ? "Microphone access was blocked. Please allow microphone access in your browser settings (click the lock icon in the address bar) and try again."
+            : "Could not access the microphone. Please check your device settings and try again.",
+        );
+        setStatus("error");
+        return;
+      }
+
       // Runtime guard: if the page is served over HTTPS but the configured
       // WS_BASE still uses ws://, upgrade to wss:// to avoid Mixed Content
       // blocks (browsers throw SecurityError / silent onerror on mobile).
@@ -803,29 +825,28 @@ function LiveInterviewContent() {
       wsRef.current = ws;
       ws.binaryType = "arraybuffer";
 
-      ws.onopen = async () => {
+      ws.onopen = () => {
         setStatus("active");
+        wasEverActiveRef.current = true;
         appendStage("Interview started");
-        try {
-          await startMic(selectedMicId || undefined);
-        } catch (micErr: unknown) {
-          const isDenied =
-            micErr instanceof DOMException &&
-            (micErr.name === "NotAllowedError" ||
-              micErr.name === "PermissionDeniedError");
-          setError(
-            isDenied
-              ? "Microphone access was blocked. Please reset the permission in your browser's address bar (click the lock/camera icon), then try again."
-              : "Could not access the microphone. Please check your device settings and try again.",
-          );
-          setStatus("error");
-          ws.close();
-        }
+        // Tell the AI to begin — sent AFTER the mic is already active so
+        // the candidate's microphone is ready when the interviewer speaks.
+        ws.send(
+          JSON.stringify({
+            type: "text",
+            text: "[The candidate has joined the interview. Please begin.]",
+          }),
+        );
       };
 
       ws.onmessage = handleMessage;
 
       ws.onerror = () => {
+        // If the interview was already active, this is likely just the WS
+        // closing gracefully (common on mobile browsers).  Let onclose
+        // handle the state transition instead of showing a scary error.
+        if (endingRef.current || wasEverActiveRef.current) return;
+
         // SecurityError (ws:// from https://) and network errors both surface here.
         const isHttps =
           typeof window !== "undefined" &&
