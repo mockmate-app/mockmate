@@ -173,9 +173,14 @@ PERSONA_CONVERSATION_GUIDANCE: dict[str, str] = {
     key: p["conversation_guidance"] for key, p in _PERSONAS.items()
 }
 
-_DEFAULT_INTERVIEWER_PROFILE = {"name": "Alex", "voice": _DEFAULT_VOICE}
+_DEFAULT_INTERVIEWER_PROFILE = {"name": "Alex", "voice": _DEFAULT_VOICE, "accent_hint": "American English"}
 INTERVIEWER_NAME_TO_VOICE = {
     profile["name"]: profile["voice"]
+    for profiles in PERSONA_INTERVIEWER_PROFILES.values()
+    for profile in profiles
+}
+INTERVIEWER_NAME_TO_ACCENT = {
+    profile["name"]: profile.get("accent_hint", "American English")
     for profiles in PERSONA_INTERVIEWER_PROFILES.values()
     for profile in profiles
 }
@@ -185,6 +190,7 @@ _DEFAULT_CONVERSATION_GUIDANCE = PERSONA_CONVERSATION_GUIDANCE["neutral"]
 
 SYSTEM_PROMPT_TEMPLATE = """
 You are {interviewer_name}, conducting a live voice mock interview for MockMate.
+Your accent / speech style: {accent_hint}. Speak naturally with this accent throughout.
 The candidate is interviewing for: {job_role}
 
 ━━━ YOUR PERSONA (HIGHEST PRIORITY — shapes everything you say) ━━━
@@ -420,6 +426,7 @@ class InterviewEngineAgent:
         )
         interviewer_name = profile.get("name", _DEFAULT_INTERVIEWER_PROFILE["name"])
         voice = profile.get("voice", _DEFAULT_INTERVIEWER_PROFILE["voice"])
+        accent_hint = profile.get("accent_hint", _DEFAULT_INTERVIEWER_PROFILE["accent_hint"])
         doc: dict[str, Any] = {
             "session_id": session_id,
             "user_id": user_id,
@@ -427,6 +434,7 @@ class InterviewEngineAgent:
             "job_role": job_role,
             "voice": voice,
             "interviewer_name": interviewer_name,
+            "accent_hint": accent_hint,
             "questions": questions,
             "status": "created",
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -609,6 +617,10 @@ class InterviewEngineAgent:
             voice = INTERVIEWER_NAME_TO_VOICE[interviewer_name]
         if not voice:
             voice = _DEFAULT_VOICE
+        accent_hint = session_data.get(
+            "accent_hint",
+            INTERVIEWER_NAME_TO_ACCENT.get(interviewer_name, "American English"),
+        )
         conversation_guidance = PERSONA_CONVERSATION_GUIDANCE.get(
             persona, _DEFAULT_CONVERSATION_GUIDANCE
         )
@@ -618,6 +630,7 @@ class InterviewEngineAgent:
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
             job_role=session_data.get("job_role", "Software Engineer"),
             interviewer_name=interviewer_name,
+            accent_hint=accent_hint,
             personality_guidance=personality_guidance,
             conversation_guidance=conversation_guidance,
             questions_json=json.dumps(session_data.get("questions", []), indent=2),
