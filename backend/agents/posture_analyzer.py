@@ -39,7 +39,7 @@ _PROJECT    = _require("GOOGLE_CLOUD_PROJECT")
 _REGION     = _require("GOOGLE_CLOUD_LOCATION")
 _COLLECTION = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores")  # optional
 _DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")                  # optional
-_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")             # optional
+_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")             # optional
 
 ANALYSIS_PROMPT = """
 You are a professional interview coach analysing a single video frame from a

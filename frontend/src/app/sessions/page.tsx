@@ -7,11 +7,11 @@ import { useSession } from "@/lib/auth-client";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import {
-  Mic, ChevronRight, Award, ArrowLeft,
+  ChevronRight, Award, ArrowLeft,
   Search, BarChart2, Loader2, RotateCcw,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SessionStatusPill, canRetry } from "@/components/SessionStatusPill";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,9 +38,13 @@ interface SessionSummary {
   ended_by: string | null;
   created_at: string;
   ended_at: string | null;
+  live_started_at?: string | null;
   question_count: number;
   overall_score: number | null;
   feedback_ready: boolean;
+  decision?: "offer" | "rejection" | null;
+  last_retried_at?: string | null;
+  interviewer_avatar_url?: string | null;
 }
 
 interface SessionsPage {
@@ -202,7 +206,7 @@ function SessionsContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">All sessions</h1>
-            <p className="mt-1 text-sm text-muted">{totalSessionCount} total interviews recorded</p>
+            {!loading && <p className="mt-1 text-sm text-muted">{totalSessionCount} total interviews recorded</p>}
           </div>
           <div className="flex gap-3">
             {totalSessionCount > 0 && (
@@ -265,7 +269,7 @@ function SessionsContent() {
                   <TableRow className="bg-surface">
                     <TableHead className="text-xs font-medium text-muted">Persona / Role</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden md:table-cell">Interviewer</TableHead>
-                    <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Date</TableHead>
+                    <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden lg:table-cell">Duration</TableHead>
                     <TableHead className="text-xs font-medium text-muted text-center hidden sm:table-cell">Questions</TableHead>
                     <TableHead className="text-xs font-medium text-muted text-center">Score</TableHead>
@@ -286,10 +290,10 @@ function SessionsContent() {
                         {s.interviewer_name ?? "—"}
                       </TableCell>
                       <TableCell className="text-xs text-muted hidden sm:table-cell whitespace-nowrap">
-                        {fmtDate(s.created_at)}
+                        {fmtDate(s.last_retried_at ?? s.live_started_at ?? s.created_at)}
                       </TableCell>
                       <TableCell className="text-xs text-muted hidden lg:table-cell whitespace-nowrap">
-                        {fmtDuration(s.created_at, s.ended_at)}
+                        {fmtDuration(s.live_started_at ?? s.created_at, s.ended_at)}
                       </TableCell>
                       <TableCell className="text-xs text-center text-muted hidden sm:table-cell">
                         {s.question_count > 0 ? s.question_count : "—"}
@@ -304,18 +308,12 @@ function SessionsContent() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {!s.feedback_ready && s.status !== "active" ? (
-                          <Badge variant="secondary" className="text-xs font-medium rounded-full bg-red-100 text-red-600">
-                            Abandoned
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className={`text-xs font-medium rounded-full ${s.status === "ended" ? "bg-zinc-100 text-zinc-500"
-                              : s.status === "active" ? "bg-green-100 text-green-600"
-                                : "bg-yellow-100 text-yellow-600"
-                            }`}>
-                            {s.status === "ended" ? "Completed" : s.status}
-                          </Badge>
-                        )}
+                        <SessionStatusPill
+                          status={s.status}
+                          ended_by={s.ended_by}
+                          feedback_ready={s.feedback_ready}
+                          decision={s.decision}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         {s.feedback_ready ? (
@@ -327,13 +325,15 @@ function SessionsContent() {
                           </Link>
                         ) : s.status === "active" ? (
                           <span className="text-xs text-muted italic">In progress</span>
-                        ) : (
+                        ) : canRetry(s) ? (
                           <Link
-                            href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}`}
+                            href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}${s.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(s.interviewer_avatar_url)}` : ""}`}
                             className="text-xs text-orange hover:underline whitespace-nowrap inline-flex items-center gap-1"
                           >
                             <RotateCcw size={12} /> Retry
                           </Link>
+                        ) : (
+                          <span className="text-xs text-muted/40">—</span>
                         )}
                       </TableCell>
                     </TableRow>

@@ -55,6 +55,7 @@ export interface StartSessionResponse {
   session_id: string;
   question_count: number;
   interviewer_name?: string;
+  interviewer_avatar_url?: string;
   voice?: string;
   questions?: Question[];
 }

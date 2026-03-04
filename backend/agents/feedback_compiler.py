@@ -40,7 +40,7 @@ def _require(var: str) -> str:
 _PROJECT      = _require("GOOGLE_CLOUD_PROJECT")
 _REGION       = _require("GOOGLE_CLOUD_LOCATION")
 _DATABASE     = os.getenv("FIRESTORE_DATABASE", "(default)")               # optional
-_MODEL        = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")           # optional
+_MODEL        = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")           # optional
 _COL_SESSIONS     = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")       # optional
 _COL_TRANSCRIPTS  = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts") # optional
 _COL_POSTURE      = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores") # optional
@@ -262,7 +262,7 @@ class FeedbackCompilerAgent:
                     generation_config=GenerationConfig(
                         response_mime_type="application/json",
                         temperature=0.3,
-                        max_output_tokens=16384,
+                        max_output_tokens=8192,
                     ),
                 ),
                 timeout=_FEEDBACK_TIMEOUT,
@@ -314,6 +314,7 @@ class FeedbackCompilerAgent:
             await self._db.collection(_COL_SESSIONS).document(session_id).update({
                 "overall_score":  report.get("overall_score"),
                 "feedback_ready": True,
+                "decision":       report.get("decision"),
             })
         except Exception:  # noqa: BLE001
             pass  # best-effort; don't fail the whole compile if this update fails

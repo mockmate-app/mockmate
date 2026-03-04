@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SessionStatusPill, canRetry } from "@/components/SessionStatusPill";
 import {
   Table,
   TableBody,
@@ -38,6 +39,9 @@ interface SessionSummary {
   question_count: number;
   overall_score: number | null;
   feedback_ready: boolean;
+  last_retried_at?: string | null;
+  live_started_at?: string | null;
+  interviewer_avatar_url?: string | null;
 }
 
 interface ResumeExperience {
@@ -262,9 +266,9 @@ function DashboardContent() {
             label="Last interview"
             value={
               lastSession
-                ? daysSince(lastSession.created_at) === 0
+                ? daysSince(lastSession.last_retried_at ?? lastSession.live_started_at ?? lastSession.created_at) === 0
                   ? "Today"
-                  : `${daysSince(lastSession.created_at)}d ago`
+                  : `${daysSince(lastSession.last_retried_at ?? lastSession.live_started_at ?? lastSession.created_at)}d ago`
                 : "—"
             }
           />
@@ -289,7 +293,7 @@ function DashboardContent() {
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
 
           {/* Recent sessions — 2/3 width */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
             <SectionHeader title="Recent sessions" href="/sessions" />
 
             <Card className="rounded-xl border border-border overflow-hidden">
@@ -309,7 +313,7 @@ function DashboardContent() {
                   <TableHeader>
                     <TableRow className="bg-surface">
                       <TableHead className="text-xs font-medium text-muted">Persona / Role</TableHead>
-                      <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Date</TableHead>
+                      <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
                       <TableHead className="text-xs font-medium text-muted text-center">Score</TableHead>
                       <TableHead className="text-xs font-medium text-muted text-right"></TableHead>
                     </TableRow>
@@ -324,21 +328,19 @@ function DashboardContent() {
                           <p className="mt-2 mx-0.5 text-xs text-muted truncate w-full">{s.job_role}</p>
                         </TableCell>
                         <TableCell className="text-xs text-muted hidden sm:table-cell whitespace-nowrap">
-                          {fmtDate(s.created_at)}
+                          {fmtDate(s.last_retried_at ?? s.live_started_at ?? s.created_at)}
                         </TableCell>
                         <TableCell className="text-center">
                           {s.overall_score !== null ? (
                             <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>
                               {s.overall_score}
                             </Badge>
-                          ) : !s.feedback_ready && s.status !== "active" ? (
-                            <Badge variant="secondary" className="text-xs font-medium bg-red-100 text-red-600 rounded-full">
-                              Abandoned
-                            </Badge>
-                          ) : s.status === "active" ? (
-                            <span className="text-xs text-muted italic">In progress</span>
                           ) : (
-                            <span className="text-xs text-muted/40">—</span>
+                            <SessionStatusPill
+                              status={s.status}
+                              ended_by={s.ended_by}
+                              feedback_ready={s.feedback_ready}
+                            />
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -351,13 +353,15 @@ function DashboardContent() {
                             </Link>
                           ) : s.status === "active" ? (
                             <span className="text-xs text-muted italic">In progress</span>
-                          ) : (
+                          ) : canRetry(s) ? (
                             <Link
-                              href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}`}
+                              href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}${s.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(s.interviewer_avatar_url)}` : ""}`}
                               className="text-xs text-orange hover:underline whitespace-nowrap inline-flex items-center gap-1"
                             >
                               <RotateCcw size={12} /> Retry
                             </Link>
+                          ) : (
+                            <span className="text-xs text-muted/40">—</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -448,7 +452,7 @@ function DashboardContent() {
                     )}
 
                     <Link
-                      href="/resume"
+                      href="/resume?from=dashboard"
                       className="text-xs text-orange hover:underline inline-flex items-center gap-1 w-fit"
                     >
                       View résumé <ChevronRight size={12} />

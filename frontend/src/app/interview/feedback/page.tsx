@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import Image from "next/image";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { MessageSquareText, User, Bot } from "lucide-react";
+import { MessageSquareText, User } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -96,9 +97,11 @@ interface TranscriptData {
 
 interface SessionMeta {
   session_id: string;
+  user_id?: string;
   persona: string;
   job_role: string;
   interviewer_name: string;
+  interviewer_avatar_url?: string;
   status: string;
   ended_by: string | null;
   created_at: string;
@@ -165,30 +168,78 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </Card>
   );
 }
-
+/* Stateful avatar component: shows the AI photo or falls back to initial. */
+function InterviewerAvatarImg({
+  src,
+  label,
+  initial,
+}: {
+  src?: string;
+  label: string;
+  initial: string;
+}) {
+  const [err, setErr] = useState(false);
+  if (src && !err) {
+    return (
+      <Image
+        src={src}
+        alt={label}
+        width={24}
+        height={24}
+        unoptimized
+        onError={() => setErr(true)}
+        className="h-6 w-6 rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/70 text-[10px] font-bold">
+      {initial}
+    </div>
+  );
+}
 /* ── Transcript list (shared between sidebar and sheet) ────────────────── */
 
-function TranscriptList({ turns }: { turns: TranscriptTurn[] }) {
+function TranscriptList({
+  turns,
+  interviewerName,
+  interviewerAvatarUrl,
+}: {
+  turns: TranscriptTurn[];
+  interviewerName?: string;
+  interviewerAvatarUrl?: string;
+}) {
   if (turns.length === 0) {
     return <p className="text-xs text-white/30 italic px-1">No transcript turns recorded.</p>;
   }
+
+  const interviewerInitial = (interviewerName ?? "I").trim()[0].toUpperCase();
+  const interviewerLabel = interviewerName ?? "Interviewer";
 
   return (
     <div className="flex flex-col gap-3">
       {turns.map((turn, i) => {
         const isUser = turn.speaker === "user";
         return (
-          <div key={i} className={`flex gap-2.5 ${isUser ? "" : ""}`}>
+          <div key={i} className={`flex gap-2.5 ${isUser ? "" : ""}` }>
             <div
-              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                isUser ? "bg-orange/20 text-orange" : "bg-white/10 text-white/50"
+              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                isUser ? "bg-orange/20 text-orange" : ""
               }`}
             >
-              {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+              {isUser ? (
+                <User className="h-3.5 w-3.5" />
+              ) : (
+                <InterviewerAvatarImg
+                  src={interviewerAvatarUrl}
+                  label={interviewerLabel}
+                  initial={interviewerInitial}
+                />
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-white/40 mb-0.5">
-                {isUser ? "You" : "Interviewer"}
+                {isUser ? "You" : interviewerLabel}
               </p>
               <p className="text-sm leading-relaxed text-white/80">{turn.text}</p>
             </div>
@@ -204,9 +255,30 @@ function TranscriptList({ turns }: { turns: TranscriptTurn[] }) {
 function FeedbackContent() {
   const params = useSearchParams();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
   const sessionId = params.get("session_id") ?? "";
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionPending && !session) {
+      router.replace(`/login?next=/interview/feedback?session_id=${sessionId}`);
+    }
+  }, [session, sessionPending, router, sessionId]);
+
+  // ── Ownership guard — runs once sessionMeta loads ─────────────────────────
+  const { data: sessionMeta } = useQuery({
+    queryKey: ["session-meta", sessionId],
+    queryFn: () => fetchSessionMeta(sessionId),
+    enabled: !!sessionId,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (sessionMeta?.user_id && session?.user?.id && sessionMeta.user_id !== session.user.id) {
+      router.replace("/dashboard");
+    }
+  }, [sessionMeta, session, router]);
 
   const { data: report, isLoading: loading, error: queryError } = useQuery({
     queryKey: ["feedback", sessionId],
@@ -227,14 +299,13 @@ function FeedbackContent() {
     retryDelay: 2000,
   });
 
-  const { data: sessionMeta } = useQuery({
-    queryKey: ["session-meta", sessionId],
-    queryFn: () => fetchSessionMeta(sessionId),
-    enabled: !!sessionId,
-    retry: false,
-  });
+  // sessionMeta already declared above for the ownership guard
 
   const turns = transcript?.turns ?? [];
+  // Build the interviewer avatar URL from the stored path (backend-relative)
+  const interviewerAvatarUrl = sessionMeta?.interviewer_avatar_url
+    ? `${API_BASE}${sessionMeta.interviewer_avatar_url}`
+    : undefined;
 
   const error = !sessionId
     ? "Missing session_id. Please start a new interview."
@@ -404,7 +475,11 @@ function FeedbackContent() {
                     <Skeleton className="h-10 w-full rounded-lg bg-white/10" />
                   </div>
                 ) : (
-                  <TranscriptList turns={turns} />
+                  <TranscriptList
+                    turns={turns}
+                    interviewerName={sessionMeta?.interviewer_name}
+                    interviewerAvatarUrl={interviewerAvatarUrl}
+                  />
                 )}
               </div>
             </ScrollArea>
@@ -452,7 +527,11 @@ function FeedbackContent() {
                     <Skeleton className="h-10 w-full rounded-lg bg-white/10" />
                   </div>
                 ) : (
-                  <TranscriptList turns={turns} />
+                  <TranscriptList
+                    turns={turns}
+                    interviewerName={sessionMeta?.interviewer_name}
+                    interviewerAvatarUrl={interviewerAvatarUrl}
+                  />
                 )}
               </div>
             </ScrollArea>

@@ -15,9 +15,9 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ from agents.question_generator import QuestionGeneratorAgent
 from agents.interview_engine import InterviewEngineAgent
 from agents.posture_analyzer import PostureAnalyzerAgent
 from agents.feedback_compiler import FeedbackCompilerAgent
+from agents.interviewer_avatar import InterviewerAvatarAgent
 
 # ---------------------------------------------------------------------------
 # Lifespan — initialise/teardown shared resources
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
     app.state.interview_engine = InterviewEngineAgent()
     app.state.posture_analyzer = PostureAnalyzerAgent()
     app.state.feedback_compiler = FeedbackCompilerAgent()
+    app.state.avatar_agent = InterviewerAvatarAgent()
     yield
     # Teardown (if needed) goes here
 
@@ -227,7 +229,7 @@ async def get_resume_file(user_id: str):
     )
 
 @app.post("/session/start", tags=["session"])
-async def start_session(config: SessionConfig):
+async def start_session(config: SessionConfig, background_tasks: BackgroundTasks):
     """Generate personalised interview questions and create a session."""
     questions = await app.state.question_generator.generate(
         user_id=config.user_id,
@@ -241,16 +243,54 @@ async def start_session(config: SessionConfig):
         persona=config.persona,
         job_role=config.job_role,
     )
+    # Eagerly warm up the avatar cache in the background so it is ready
+    # by the time the user enters the live interview page.
+    background_tasks.add_task(
+        app.state.avatar_agent.get_or_generate,
+        session_meta["interviewer_name"],
+        config.persona,
+    )
     return {
-        "session_id":     session_meta["session_id"],
-        "interviewer_name": session_meta["interviewer_name"],
-        "voice": session_meta["voice"],
-        "question_count": len(questions),
-        "questions":      questions,
-        "persona":        config.persona,
+        "session_id":             session_meta["session_id"],
+        "interviewer_name":       session_meta["interviewer_name"],
+        "interviewer_avatar_url": session_meta.get("interviewer_avatar_url"),
+        "voice":                  session_meta["voice"],
+        "question_count":         len(questions),
+        "questions":              questions,
+        "persona":                config.persona,
         "job_role":       config.job_role,
         "difficulty":     config.difficulty,
     }
+
+
+# ---------------------------------------------------------------------------
+# Interviewer avatars
+# ---------------------------------------------------------------------------
+
+@app.get("/interviewer-avatar/{name}", tags=["assets"])
+async def get_interviewer_avatar(name: str, persona: str = "neutral"):
+    """
+    Serve the AI-generated profile picture for an interviewer.
+
+    - Returns a cached JPEG from GCS if one exists for this name.
+    - Otherwise generates a new portrait with Imagen, caches it in GCS,
+      and streams it back.  Subsequent calls always hit the GCS cache.
+    - Responses are cache-controlled for 7 days so the browser/CDN rarely
+      needs to re-fetch (interviewer avatars are immutable once generated).
+    """
+    img_bytes = await app.state.avatar_agent.get_or_generate(name, persona)
+    if not img_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Avatar not available for interviewer '{name}'.",
+        )
+    return Response(
+        content=img_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "public, max-age=604800, immutable",  # 7 days
+        },
+    )
 
 
 @app.get("/session/{session_id}/questions", tags=["session"])
@@ -358,7 +398,7 @@ async def generate_feedback(req: FeedbackRequest):
 # ---------------------------------------------------------------------------
 
 @app.websocket("/ws/interview/{session_id}")
-async def websocket_interview(websocket: WebSocket, session_id: str):
+async def websocket_interview(websocket: WebSocket, session_id: str, user_id: str | None = None):
     """
     Streams audio chunks from the browser to the Gemini Live API and
     returns AI interviewer responses in real time.
@@ -368,7 +408,7 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     await websocket.accept()
     engine: InterviewEngineAgent = websocket.app.state.interview_engine
     try:
-        await engine.run_live_session(websocket, session_id)
+        await engine.run_live_session(websocket, session_id, caller_user_id=user_id)
     except WebSocketDisconnect:
         logger.debug("Browser disconnected from /ws/interview/%s", session_id)
     except Exception as exc:

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
@@ -50,6 +50,12 @@ export default function ResumePage() {
 function ResumeContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const from = searchParams.get("from");
+  const origin = searchParams.get("origin"); // original `from` forwarded by the upload page
+  const backHref  = from === "upload" ? `/resume/upload${origin ? `?from=${origin}` : ""}` : "/dashboard";
+  const backLabel = from === "upload" ? "Back to upload" : "Back to dashboard";
 
   const uid = session?.user?.id;
 
@@ -87,8 +93,8 @@ function ResumeContent() {
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-10 flex flex-col gap-8">
         {/* Breadcrumb + actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
-            <ArrowLeft size={14} /> Back to dashboard
+          <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
+            <ArrowLeft size={14} /> {backLabel}
           </Link>
           {resume && (
             <div className="flex items-center gap-3">

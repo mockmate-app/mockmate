@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { uploadResume } from "@/lib/api";
 import type { ParsedResume } from "@/lib/api";
@@ -18,6 +18,8 @@ import {
   GraduationCap,
   Star,
   Cpu,
+  User,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 // ---------------------------------------------------------------------------
 // Page
@@ -73,6 +77,14 @@ function ResumeContent({
   const from = searchParams.get("from");
   const backHref = from === "dashboard" ? "/dashboard" : from === "setup" ? "/interview/setup" : "/resume";
   const backLabel = from === "dashboard" ? "Back to dashboard" : from === "setup" ? "Back to interview setup" : "Back to my résumé";
+
+  const { data: existingResumeData, isLoading: loadingExistingResume } = useQuery({
+    queryKey: ["resume", userId],
+    queryFn: () =>
+      fetch(`${API_BASE}/resume/${userId}`).then((r) => (r.ok ? r.json() : null)),
+    enabled: !!userId,
+  });
+  const existingResume = existingResumeData?.resume_data ?? null;
 
   const [stage, setStage] = useState<Stage>("idle");
   const [dragging, setDragging] = useState(false);
@@ -270,6 +282,100 @@ function ResumeContent({
         {/* Parsed résumé result */}
         {stage === "success" && resume && (
           <ParsedResumeCard resume={resume} onReplace={reset} onContinue={() => router.push("/interview/setup?from=resume")} />
+        )}
+
+        {/* Current résumé card — shown while idle or after error */}
+        {(stage === "idle" || stage === "error") && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-semibold text-dark">Current résumé</p>
+            <Card className="rounded-xl border border-border">
+              <CardContent className="p-4">
+                {loadingExistingResume ? (
+                  <div className="flex flex-col gap-3 py-3">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-full" />
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <Skeleton className="h-4 w-3/4 rounded" />
+                        <Skeleton className="h-3 w-1/2 rounded" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-6 w-full rounded" />
+                    <Skeleton className="h-6 w-full rounded" />
+                  </div>
+                ) : existingResume ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Identity */}
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-orange/10">
+                        <User size={16} className="text-orange" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-dark text-sm truncate">{existingResume.name}</p>
+                        {existingResume.experience?.[0] && (
+                          <p className="text-xs text-muted mt-0.5 truncate">
+                            {existingResume.experience[0].title} · {existingResume.experience[0].company}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Skills */}
+                    {existingResume.skills && existingResume.skills.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted mb-2">Top skills</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {existingResume.skills.slice(0, 8).map((skill: string) => (
+                            <Badge
+                              key={skill}
+                              variant="outline"
+                              className="px-2 py-0.5 text-xs text-dark border-border bg-surface rounded-md"
+                            >
+                              {skill}
+                            </Badge>
+                          ))}
+                          {existingResume.skills.length > 8 && (
+                            <Badge variant="outline" className="px-2 py-0.5 text-xs text-muted border-border bg-surface rounded-md">
+                              +{existingResume.skills.length - 8} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Experience */}
+                    {existingResume.experience && existingResume.experience.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted mb-2">Experience</p>
+                        <div className="flex flex-col gap-3">
+                          {existingResume.experience.slice(0, 2).map((exp: { title: string; company: string; duration: string }, i: number) => (
+                            <div key={i} className="flex items-start gap-2.5">
+                              <Briefcase size={12} className="text-muted mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-dark truncate">{exp.title}</p>
+                                <p className="text-xs text-muted truncate">{exp.company} · {exp.duration}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Link
+                      href={`/resume?from=upload${from ? `&origin=${from}` : ""}`}
+                      className="text-xs text-orange hover:underline inline-flex items-center gap-1 w-fit"
+                    >
+                      View full résumé <ChevronRight size={12} />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-6 text-center">
+                    <FileText size={28} className="text-muted opacity-40" />
+                    <p className="text-sm text-muted">No résumé uploaded yet.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
     </div>

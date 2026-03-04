@@ -57,7 +57,7 @@ _COLLECTION         = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")     
 _RESUME_COLLECTION  = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")              # optional
 _TRANSCRIPT_COLLECTION = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts")  # optional
 _DATABASE           = os.getenv("FIRESTORE_DATABASE", "(default)")                      # optional
-_MODEL        = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")                 # optional
+_MODEL        = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")                 # optional
 _LIVE_MODEL   = os.getenv("MOCKMATE_LIVE_MODEL", "gemini-live-2.5-flash-native-audio")  # optional
 _APP_NAME     = "mockmate"
 _PUBSUB_TOPIC = os.getenv("PUBSUB_TOPIC_SESSION_END", "session-end")
@@ -372,11 +372,15 @@ Silently classify the candidate's answer BEFORE replying:
     Never confirm or deny. Never break character.
 
 3. PACING GUARDRAILS:
-  • If the candidate gives extremely long-winded answers (2+ minutes of monologue),
-    gently interrupt: "Let me stop you there — what was the key takeaway?"
+  • Keep the TOTAL interview to within 10 minutes of conversation — you MUST start
+    wrapping up and move to the candidate-questions phase by the 9-minute mark.
+    If you are running long, skip remaining competency areas and go straight to closing.
+  • If the candidate's answer runs longer than about 1 minute, gently cut in:
+    "Let me stop you there — what was the key takeaway?" or
+    "Got it — I want to make sure we cover everything, so let's move on."
+    Do NOT wait for them to finish. Interject naturally mid-sentence.
   • If the candidate gives only one-word answers repeatedly,
     don't just accept it: "Give me more than that — walk me through the situation."
-  • Keep the interview to roughly 15-25 minutes of content (5-7 competency areas + curveball).
 
 4. CANDIDATE-REQUESTED END — enforce immediately:
   • If the candidate explicitly asks to end, stop, or hang up the interview (e.g. "can you
@@ -491,6 +495,11 @@ class InterviewEngineAgent:
         except Exception:
             logger.warning("Could not fetch candidate name for user %s", user_id)
 
+        # Build a stable, predictable URL path for the interviewer avatar.
+        # The actual image is generated lazily by the /interviewer-avatar/{name}
+        # endpoint the first time it is requested; subsequent calls hit GCS cache.
+        interviewer_avatar_url = f"/interviewer-avatar/{interviewer_name}"
+
         doc: dict[str, Any] = {
             "session_id": session_id,
             "user_id": user_id,
@@ -498,6 +507,7 @@ class InterviewEngineAgent:
             "job_role": job_role,
             "voice": voice,
             "interviewer_name": interviewer_name,
+            "interviewer_avatar_url": interviewer_avatar_url,
             "accent_hint": accent_hint,
             "candidate_name": candidate_name,
             "questions": questions,
@@ -509,7 +519,9 @@ class InterviewEngineAgent:
         return {
             "session_id": session_id,
             "interviewer_name": interviewer_name,
+            "interviewer_avatar_url": interviewer_avatar_url,
             "voice": voice,
+            "persona": persona,
         }
 
     async def _save_transcript(
@@ -584,10 +596,14 @@ class InterviewEngineAgent:
                 "ended_by":         data.get("ended_by"),
                 "created_at":       data.get("created_at"),
                 "ended_at":         data.get("ended_at"),
+                "live_started_at":  data.get("live_started_at"),
                 "question_count":   len(data.get("questions", [])),
                 # written back by FeedbackCompilerAgent when report is compiled
                 "overall_score":    data.get("overall_score"),
                 "feedback_ready":   data.get("feedback_ready", False),
+                "decision":         data.get("decision"),
+                "last_retried_at":        data.get("last_retried_at"),
+                "interviewer_avatar_url": data.get("interviewer_avatar_url"),
             })
 
         # ── Aggregate stats from ALL sessions ──
@@ -607,8 +623,12 @@ class InterviewEngineAgent:
             "this_month": this_month,
         }
 
-        # Sort newest-first in Python, then page the slice
-        results.sort(key=lambda s: s.get("created_at") or "", reverse=True)
+        # Sort newest-first: prefer last_retried_at (for resumed sessions) so
+        # retried sessions bubble to the top; fall back to created_at.
+        results.sort(
+            key=lambda s: s.get("last_retried_at") or s.get("created_at") or "",
+            reverse=True,
+        )
         return results[offset:offset + limit], stats
 
     async def get_transcript(self, session_id: str) -> dict[str, Any] | None:
@@ -636,18 +656,20 @@ class InterviewEngineAgent:
             "interviewer_name": data.get("interviewer_name"),
             "status":           data.get("status"),
             "ended_by":         data.get("ended_by"),
+            "user_id":          data.get("user_id"),
             "created_at":       data.get("created_at"),
             "ended_at":         data.get("ended_at"),
             "question_count":   len(data.get("questions", [])),
-            "overall_score":    data.get("overall_score"),
-            "feedback_ready":   data.get("feedback_ready", False),
+            "overall_score":         data.get("overall_score"),
+            "feedback_ready":         data.get("feedback_ready", False),
+            "interviewer_avatar_url": data.get("interviewer_avatar_url"),
         }
 
     # ------------------------------------------------------------------
     # Live streaming  (ADK bidirectional streaming)
     # ------------------------------------------------------------------
 
-    async def run_live_session(self, websocket: WebSocket, session_id: str) -> None:
+    async def run_live_session(self, websocket: WebSocket, session_id: str, caller_user_id: str | None = None) -> None:
         """
         Bidirectional audio bridge between the browser WebSocket and the
         Gemini Live API via google-adk.
@@ -674,6 +696,16 @@ class InterviewEngineAgent:
 
         session_data = session_doc.to_dict()
         session_status = session_data.get("status", "created")
+
+        # ── Ownership check ───────────────────────────────────────────────────
+        # Reject the connection immediately if the caller is not the session owner.
+        session_owner = session_data.get("user_id")
+        if caller_user_id and session_owner and caller_user_id != session_owner:
+            await websocket.close(
+                code=4403,
+                reason="You do not have permission to access this interview session.",
+            )
+            return
         # Only block sessions that finished AND already have feedback generated.
         # Sessions in "created" or "ready" are brand-new.  Sessions that are
         # "active" or "ended" without feedback may have been abandoned/crashed,
@@ -717,6 +749,63 @@ class InterviewEngineAgent:
             session_opening=_build_opening_flavor(random.choice(_FLAVOR_OPENING)),
         )
 
+        # ── Session resume: inject prior transcript as context ───────────────
+        # If the session was previously active and already has a transcript in
+        # Firestore, automatically load it so the AI can continue where it left
+        # off.  This handles mid-interview disconnections seamlessly.
+        _is_resume = False
+        _prior_transcript_turns: list[dict[str, Any]] = []
+        if session_status in ("active", "ended"):
+            prior_doc = await (
+                self._db
+                .collection(_TRANSCRIPT_COLLECTION)
+                .document(session_id)
+                .get()
+            )
+            if prior_doc.exists:
+                prior_turns = prior_doc.to_dict().get("turns", [])
+                if prior_turns:
+                    _is_resume = True
+                    _prior_transcript_turns = prior_turns
+                    # Build conversation history text
+                    history_lines = []
+                    for entry in prior_turns:
+                        speaker = entry.get("speaker", "unknown")
+                        label = "CANDIDATE" if speaker == "user" else "INTERVIEWER"
+                        text = entry.get("text", "").strip()
+                        if text:
+                            history_lines.append(f"{label}: {text}")
+                    transcript_text = "\n".join(history_lines)
+                    system_prompt += f"""
+
+━━━ SESSION RESUME — CONNECTION WAS INTERRUPTED ━━━
+
+This is a RESUMED session. The connection was interrupted mid-interview.
+Below is the COMPLETE conversation that already took place before the drop.
+You MUST treat this as continuous — do NOT:
+  • Re-introduce yourself or greet the candidate again
+  • Ask for their introduction again
+  • Repeat any question you already asked
+  • Re-do small talk
+Instead:
+  • Acknowledge the reconnection briefly and naturally (one sentence, e.g.
+    "Hey, looks like we got disconnected — no worries, let’s pick up where
+    we left off.")
+  • Continue from the exact point the conversation was interrupted
+  • If you were mid-question, re-ask that specific question
+  • If the candidate was mid-answer, prompt them to continue
+  • Keep the same tone and persona you had before
+
+--- Prior conversation transcript ---
+{transcript_text}
+--- End of prior conversation ---
+"""
+                    logger.info(
+                        "Resuming session with prior transcript — "
+                        "session_id=%s  prior_turns=%d",
+                        session_id, len(prior_turns),
+                    )
+
         # ── Phase 1: init ADK runner (per-session; system prompt is dynamic) ──
         agent = Agent(
             name="mockmate_interviewer",
@@ -754,17 +843,15 @@ class InterviewEngineAgent:
             # (gemini-live-2.5-flash-native-audio supports both on Vertex AI)
             proactivity=genai_types.ProactivityConfig(proactive_audio=True),
             enable_affective_dialog=True,
-            # Server-side VAD: do NOT interrupt AI output when user speech is
-            # detected.  On mobile speakers the AI's own audio playback is picked
-            # up by the mic, triggering false "user interruption" events that
-            # break the conversation flow.  With NO_INTERRUPTION the model simply
-            # queues the user's input and responds after it finishes speaking.
+            # Server-side VAD: NO_INTERRUPTION prevents AI output being cut mid-sentence
+            # by mic echo on mobile.  Commented out so the AI can naturally interrupt
+            # long candidate answers (per pacing guardrails in the system prompt).
             realtime_input_config=genai_types.RealtimeInputConfig(
-                activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
+                # activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
                     end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
-                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
+                    silence_duration_ms=3000,  # wait 3 s of silence before ending turn
                     prefix_padding_ms=300,     # capture speech onset with padding
                 ),
             ),
@@ -792,12 +879,36 @@ class InterviewEngineAgent:
         # The upstream handler forwards {"type":"text"} payloads to the
         # live_request_queue automatically.
 
-        await self._db.collection(_COLLECTION).document(session_id).update(
-            {"status": "active"}
-        )
+        session_update: dict[str, Any] = {
+            "status": "active",
+            # Always stamp the actual start time of this live connection so that
+            # duration can be computed as (ended_at - live_started_at), giving the
+            # true interview length regardless of when the session was first created.
+            "live_started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if _is_resume:
+            session_update["last_retried_at"] = datetime.now(timezone.utc).isoformat()
+        await self._db.collection(_COLLECTION).document(session_id).update(session_update)
+
+        # Notify frontend whether this is a resume so it can adjust its
+        # kickstart message (the WS is already accepted at this point).
+        try:
+            meta_payload: dict[str, Any] = {
+                "type": "session_meta",
+                "resume": _is_resume,
+                "prior_turns": len(_prior_transcript_turns) if _is_resume else 0,
+            }
+            # Include the actual prior transcript turns so the frontend can
+            # display them in the chat history.
+            if _is_resume and _prior_transcript_turns:
+                meta_payload["transcript"] = _prior_transcript_turns
+            await websocket.send_text(json.dumps(meta_payload))
+        except Exception:
+            pass  # best-effort
 
         logger.info(
-            "Live session starting — session_id=%s  user_id=%s  model=%s",
+            "Live session %s — session_id=%s  user_id=%s  model=%s",
+            "resuming" if _is_resume else "starting",
             session_id, user_id, _LIVE_MODEL,
         )
 
@@ -890,7 +1001,9 @@ class InterviewEngineAgent:
                 pass  # connection already closed
 
         # Transcript turns accumulated in memory across downstream events.
-        _transcript_turns: list[dict[str, Any]] = []
+        # Pre-populate with prior turns on resume so the final saved
+        # transcript is a complete, gap-free record.
+        _transcript_turns: list[dict[str, Any]] = list(_prior_transcript_turns)
         _session_start_time = time.monotonic()
 
         async def _downstream() -> None:
@@ -1016,10 +1129,12 @@ class InterviewEngineAgent:
                 elapsed = time.monotonic() - _session_start_time
                 # Status 1000 = normal WebSocket close (OK). This is expected
                 # when the user ends the interview or the session times out.
-                if exc.status == 1000:
+                # Status None = normal close initiated by us (live_request_queue
+                # closed after user sent "end").
+                if exc.status in (1000, None):
                     logger.info(
-                        "Live connection closed normally (1000) — session_id=%s  elapsed=%.1fs",
-                        session_id, elapsed,
+                        "Live connection closed normally (%s) — session_id=%s  elapsed=%.1fs",
+                        exc.status, session_id, elapsed,
                     )
                 else:
                     logger.error(
@@ -1085,9 +1200,13 @@ class InterviewEngineAgent:
         finally:
             # ── Phase 4: terminate ────────────────────────────────────────────
             live_request_queue.close()   # idempotent
-            # Save transcript to its own collection (keeps session doc lean)
+            # Save transcript to its own collection (keeps session doc lean).
+            # For retried/resumed sessions, prepend the prior turns so the
+            # saved transcript always reflects the FULL conversation history
+            # (not just the turns from this connection).
             if _transcript_turns:
-                await self._save_transcript(session_id, _transcript_turns)
+                merged_turns = _prior_transcript_turns + _transcript_turns
+                await self._save_transcript(session_id, merged_turns)
             await self.end_session(session_id)
             logger.info(
                 "Live session ended — session_id=%s  transcript_turns=%d",

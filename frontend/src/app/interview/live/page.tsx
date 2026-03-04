@@ -21,7 +21,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import AppHeader from "@/components/AppHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,13 +55,16 @@ interface TranscriptEntry {
 }
 
 interface AdkEvent {
-  type: "input_transcription" | "output_transcription" | "control" | "ping" | "error";
+  type: "input_transcription" | "output_transcription" | "control" | "ping" | "error" | "session_meta";
   text?: string;
   finished?: boolean;
   turn_complete?: boolean;
   interrupted?: boolean;
   code?: string;
   message?: string;
+  resume?: boolean;
+  prior_turns?: number;
+  transcript?: Array<{ speaker: string; text: string; ts?: string }>;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -126,13 +130,27 @@ function ProfileAvatar({
   ai?: boolean;
 }) {
   if (image) {
+    if (ai) {
+      // Use unoptimized Next.js Image for interviewer avatars: they come from
+      // the backend API and remote pattern configuration would vary per env.
+      return (
+        <Image
+          src={image}
+          alt={fallback}
+          width={112}
+          height={112}
+          unoptimized
+          className="w-28 h-28 rounded-full border border-white/15 object-cover"
+        />
+      );
+    }
     return (
       <Image
         src={image}
         alt={fallback}
-        width={88}
-        height={88}
-        className="w-28 h-28 rounded-full border border-white/15 object-cover"
+        width={112}
+        height={112}
+        className="rounded-full border border-white/15 object-cover"
       />
     );
   }
@@ -191,7 +209,7 @@ function ParticipantCard({
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col items-center gap-3 min-w-45">
       {showVideo ? (
         <div
-          className={`rounded-xl overflow-hidden m-1 transition-all duration-200 ${
+          className={`rounded-xl overflow-hidden m-1 transition-all duration-200 p-1.5 ${
             speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
           }`}
         >
@@ -200,12 +218,12 @@ function ParticipantCard({
             autoPlay
             muted
             playsInline
-            className="w-28 h-28 object-cover rounded-lg bg-black"
+            className="aspect-video h-28 object-cover rounded-lg bg-black"
           />
         </div>
       ) : (
         <div
-          className={`rounded-full p-1.5 transition-all duration-200 ${
+          className={`rounded-full p-1.5 aspect-square transition-all duration-200 ${
             speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
           }`}
         >
@@ -241,24 +259,66 @@ function ParticipantCard({
   );
 }
 
+/* Small stateful component so each transcript bubble can independently fall
+   back to an initial-letter circle if the AI avatar fails to load. */
+function InterviewerBubbleAvatar({
+  src,
+  name,
+  initial,
+}: {
+  src: string | null;
+  name: string;
+  initial: string;
+}) {
+  const [err, setErr] = useState(false);
+  if (src && !err) {
+    return (
+      <Image
+        src={src}
+        alt={name}
+        width={28}
+        height={28}
+        unoptimized
+        onError={() => setErr(true)}
+        className="w-7 h-7 rounded-full shrink-0 object-cover"
+      />
+    );
+  }
+  return (
+    <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
+      <span className="text-white/70 text-xs font-bold select-none">{initial}</span>
+    </div>
+  );
+}
+
 function TypingBubble({
   speaker,
   interviewerInitial,
   userImage,
+  interviewerImage,
 }: {
   speaker: "you" | "interviewer";
   interviewerInitial: string;
   userImage?: string | null;
+  interviewerImage?: string | null;
 }) {
   const isAI = speaker === "interviewer";
   return (
     <div className={`flex gap-3 ${isAI ? "" : "flex-row-reverse"}`}>
       {isAI ? (
-        <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
-          <span className="text-white/60 text-xs font-bold select-none">
-            {interviewerInitial}
-          </span>
-        </div>
+        interviewerImage ? (
+          <InterviewerBubbleAvatar
+            src={interviewerImage}
+            name="Interviewer"
+            initial={interviewerInitial}
+          />
+        ) : (
+          <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
+            <span className="text-white/60 text-xs font-bold select-none">
+              {interviewerInitial}
+            </span>
+          </div>
+        )
       ) : userImage ? (
         <Image
           src={userImage}
@@ -306,15 +366,48 @@ export default function LiveInterviewPage() {
 function LiveInterviewContent() {
   const params = useSearchParams();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
+  const queryClient = useQueryClient();
 
   const sessionId = params.get("session_id") ?? "";
   const personaId = params.get("persona") ?? "neutral";
   const jobRole = params.get("job_role") ?? "Software Engineer";
   const interviewerName = params.get("interviewer_name") ?? "Alex";
+  const avatarUrlPath   = params.get("avatar_url") ?? "";
+
+  // ── Auth guard: redirect to /login if not authenticated ──────────────────
+  useEffect(() => {
+    if (!sessionPending && !session) {
+      router.replace(`/login?next=/interview/live${params.toString() ? "?" + params.toString() : ""}`);
+    }
+  }, [session, sessionPending, router, params]);
+
+  // ── Ownership gate: verify this session belongs to the logged-in user ─────
+  const [ownershipChecked, setOwnershipChecked] = useState(false);
+  useEffect(() => {
+    if (sessionPending || !session || !sessionId) return;
+    let cancelled = false;
+    fetch(`${API_BASE}/session/${encodeURIComponent(sessionId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        if (data?.user_id && data.user_id !== session.user.id) {
+          // Not the owner — kick back to dashboard immediately
+          router.replace("/dashboard");
+        } else {
+          setOwnershipChecked(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOwnershipChecked(true); // let the WS enforce it
+      });
+    return () => { cancelled = true; };
+  }, [session, sessionPending, sessionId, router]);
 
   const personaLabel = PERSONA_LABELS[personaId] ?? personaId;
   const interviewerInitial = interviewerName.trim()[0]?.toUpperCase() ?? "A";
+  // Resolve avatar URL: path stored in Firestore + returned from session/start
+  const interviewerAvatarUrl = avatarUrlPath ? `${API_BASE}${avatarUrlPath}` : null;
   const userImage = session?.user?.image ?? null;
 
   const [status, setStatus] = useState<InterviewStatus>("idle");
@@ -351,6 +444,7 @@ function LiveInterviewContent() {
   const aiSpeakingRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
   const reconnectingRef = useRef(false);
+  const isResumeRef = useRef(false);
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
@@ -654,6 +748,48 @@ function LiveInterviewContent() {
           return;
         }
 
+        // Session metadata from backend — tells us if this is a resume
+        if (msg.type === "session_meta") {
+          isResumeRef.current = msg.resume ?? false;
+          if (msg.resume && wsRef.current?.readyState === WebSocket.OPEN) {
+            // Populate the chat with prior transcript turns so the user
+            // can see the full conversation history from before the drop.
+            if (msg.transcript && Array.isArray(msg.transcript)) {
+              const priorEntries: TranscriptEntry[] = msg.transcript
+                .filter((t: { text?: string }) => t.text?.trim())
+                .map((t: { speaker: string; text: string; ts?: string }) => ({
+                  speaker: (t.speaker === "user" ? "you" : "interviewer") as "you" | "interviewer",
+                  text: t.text,
+                  finished: true,
+                  ts: t.ts ? new Date(t.ts).getTime() : Date.now(),
+                }));
+              if (priorEntries.length > 0) {
+                setTranscript(priorEntries);
+              }
+            }
+            appendStage(
+              `Resuming interview (${msg.prior_turns ?? 0} prior exchanges loaded)`,
+            );
+            // Tell the AI the candidate has reconnected — different from
+            // the fresh-start kickstart so the AI continues naturally.
+            wsRef.current.send(
+              JSON.stringify({
+                type: "text",
+                text: "[The candidate has reconnected after a connection interruption. Welcome them back briefly and continue the interview from where you left off. DO NOT repeat or summarize what was discussed before.]",
+              }),
+            );
+          } else if (wsRef.current?.readyState === WebSocket.OPEN) {
+            // Fresh start — send the normal kickstart
+            wsRef.current.send(
+              JSON.stringify({
+                type: "text",
+                text: "[The candidate has joined the interview. Please begin.]",
+              }),
+            );
+          }
+          return;
+        }
+
         // Server-side error events (ADK errors, Gemini API errors, etc.)
         if (msg.type === "error") {
           console.error("[MockMate] Server error:", msg.code, msg.message);
@@ -777,10 +913,15 @@ function LiveInterviewContent() {
         // ignore non-json
       }
     },
-    [playPcmChunk, scheduleInterviewerEnd],
+    [playPcmChunk, scheduleInterviewerEnd, appendStage],
   );
 
   const startInterview = useCallback(async () => {
+    if (!session) {
+      setError("Your session has expired. Please refresh the page and sign in again.");
+      setStatus("error");
+      return;
+    }
     if (!sessionId) {
       setError("No session ID provided. Please start from the setup page.");
       setStatus("error");
@@ -820,6 +961,12 @@ function LiveInterviewContent() {
       );
       if (checkRes.ok) {
         const sessionData = await checkRes.json();
+        // Ownership check — only the session owner may join the live interview
+        if (sessionData.user_id && session?.user?.id && sessionData.user_id !== session.user.id) {
+          setError("You don't have permission to access this interview session.");
+          setStatus("error");
+          return;
+        }
         if (sessionData.status === "ended" && sessionData.feedback_ready) {
           setError(
             "This session has already been completed. Please create a new interview from the setup page.",
@@ -858,7 +1005,7 @@ function LiveInterviewContent() {
         WS_BASE.startsWith("ws://")
           ? WS_BASE.replace("ws://", "wss://")
           : WS_BASE;
-      const ws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}`);
+      const ws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}?user_id=${encodeURIComponent(session?.user?.id ?? "")}`);
       wsRef.current = ws;
       ws.binaryType = "arraybuffer";
 
@@ -866,14 +1013,10 @@ function LiveInterviewContent() {
         setStatus("active");
         wasEverActiveRef.current = true;
         appendStage("Interview started");
-        // Tell the AI to begin — sent AFTER the mic is already active so
-        // the candidate's microphone is ready when the interviewer speaks.
-        ws.send(
-          JSON.stringify({
-            type: "text",
-            text: "[The candidate has joined the interview. Please begin.]",
-          }),
-        );
+        // The kickstart message is now sent when we receive the
+        // "session_meta" event from the backend, which tells us whether
+        // this is a fresh start or a resume.  This ensures the AI gets
+        // the right instruction ("begin" vs "continue where you left off").
       };
 
       ws.onmessage = handleMessage;
@@ -898,6 +1041,9 @@ function LiveInterviewContent() {
       ws.onclose = (e) => {
         if (e.code === 4404) {
           setError("Session not found. Please start a new interview.");
+          setStatus("error");
+        } else if (e.code === 4403) {
+          setError("You don't have permission to access this interview session.");
           setStatus("error");
         } else if (e.code === 4409) {
           setError(
@@ -929,7 +1075,7 @@ function LiveInterviewContent() {
               WS_BASE.startsWith("ws://")
                 ? WS_BASE.replace("ws://", "wss://")
                 : WS_BASE;
-            const rws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}`);
+            const rws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}?user_id=${encodeURIComponent(session?.user?.id ?? "")}`);
             wsRef.current = rws;
             rws.binaryType = "arraybuffer";
 
@@ -937,13 +1083,10 @@ function LiveInterviewContent() {
               reconnectAttemptsRef.current = 0;
               reconnectingRef.current = false;
               appendStage("Reconnected — interview continues");
-              // Re-kickstart: tell the AI the candidate reconnected
-              rws.send(
-                JSON.stringify({
-                  type: "text",
-                  text: "[The candidate's connection was briefly interrupted but has reconnected. Please continue the interview where you left off.]",
-                }),
-              );
+              // The kickstart message is deferred to the session_meta
+              // handler in handleMessage — the backend will send
+              // session_meta with resume=true which triggers the right
+              // resume kickstart automatically.
             };
 
             rws.onmessage = handleMessage;
@@ -969,6 +1112,7 @@ function LiveInterviewContent() {
       setStatus("error");
     }
   }, [
+    session,
     sessionId,
     handleMessage,
     startMic,
@@ -1032,9 +1176,14 @@ function LiveInterviewContent() {
       // Give the backend time to save transcript in the WebSocket finally block
       // (the WS close triggers transcript persistence on the server side).
       await new Promise((r) => setTimeout(r, 2500));
+      // Bust the React Query cache for this session so the feedback page
+      // always fetches the latest transcript and regenerates feedback from
+      // the full (prior + new) transcript rather than showing stale data.
+      queryClient.removeQueries({ queryKey: ["feedback", sessionId] });
+      queryClient.removeQueries({ queryKey: ["transcript", sessionId] });
       setFeedbackReady(true);
     },
-    [closeAudioContextSafely, persistSessionEnd],
+    [closeAudioContextSafely, persistSessionEnd, queryClient, sessionId],
   );
 
   const endInterviewRef = useRef(endInterview);
@@ -1160,16 +1309,23 @@ function LiveInterviewContent() {
 
   return (
     <div className="h-screen bg-dark text-white flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-30 bg-dark border-b border-white/10 px-5 sm:px-6 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="font-semibold text-base sm:text-lg">Live Interview</h1>
-          <p className="text-xs sm:text-sm text-white/45">
-            <span className="text-primary">Job role </span> {jobRole} ·
-            <span className="text-primary">Persona </span> {personaLabel}
-          </p>
-        </div>
+      <AppHeader
+        homeHref="/dashboard"
+        variant="dark"
+        name={session?.user?.name}
+        email={session?.user?.email}
+        image={session?.user?.image}
+      />
+
+      {/* Interview info + status bar */}
+      <div className="shrink-0 bg-dark border-b border-white/10 px-5 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+        <p className="text-xs sm:text-sm text-white/45 truncate">
+          <span className="text-primary">Job role </span>{jobRole}
+          {" · "}
+          <span className="text-primary">Persona </span>{personaLabel}
+        </p>
         <span
-          className={`px-3 py-1 rounded-full text-xs font-medium ${
+          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
             status === "active"
               ? "bg-green-500/20 text-green-400"
               : status === "connecting"
@@ -1183,7 +1339,7 @@ function LiveInterviewContent() {
         >
           {statusLabel}
         </span>
-      </header>
+      </div>
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         <aside className="lg:w-85 xl:w-95 border-b lg:border-b-0 lg:border-r border-white/10 p-4 shrink-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto">
@@ -1191,6 +1347,7 @@ function LiveInterviewContent() {
             <ParticipantCard
               title={interviewerName}
               subtitle={`${personaLabel} interviewer`}
+              image={interviewerAvatarUrl}
               speaking={aiSpeaking}
               ai
               ended={status === "ended"}
@@ -1224,7 +1381,7 @@ function LiveInterviewContent() {
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 flex flex-col gap-3">
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
-                {error}{error.includes("session has already been used") ? <Link href="/interview/setup?from=dashboard" className="underline ml-1">Go to setup page</Link> : null}
+                {error}{error.includes("create a new interview") ? <Link href="/interview/setup?from=dashboard" className="underline ml-1">Go to setup page</Link> : null}
               </div>
             )}
 
@@ -1232,6 +1389,7 @@ function LiveInterviewContent() {
               <TypingBubble
                 speaker="interviewer"
                 interviewerInitial={interviewerInitial}
+                interviewerImage={interviewerAvatarUrl}
                 userImage={userImage}
               />
             )}
@@ -1242,6 +1400,7 @@ function LiveInterviewContent() {
                 <TypingBubble
                   speaker="you"
                   interviewerInitial={interviewerInitial}
+                  interviewerImage={interviewerAvatarUrl}
                   userImage={userImage}
                 />
               )}
@@ -1252,7 +1411,7 @@ function LiveInterviewContent() {
               !youSpeaking &&
               !(yourTurn && !muted) && (
                 <div className="flex-1 flex items-center justify-center text-white/35 text-sm text-center">
-                  {status === "idle" && "Click Start Interview to begin."}
+                  {status === "idle" && (ownershipChecked ? "Click Start Interview to begin." : "Verifying access…")}
                   {status === "connecting" && "Connecting to your interviewer…"}
                   {status === "active" &&
                     "The conversation transcript will appear here."}
@@ -1277,11 +1436,11 @@ function LiveInterviewContent() {
                   className={`flex gap-3 ${entry.speaker === "you" ? "flex-row-reverse" : ""}`}
                 >
                   {entry.speaker === "interviewer" ? (
-                    <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center bg-white/10">
-                      <span className="text-white/70 text-xs font-bold select-none">
-                        {interviewerInitial}
-                      </span>
-                    </div>
+                    <InterviewerBubbleAvatar
+                      src={interviewerAvatarUrl}
+                      name={interviewerName}
+                      initial={interviewerInitial}
+                    />
                   ) : userImage ? (
                     <Image
                       src={userImage}
@@ -1314,6 +1473,7 @@ function LiveInterviewContent() {
               <TypingBubble
                 speaker="interviewer"
                 interviewerInitial={interviewerInitial}
+                interviewerImage={interviewerAvatarUrl}
                 userImage={userImage}
               />
             )}
@@ -1324,6 +1484,7 @@ function LiveInterviewContent() {
                 <TypingBubble
                   speaker="you"
                   interviewerInitial={interviewerInitial}
+                  interviewerImage={interviewerAvatarUrl}
                   userImage={userImage}
                 />
               )}
@@ -1447,10 +1608,11 @@ function LiveInterviewContent() {
               {(status === "idle" || status === "error") && (
                 <button
                   onClick={startInterview}
-                  className="flex items-center gap-2 bg-orange hover:bg-orange-500 text-white px-6 py-3 rounded-full font-medium"
+                  disabled={!ownershipChecked}
+                  className="flex items-center gap-2 bg-orange hover:bg-orange-500 disabled:bg-white/10 disabled:text-white/40 disabled:cursor-not-allowed text-white px-6 py-3 rounded-full font-medium transition-colors"
                 >
-                  <Mic size={18} />
-                  Start Interview
+                  {!ownershipChecked ? <Loader2 size={18} className="animate-spin" /> : <Mic size={18} />}
+                  {!ownershipChecked ? "Verifying…" : "Start Interview"}
                 </button>
               )}
 
