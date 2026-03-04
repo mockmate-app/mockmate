@@ -20,7 +20,7 @@ export default function Hero() {
         />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-6 pt-36 pb-28 text-center">
+      <div className="relative mx-auto max-w-7xl px-6 pt-36 pb-28 flex flex-col items-center text-center">
         {/* Eyebrow pill */}
         <Badge
           variant="outline"
@@ -31,13 +31,13 @@ export default function Hero() {
         </Badge>
 
         {/* Main headline */}
-        <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-tight tracking-tight text-light sm:text-6xl lg:text-7xl">
+        <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tight text-light sm:text-6xl lg:text-7xl">
           Interview practice,{" "}
           <span className="text-gradient">without the nerves.</span>
         </h1>
 
         {/* Subtext */}
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-light/60">
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-light/60">
           MockMate conducts live, voice-based mock interviews personalised to
           your résumé — scoring your tone, posture, vocabulary, and confidence
           in real time. Walk into every real interview already knowing how it

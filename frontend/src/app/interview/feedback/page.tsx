@@ -157,9 +157,9 @@ function DimensionBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <Card className="rounded-2xl border border-white/10 bg-white/5">
+    <Card className={`rounded-2xl border border-white/10 bg-white/5 ${className}`}>
       <CardContent className="p-5">
         <h2 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-4">
           {title}
@@ -474,7 +474,7 @@ function FeedbackContent() {
               )}
 
               {/* Decision letter */}
-              <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"}>
+              <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"} className="border-orange">
                 <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">
                   {report.decision_letter}
                 </p>
@@ -483,10 +483,10 @@ function FeedbackContent() {
           )}
 
           <Button
-            onClick={() => router.push("/dashboard")}
-            className="self-start rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
+            onClick={() => router.back()}
+            className="self-start rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5 mx-auto"
           >
-            Back to Dashboard
+            Go back
           </Button>
         </div>
 
