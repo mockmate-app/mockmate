@@ -54,11 +54,13 @@ interface TranscriptEntry {
 }
 
 interface AdkEvent {
-  type: "input_transcription" | "output_transcription" | "control";
+  type: "input_transcription" | "output_transcription" | "control" | "ping" | "error";
   text?: string;
   finished?: boolean;
   turn_complete?: boolean;
   interrupted?: boolean;
+  code?: string;
+  message?: string;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -71,6 +73,8 @@ const WS_BASE =
   process.env.NEXT_PUBLIC_WS_URL ?? API_BASE.replace(/^http/, "ws");
 const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
+const WS_RECONNECT_MAX_ATTEMPTS = 3;
+const WS_RECONNECT_DELAY_MS = 2000;
 
 const PERSONA_LABELS: Record<string, string> = {
   neutral: "Professional",
@@ -345,6 +349,8 @@ function LiveInterviewContent() {
   const endingRef = useRef(false);
   const wasEverActiveRef = useRef(false);
   const aiSpeakingRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectingRef = useRef(false);
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
@@ -640,6 +646,35 @@ function LiveInterviewContent() {
       try {
         const msg: AdkEvent = JSON.parse(event.data as string);
 
+        // Keep-alive: respond to server pings immediately
+        if (msg.type === "ping") {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: "pong" }));
+          }
+          return;
+        }
+
+        // Server-side error events (ADK errors, Gemini API errors, etc.)
+        if (msg.type === "error") {
+          console.error("[MockMate] Server error:", msg.code, msg.message);
+          // Terminal errors — show in transcript but don't end immediately
+          // (the server may recover via session resumption)
+          const isTerminal = msg.code === "SAFETY" || msg.code === "MAX_TOKENS";
+          if (isTerminal) {
+            setTranscript((prev) => [
+              ...prev,
+              {
+                speaker: "system" as const,
+                kind: "stage" as const,
+                text: `Interview ended: ${msg.message || msg.code || "server error"}`,
+                ts: Date.now(),
+              },
+            ]);
+            endInterviewRef.current?.("system");
+          }
+          return;
+        }
+
         if (
           (msg.type === "input_transcription" ||
             msg.type === "output_transcription") &&
@@ -759,6 +794,8 @@ function LiveInterviewContent() {
     pendingInterviewerEndRef.current = false;
     endingRef.current = false;
     wasEverActiveRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    reconnectingRef.current = false;
     if (interviewerEndTimeoutRef.current) {
       window.clearTimeout(interviewerEndTimeoutRef.current);
       interviewerEndTimeoutRef.current = null;
@@ -867,7 +904,57 @@ function LiveInterviewContent() {
             "This session has already been used. Please create a new interview from the setup page.",
           );
           setStatus("error");
+        } else if (
+          // Abnormal close while interview is active and user didn't end it:
+          // attempt transparent reconnection instead of immediately ending.
+          e.code !== 1000 &&
+          wasEverActiveRef.current &&
+          !endingRef.current &&
+          reconnectAttemptsRef.current < WS_RECONNECT_MAX_ATTEMPTS
+        ) {
+          reconnectAttemptsRef.current += 1;
+          reconnectingRef.current = true;
+          const attempt = reconnectAttemptsRef.current;
+          console.warn(
+            `[MockMate] WS closed unexpectedly (code=${e.code}). ` +
+            `Reconnect attempt ${attempt}/${WS_RECONNECT_MAX_ATTEMPTS}…`,
+          );
+          appendStage(`Connection lost — reconnecting (${attempt}/${WS_RECONNECT_MAX_ATTEMPTS})…`);
+
+          window.setTimeout(() => {
+            if (endingRef.current) return;
+            const safeWsBase =
+              typeof window !== "undefined" &&
+              window.location.protocol === "https:" &&
+              WS_BASE.startsWith("ws://")
+                ? WS_BASE.replace("ws://", "wss://")
+                : WS_BASE;
+            const rws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}`);
+            wsRef.current = rws;
+            rws.binaryType = "arraybuffer";
+
+            rws.onopen = () => {
+              reconnectAttemptsRef.current = 0;
+              reconnectingRef.current = false;
+              appendStage("Reconnected — interview continues");
+              // Re-kickstart: tell the AI the candidate reconnected
+              rws.send(
+                JSON.stringify({
+                  type: "text",
+                  text: "[The candidate's connection was briefly interrupted but has reconnected. Please continue the interview where you left off.]",
+                }),
+              );
+            };
+
+            rws.onmessage = handleMessage;
+            rws.onerror = () => {
+              // Let onclose handle it
+            };
+            // Recursive — this same onclose handler runs on the new socket
+            rws.onclose = ws.onclose;
+          }, WS_RECONNECT_DELAY_MS);
         } else {
+          reconnectingRef.current = false;
           setStatus((prev) => {
             if (prev === "active") {
               appendStage("Interview ended (connection closed)");

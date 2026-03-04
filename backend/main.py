@@ -329,8 +329,28 @@ async def read_feedback(session_id: str):
 @app.post("/feedback/generate", tags=["feedback"])
 async def generate_feedback(req: FeedbackRequest):
     """Compile full multimodal feedback and mock hiring decision letter."""
-    report = await app.state.feedback_compiler.compile(req.session_id)
-    return report
+    try:
+        report = await app.state.feedback_compiler.compile(req.session_id)
+        return report
+    except ValueError as exc:
+        # Session not found
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        # Timeout, model error, or JSON parse failure
+        logger.error(
+            "Feedback generation failed for session '%s' — %s",
+            req.session_id, exc,
+        )
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        logger.error(
+            "Unexpected error generating feedback for session '%s' — %s: %s",
+            req.session_id, type(exc).__name__, exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error generating feedback: {type(exc).__name__}",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -11,9 +11,11 @@ Results are persisted in Firestore and returned to the caller.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import traceback
 from datetime import datetime, timezone
 from typing import Any
 
@@ -38,7 +40,7 @@ def _require(var: str) -> str:
 _PROJECT      = _require("GOOGLE_CLOUD_PROJECT")
 _REGION       = _require("GOOGLE_CLOUD_LOCATION")
 _DATABASE     = os.getenv("FIRESTORE_DATABASE", "(default)")               # optional
-_MODEL        = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")           # optional
+_MODEL        = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")           # optional
 _COL_SESSIONS     = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")       # optional
 _COL_TRANSCRIPTS  = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts") # optional
 _COL_POSTURE      = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores") # optional
@@ -243,15 +245,66 @@ class FeedbackCompilerAgent:
             transcript=transcript_text,
             posture_summary=json.dumps(posture_avg, indent=2),
         )
-        response = await self._model.generate_content_async(
-            [Part.from_text(prompt)],
-            generation_config=GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.3,
-                max_output_tokens=4096,
-            ),
+
+        logger.info(
+            "Generating feedback report — session=%s  prompt_chars=%d  "
+            "transcript_turns=%d  model=%s",
+            session.get("session_id", "?"), len(prompt),
+            len(transcript_turns), _MODEL,
         )
-        return json.loads(response.text)
+
+        _FEEDBACK_TIMEOUT = 180  # seconds — generous for long transcripts
+
+        try:
+            response = await asyncio.wait_for(
+                self._model.generate_content_async(
+                    [Part.from_text(prompt)],
+                    generation_config=GenerationConfig(
+                        response_mime_type="application/json",
+                        temperature=0.3,
+                        max_output_tokens=16384,
+                    ),
+                ),
+                timeout=_FEEDBACK_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "Feedback generation timed out after %ds — session=%s",
+                _FEEDBACK_TIMEOUT, session.get("session_id", "?"),
+            )
+            raise RuntimeError(
+                f"Feedback generation timed out after {_FEEDBACK_TIMEOUT}s. "
+                "The transcript may be too long. Please try again."
+            )
+        except Exception as exc:
+            logger.error(
+                "Feedback generation failed — session=%s  %s: %s\n%s",
+                session.get("session_id", "?"),
+                type(exc).__name__, exc,
+                traceback.format_exc(),
+            )
+            raise RuntimeError(
+                f"Feedback generation failed: {type(exc).__name__}: {exc}"
+            ) from exc
+
+        raw_text = response.text
+        logger.info(
+            "Feedback response received — session=%s  response_chars=%d",
+            session.get("session_id", "?"), len(raw_text) if raw_text else 0,
+        )
+
+        try:
+            return json.loads(raw_text)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.error(
+                "Feedback JSON parse failed — session=%s  error=%s  "
+                "raw_response_first_500=%s",
+                session.get("session_id", "?"), exc,
+                (raw_text or "")[:500],
+            )
+            raise RuntimeError(
+                "Feedback model returned invalid JSON. Please try again."
+            ) from exc
 
     async def _persist(self, session_id: str, report: dict[str, Any]) -> None:
         await self._db.collection(_COL_FEEDBACK).document(session_id).set(report)

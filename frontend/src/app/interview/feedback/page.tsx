@@ -265,7 +265,7 @@ function FeedbackContent() {
                 <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
               </p>
             ) : (
-              <p className="text-white/40 text-xs mt-1">Loading session info…</p>
+              <p className="text-white/40 text-xs mt-1">Loading interview info…</p>
             )}
           </div>
 

@@ -16,6 +16,8 @@ import json
 import logging
 import os
 import random
+import time
+import traceback
 import uuid
 import pathlib
 import warnings
@@ -32,6 +34,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 from google.genai.errors import APIError
+from google.adk.tools import google_search
 from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
@@ -54,7 +57,7 @@ _COLLECTION         = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")     
 _RESUME_COLLECTION  = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")              # optional
 _TRANSCRIPT_COLLECTION = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts")  # optional
 _DATABASE           = os.getenv("FIRESTORE_DATABASE", "(default)")                      # optional
-_MODEL        = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")                 # optional
+_MODEL        = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")                 # optional
 _LIVE_MODEL   = os.getenv("MOCKMATE_LIVE_MODEL", "gemini-live-2.5-flash-native-audio")  # optional
 _APP_NAME     = "mockmate"
 _PUBSUB_TOPIC = os.getenv("PUBSUB_TOPIC_SESSION_END", "session-end")
@@ -719,6 +722,7 @@ class InterviewEngineAgent:
             name="mockmate_interviewer",
             model=_LIVE_MODEL,
             instruction=system_prompt,
+            tools=[google_search],
         )
         runner = Runner(
             agent=agent,
@@ -774,6 +778,9 @@ class InterviewEngineAgent:
                 trigger_tokens=100_000,   # compress at ~78 % of 128k window
                 sliding_window=genai_types.SlidingWindow(target_tokens=80_000),
             ),
+            # Persist audio streams to ADK session & artifact services so
+            # file_data references are retained for post-session analysis
+            save_live_blob=True,
         )
 
         live_request_queue = LiveRequestQueue()  # one per session, never reused
@@ -838,6 +845,9 @@ class InterviewEngineAgent:
 
                         if payload.get("type") == "end":
                             break
+                        if payload.get("type") == "pong":
+                            # Client heartbeat response — keeps connection alive
+                            continue
                         if payload.get("type") == "text":
                             live_request_queue.send_content(
                                 genai_types.Content(
@@ -863,8 +873,25 @@ class InterviewEngineAgent:
                 _ws_open = False
                 live_request_queue.close()
 
+        # ── Keep-alive heartbeat ──────────────────────────────────────────
+        # Cloud Run and many reverse proxies close idle WebSocket connections
+        # (default ~10 min).  During long candidate answers no audio flows
+        # server→client, so the connection looks idle.  Sending a lightweight
+        # JSON ping every 20 s prevents premature termination.
+        _HEARTBEAT_INTERVAL = 20  # seconds
+
+        async def _heartbeat() -> None:
+            """Send periodic keep-alive pings to the browser WebSocket."""
+            try:
+                while _ws_open:
+                    await asyncio.sleep(_HEARTBEAT_INTERVAL)
+                    await _safe_send_text(json.dumps({"type": "ping"}))
+            except Exception:
+                pass  # connection already closed
+
         # Transcript turns accumulated in memory across downstream events.
         _transcript_turns: list[dict[str, Any]] = []
+        _session_start_time = time.monotonic()
 
         async def _downstream() -> None:
             """Receive ADK events → forward to browser, accumulate transcript."""
@@ -883,6 +910,54 @@ class InterviewEngineAgent:
                         live_request_queue=live_request_queue,
                         run_config=run_config,
                     ):
+                        elapsed = time.monotonic() - _session_start_time
+
+                        # ── Error events ──────────────────────────────────────────
+                        if hasattr(event, 'error_code') and event.error_code:
+                            logger.error(
+                                "ADK event error — session_id=%s  elapsed=%.1fs  "
+                                "error_code=%s  error_message=%s",
+                                session_id, elapsed,
+                                event.error_code,
+                                getattr(event, 'error_message', 'N/A'),
+                            )
+                            await _safe_send_text(json.dumps({
+                                "type": "error",
+                                "code": str(event.error_code),
+                                "message": getattr(event, 'error_message', ''),
+                            }))
+                            # Terminal errors — stop the loop
+                            terminal_codes = {'SAFETY', 'MAX_TOKENS'}
+                            if str(event.error_code) in terminal_codes:
+                                logger.warning(
+                                    "Terminal error code %s — stopping downstream  session_id=%s",
+                                    event.error_code, session_id,
+                                )
+                                break
+                            # Transient errors — continue processing
+                            continue
+
+                        # ── GoAway pre-disconnect warning ─────────────────────────
+                        if hasattr(event, 'go_away') and event.go_away:
+                            logger.info(
+                                "GoAway received — session_id=%s  elapsed=%.1fs  "
+                                "time_left=%s",
+                                session_id, elapsed,
+                                getattr(event.go_away, 'time_left', 'unknown'),
+                            )
+
+                        # ── Usage metadata tracking ───────────────────────────────
+                        if hasattr(event, 'usage_metadata') and event.usage_metadata:
+                            um = event.usage_metadata
+                            logger.debug(
+                                "Token usage — session_id=%s  elapsed=%.1fs  "
+                                "prompt=%s  candidates=%s  total=%s",
+                                session_id, elapsed,
+                                getattr(um, 'prompt_token_count', '?'),
+                                getattr(um, 'candidates_token_count', '?'),
+                                getattr(um, 'total_token_count', '?'),
+                            )
+
                         # ── Audio output ──────────────────────────────────────────
                         if event.content and event.content.parts:
                             for part in event.content.parts:
@@ -938,35 +1013,59 @@ class InterviewEngineAgent:
                                 })
                             )
             except APIError as exc:
+                elapsed = time.monotonic() - _session_start_time
                 # Status 1000 = normal WebSocket close (OK). This is expected
                 # when the user ends the interview or the session times out.
                 if exc.status == 1000:
                     logger.info(
-                        "Live connection closed normally (1000) — session_id=%s",
-                        session_id,
+                        "Live connection closed normally (1000) — session_id=%s  elapsed=%.1fs",
+                        session_id, elapsed,
                     )
                 else:
                     logger.error(
-                        "Gemini Live API error in downstream — session_id=%s  status=%s  message=%s",
-                        session_id, exc.status, exc.message,
+                        "Gemini Live API error in downstream — session_id=%s  "
+                        "elapsed=%.1fs  status=%s  message=%s\n%s",
+                        session_id, elapsed, exc.status, exc.message,
+                        traceback.format_exc(),
                     )
+                    await _safe_send_text(json.dumps({
+                        "type": "error",
+                        "code": str(exc.status),
+                        "message": str(exc.message),
+                    }))
             except ConnectionClosed as exc:
+                elapsed = time.monotonic() - _session_start_time
                 # Underlying websockets lib close — check if clean (1000/1001)
                 if exc.rcvd and exc.rcvd.code in (1000, 1001):
                     logger.info(
-                        "Gemini WS closed cleanly (%d) — session_id=%s",
-                        exc.rcvd.code, session_id,
+                        "Gemini WS closed cleanly (%d) — session_id=%s  elapsed=%.1fs",
+                        exc.rcvd.code, session_id, elapsed,
                     )
                 else:
                     logger.warning(
-                        "Gemini WS closed unexpectedly — session_id=%s  exc=%s",
-                        session_id, exc,
+                        "Gemini WS closed unexpectedly — session_id=%s  "
+                        "elapsed=%.1fs  exc=%s\n%s",
+                        session_id, elapsed, exc,
+                        traceback.format_exc(),
                     )
+                    await _safe_send_text(json.dumps({
+                        "type": "error",
+                        "code": str(exc.rcvd.code if exc.rcvd else 'unknown'),
+                        "message": f"Connection closed unexpectedly: {exc}",
+                    }))
             except Exception as exc:
+                elapsed = time.monotonic() - _session_start_time
                 logger.error(
-                    "Unexpected error in downstream — session_id=%s  %s: %s",
-                    session_id, type(exc).__name__, exc,
+                    "Unexpected error in downstream — session_id=%s  "
+                    "elapsed=%.1fs  %s: %s\n%s",
+                    session_id, elapsed, type(exc).__name__, exc,
+                    traceback.format_exc(),
                 )
+                await _safe_send_text(json.dumps({
+                    "type": "error",
+                    "code": "INTERNAL",
+                    "message": f"{type(exc).__name__}: {exc}",
+                }))
 
         # ── Phase 3: run concurrently ─────────────────────────────────────────
         # FastAPI/Starlette WebSocket can only have one concurrent reader.
@@ -975,6 +1074,7 @@ class InterviewEngineAgent:
             await asyncio.gather(
                 _upstream(),
                 _downstream(),
+                _heartbeat(),
                 return_exceptions=True,
             )
         except Exception as exc:

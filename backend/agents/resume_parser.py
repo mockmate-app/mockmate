@@ -54,7 +54,7 @@ _REGION     = _require("GOOGLE_CLOUD_LOCATION")
 _BUCKET     = _require("GCS_BUCKET")
 _COLLECTION = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")  # optional, sensible default
 _DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")          # optional, sensible default
-_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")     # optional, sensible default
+_MODEL      = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")     # optional, sensible default
 
 # ---------------------------------------------------------------------------
 # Prompt

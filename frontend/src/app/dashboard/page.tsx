@@ -223,7 +223,7 @@ function DashboardContent() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">Hi, {firstName} 👋</h1>
-            <p className="mt-1.5 text-sm text-muted">Here&apos;s your interview practice overview.</p>
+            <p className="mt-1.5 text-sm text-muted">Here&apos;s your interview practice overview</p>
           </div>
           <Button
             asChild

@@ -51,7 +51,7 @@ _REGION               = _require("GOOGLE_CLOUD_LOCATION")
 _COLLECTION_RESUMES   = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")    # optional
 _COLLECTION_SESSIONS  = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")  # optional
 _DATABASE             = os.getenv("FIRESTORE_DATABASE", "(default)")            # optional
-_MODEL                = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")       # optional
+_MODEL                = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")       # optional
 
 # ---------------------------------------------------------------------------
 # Persona registry
