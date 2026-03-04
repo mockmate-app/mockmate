@@ -69,14 +69,14 @@ interface FeedbackReport {
     structure: number;
     technical_depth: number;
     domain_vocabulary: number;
-    posture_presence: number;
+    posture_presence?: number;
   };
   strengths: string[];
   improvement_areas: string[];
   filler_words: { count: number; examples: string[] };
   vocabulary_calibration: string;
   tone_analysis: string;
-  posture_summary: string;
+  posture_summary?: string;
   decision: "offer" | "rejection";
   decision_letter: string;
   session_id: string;
@@ -271,7 +271,8 @@ function FeedbackContent() {
     queryKey: ["session-meta", sessionId],
     queryFn: () => fetchSessionMeta(sessionId),
     enabled: !!sessionId,
-    retry: false,
+    retry: 2,
+    retryDelay: 1500,
   });
 
   useEffect(() => {
@@ -295,8 +296,11 @@ function FeedbackContent() {
     queryKey: ["transcript", sessionId],
     queryFn: () => fetchTranscript(sessionId),
     enabled: !!sessionId,
-    retry: 2,
-    retryDelay: 2000,
+    retry: 6,
+    retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 8000),
+    // Keep polling every 3 s until transcript data arrives — covers the
+    // race window where the backend hasn't finished persisting yet.
+    refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
   // sessionMeta already declared above for the ownership guard
@@ -328,13 +332,22 @@ function FeedbackContent() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
-              <p className="text-white/40 text-xs md:text-sm mt-1">
-                <span className="text-primary">Job role </span>{sessionMeta.job_role}
-                {" · "}
-                <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
-                {" · "}
-                <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                {interviewerAvatarUrl && (
+                  <InterviewerAvatarImg
+                    src={interviewerAvatarUrl}
+                    label={sessionMeta.interviewer_name}
+                    initial={sessionMeta.interviewer_name.trim()[0].toUpperCase()}
+                  />
+                )}
+                <p className="text-white/40 text-xs md:text-sm">
+                  <span className="text-primary">Job role </span>{sessionMeta.job_role}
+                  {" · "}
+                  <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
+                  {" · "}
+                  <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
+                </p>
+              </div>
             ) : (
               <p className="text-white/40 text-xs mt-1">Loading interview info…</p>
             )}
@@ -432,10 +445,12 @@ function FeedbackContent() {
                 </Section>
               </div>
 
-              {/* Posture */}
-              <Section title="Posture & Presence">
-                <p className="text-sm text-white/80 leading-relaxed">{report.posture_summary}</p>
-              </Section>
+              {/* Posture — only shown when camera was enabled */}
+              {report.posture_summary && (
+                <Section title="Posture & Presence">
+                  <p className="text-sm text-white/80 leading-relaxed">{report.posture_summary}</p>
+                </Section>
+              )}
 
               {/* Decision letter */}
               <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"}>

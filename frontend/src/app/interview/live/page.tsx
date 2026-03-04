@@ -79,6 +79,9 @@ const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
 const WS_RECONNECT_MAX_ATTEMPTS = 3;
 const WS_RECONNECT_DELAY_MS = 2000;
+const POSTURE_FRAME_INTERVAL_MS = 10_000; // capture a frame every 10 seconds
+const POSTURE_FRAME_QUALITY = 0.7;        // JPEG quality (0-1)
+const POSTURE_FRAME_SIZE = 768;           // resize to 768x768 for the model
 
 const PERSONA_LABELS: Record<string, string> = {
   neutral: "Professional",
@@ -107,9 +110,8 @@ function WaveBars({ active }: { active: boolean }) {
       {levels.map((level, idx) => (
         <span
           key={idx}
-          className={`w-1 rounded-full transition-all duration-300 ${
-            active ? "bg-orange animate-pulse" : "bg-white/20"
-          }`}
+          className={`w-1 rounded-full transition-all duration-300 ${active ? "bg-orange animate-pulse" : "bg-white/20"
+            }`}
           style={{
             height: active ? `${Math.round(level * 100)}%` : "22%",
             transitionDelay: `${idx * 40}ms`,
@@ -159,9 +161,8 @@ function ProfileAvatar({
 
   return (
     <div
-      className={`w-28 h-28 rounded-full border border-white/15 flex items-center justify-center ${
-        ai ? "bg-orange/20" : "bg-white/10"
-      }`}
+      className={`w-28 h-28 rounded-full border border-white/15 flex items-center justify-center ${ai ? "bg-orange/20" : "bg-white/10"
+        }`}
     >
       {ai ? (
         <span className="text-orange text-4xl font-bold select-none">
@@ -209,9 +210,8 @@ function ParticipantCard({
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col items-center gap-3 min-w-45">
       {showVideo ? (
         <div
-          className={`rounded-xl overflow-hidden m-1 transition-all duration-200 p-1.5 ${
-            speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
-          }`}
+          className={`rounded-xl overflow-hidden m-1 transition-all duration-200 p-1.5 ${speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
+            }`}
         >
           <video
             ref={videoRef}
@@ -223,9 +223,8 @@ function ParticipantCard({
         </div>
       ) : (
         <div
-          className={`rounded-full p-1.5 aspect-square transition-all duration-200 ${
-            speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
-          }`}
+          className={`rounded-full p-1.5 aspect-square transition-all duration-200 ${speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
+            }`}
         >
           <ProfileAvatar image={image} fallback={title} ai={ai} />
         </div>
@@ -333,9 +332,8 @@ function TypingBubble({
         </div>
       )}
       <div
-        className={`px-4 py-3 rounded-2xl border flex items-center gap-1.5 ${
-          isAI ? "bg-white/5 border-white/10" : "bg-orange/15 border-orange/20"
-        }`}
+        className={`px-4 py-3 rounded-2xl border flex items-center gap-1.5 ${isAI ? "bg-white/5 border-white/10" : "bg-orange/15 border-orange/20"
+          }`}
       >
         {[0, 150, 300].map((delay) => (
           <span
@@ -373,7 +371,7 @@ function LiveInterviewContent() {
   const personaId = params.get("persona") ?? "neutral";
   const jobRole = params.get("job_role") ?? "Software Engineer";
   const interviewerName = params.get("interviewer_name") ?? "Alex";
-  const avatarUrlPath   = params.get("avatar_url") ?? "";
+  const avatarUrlPath = params.get("avatar_url") ?? "";
 
   // ── Auth guard: redirect to /login if not authenticated ──────────────────
   useEffect(() => {
@@ -445,10 +443,16 @@ function LiveInterviewContent() {
   const reconnectAttemptsRef = useRef(0);
   const reconnectingRef = useRef(false);
   const isResumeRef = useRef(false);
+  const priorTranscriptLoadedRef = useRef(false);
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
   const micWorkletLoadedRef = useRef(false);
+  const cameraOnRef = useRef(false);
+
+  useEffect(() => {
+    cameraOnRef.current = cameraOn;
+  }, [cameraOn]);
 
   useEffect(() => {
     aiSpeakingRef.current = aiSpeaking;
@@ -754,22 +758,29 @@ function LiveInterviewContent() {
           if (msg.resume && wsRef.current?.readyState === WebSocket.OPEN) {
             // Populate the chat with prior transcript turns so the user
             // can see the full conversation history from before the drop.
-            if (msg.transcript && Array.isArray(msg.transcript)) {
-              const priorEntries: TranscriptEntry[] = msg.transcript
-                .filter((t: { text?: string }) => t.text?.trim())
-                .map((t: { speaker: string; text: string; ts?: string }) => ({
-                  speaker: (t.speaker === "user" ? "you" : "interviewer") as "you" | "interviewer",
-                  text: t.text,
-                  finished: true,
-                  ts: t.ts ? new Date(t.ts).getTime() : Date.now(),
-                }));
-              if (priorEntries.length > 0) {
-                setTranscript(priorEntries);
+            // Only load prior transcript once — on reconnection the
+            // session_meta fires again but we already have the turns.
+            if (!priorTranscriptLoadedRef.current) {
+              priorTranscriptLoadedRef.current = true;
+              if (msg.transcript && Array.isArray(msg.transcript)) {
+                const priorEntries: TranscriptEntry[] = msg.transcript
+                  .filter((t: { text?: string }) => t.text?.trim())
+                  .map((t: { speaker: string; text: string; ts?: string }) => ({
+                    speaker: (t.speaker === "user" ? "you" : "interviewer") as "you" | "interviewer",
+                    text: t.text,
+                    finished: true,
+                    ts: t.ts ? new Date(t.ts).getTime() : Date.now(),
+                  }));
+                if (priorEntries.length > 0) {
+                  // Append prior turns after existing stage messages (e.g.
+                  // "Interview started") so nothing gets overwritten.
+                  setTranscript((prev) => [...prev, ...priorEntries]);
+                }
               }
+              appendStage(
+                `Resuming interview (${msg.prior_turns ?? 0} prior exchanges loaded)`,
+              );
             }
-            appendStage(
-              `Resuming interview (${msg.prior_turns ?? 0} prior exchanges loaded)`,
-            );
             // Tell the AI the candidate has reconnected — different from
             // the fresh-start kickstart so the AI continues naturally.
             wsRef.current.send(
@@ -848,9 +859,9 @@ function LiveInterviewContent() {
               const ctx = outCtxRef.current;
               const drainMs = ctx
                 ? Math.max(
-                    0,
-                    (nextPlayTimeRef.current - ctx.currentTime) * 1000,
-                  ) + 400
+                  0,
+                  (nextPlayTimeRef.current - ctx.currentTime) * 1000,
+                ) + 400
                 : 800;
               scheduleInterviewerEnd(drainMs);
             }
@@ -1001,8 +1012,8 @@ function LiveInterviewContent() {
       // blocks (browsers throw SecurityError / silent onerror on mobile).
       const safeWsBase =
         typeof window !== "undefined" &&
-        window.location.protocol === "https:" &&
-        WS_BASE.startsWith("ws://")
+          window.location.protocol === "https:" &&
+          WS_BASE.startsWith("ws://")
           ? WS_BASE.replace("ws://", "wss://")
           : WS_BASE;
       const ws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}?user_id=${encodeURIComponent(session?.user?.id ?? "")}`);
@@ -1071,8 +1082,8 @@ function LiveInterviewContent() {
             if (endingRef.current) return;
             const safeWsBase =
               typeof window !== "undefined" &&
-              window.location.protocol === "https:" &&
-              WS_BASE.startsWith("ws://")
+                window.location.protocol === "https:" &&
+                WS_BASE.startsWith("ws://")
                 ? WS_BASE.replace("ws://", "wss://")
                 : WS_BASE;
             const rws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}?user_id=${encodeURIComponent(session?.user?.id ?? "")}`);
@@ -1101,6 +1112,9 @@ function LiveInterviewContent() {
           setStatus((prev) => {
             if (prev === "active") {
               appendStage("Interview ended (connection closed)");
+              setAiSpeaking(false);
+              setYouSpeaking(false);
+              setYourTurn(false);
               return "ended";
             }
             return prev;
@@ -1291,6 +1305,48 @@ function LiveInterviewContent() {
     }
   }, [cameraOn, isActive]);
 
+  // ── Posture analysis: periodic frame capture ───────────────────────
+  // When the camera is on and the interview is active, capture a JPEG
+  // frame from the video element every POSTURE_FRAME_INTERVAL_MS and
+  // send it to the backend for posture analysis.
+  useEffect(() => {
+    if (!isActive || !cameraOn) return;
+
+    const intervalId = window.setInterval(() => {
+      const video = camVideoRef.current;
+      const ws = wsRef.current;
+      if (!video || !ws || ws.readyState !== WebSocket.OPEN) return;
+      if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = POSTURE_FRAME_SIZE;
+        canvas.height = POSTURE_FRAME_SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        // Draw the video frame scaled/cropped to a square
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const side = Math.min(vw, vh);
+        const sx = (vw - side) / 2;
+        const sy = (vh - side) / 2;
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, POSTURE_FRAME_SIZE, POSTURE_FRAME_SIZE);
+
+        // Convert to base64 JPEG (strip the data:image/jpeg;base64, prefix)
+        const dataUrl = canvas.toDataURL("image/jpeg", POSTURE_FRAME_QUALITY);
+        const base64Data = dataUrl.split(",")[1];
+        if (base64Data) {
+          ws.send(JSON.stringify({ type: "video_frame", data: base64Data }));
+        }
+      } catch {
+        // Best effort — don't crash the interview for a failed frame capture
+      }
+    }, POSTURE_FRAME_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [cameraOn, isActive]);
+
   useEffect(() => {
     return () => {
       if (userSpeakingTimeoutRef.current) {
@@ -1325,8 +1381,7 @@ function LiveInterviewContent() {
           <span className="text-primary">Persona </span>{personaLabel}
         </p>
         <span
-          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
-            status === "active"
+          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium ${status === "active"
               ? "bg-green-500/20 text-green-400"
               : status === "connecting"
                 ? "bg-yellow-500/20 text-yellow-400"
@@ -1335,7 +1390,7 @@ function LiveInterviewContent() {
                   : status === "error"
                     ? "bg-red-500/20 text-red-400"
                     : "bg-white/10 text-white/60"
-          }`}
+            }`}
         >
           {statusLabel}
         </span>
@@ -1378,6 +1433,15 @@ function LiveInterviewContent() {
         </aside>
 
         <main className="flex-1 min-h-0 flex flex-col">
+          {/* Sticky camera-on reminder for posture analysis */}
+          {isActive && !cameraOn && (
+            <div className="p-4">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange/15 border border-orange/30 text-orange text-xs font-medium w-fit mx-auto">
+                <Video size={14} className="shrink-0" />
+                <span>Turn on your camera (from bottom toolbar) to enable AI posture &amp; presence analysis</span>
+              </div>
+            </div>
+          )}
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 flex flex-col gap-3">
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
@@ -1456,11 +1520,10 @@ function LiveInterviewContent() {
                   )}
 
                   <div
-                    className={`max-w-[84%] sm:max-w-[76%] px-4 py-3 rounded-2xl text-sm leading-relaxed border ${
-                      entry.speaker === "you"
+                    className={`max-w-[84%] sm:max-w-[76%] px-4 py-3 rounded-2xl text-sm leading-relaxed border ${entry.speaker === "you"
                         ? "bg-orange/15 border-orange/20 text-white"
                         : "bg-white/5 border-white/10 text-white/90"
-                    }`}
+                      }`}
                   >
                     {entry.text}
                   </div>
@@ -1497,112 +1560,112 @@ function LiveInterviewContent() {
               status === "error" ||
               status === "connecting" ||
               isActive) && (
-              <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={
-                        status === "connecting" || audioInputs.length === 0
-                      }
-                      className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
-                    >
-                      <Mic size={14} className="text-white/60" />
-                      <span className="shrink-0">Mic</span>
-                      <span className="ml-auto min-w-0 truncate text-left">
-                        {selectedMicLabel}
-                      </span>
-                      <ChevronDown
-                        size={14}
-                        className="text-white/60 shrink-0"
-                      />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
-                  >
-                    <DropdownMenuLabel className="text-white/60">
-                      Microphones
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuRadioGroup
-                      value={selectedMicId}
-                      onValueChange={(value) => {
-                        void handleMicDeviceChange(value);
-                      }}
-                    >
-                      <DropdownMenuRadioItem
-                        value=""
-                        className="text-white/85 focus:bg-white/10 focus:text-white"
+                <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        disabled={
+                          status === "connecting" || audioInputs.length === 0
+                        }
+                        className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
                       >
-                        System default microphone
-                      </DropdownMenuRadioItem>
-                      {audioInputs.map((device, index) => (
+                        <Mic size={14} className="text-white/60" />
+                        <span className="shrink-0">Mic</span>
+                        <span className="ml-auto min-w-0 truncate text-left">
+                          {selectedMicLabel}
+                        </span>
+                        <ChevronDown
+                          size={14}
+                          className="text-white/60 shrink-0"
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
+                    >
+                      <DropdownMenuLabel className="text-white/60">
+                        Microphones
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuRadioGroup
+                        value={selectedMicId}
+                        onValueChange={(value) => {
+                          void handleMicDeviceChange(value);
+                        }}
+                      >
                         <DropdownMenuRadioItem
-                          key={device.deviceId}
-                          value={device.deviceId}
+                          value=""
                           className="text-white/85 focus:bg-white/10 focus:text-white"
                         >
-                          {device.label || `Microphone ${index + 1}`}
+                          System default microphone
                         </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        {audioInputs.map((device, index) => (
+                          <DropdownMenuRadioItem
+                            key={device.deviceId}
+                            value={device.deviceId}
+                            className="text-white/85 focus:bg-white/10 focus:text-white"
+                          >
+                            {device.label || `Microphone ${index + 1}`}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={
-                        status === "connecting" || videoInputs.length === 0
-                      }
-                      className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
-                    >
-                      <Video size={14} className="text-white/60" />
-                      <span className="shrink-0">Camera</span>
-                      <span className="ml-auto min-w-0 truncate text-left">
-                        {selectedCameraLabel}
-                      </span>
-                      <ChevronDown
-                        size={14}
-                        className="text-white/60 shrink-0"
-                      />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
-                  >
-                    <DropdownMenuLabel className="text-white/60">
-                      Cameras
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuRadioGroup
-                      value={selectedCameraId}
-                      onValueChange={(value) => {
-                        void handleCameraDeviceChange(value);
-                      }}
-                    >
-                      <DropdownMenuRadioItem
-                        value=""
-                        className="text-white/85 focus:bg-white/10 focus:text-white"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        disabled={
+                          status === "connecting" || videoInputs.length === 0
+                        }
+                        className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
                       >
-                        System default camera
-                      </DropdownMenuRadioItem>
-                      {videoInputs.map((device, index) => (
+                        <Video size={14} className="text-white/60" />
+                        <span className="shrink-0">Camera</span>
+                        <span className="ml-auto min-w-0 truncate text-left">
+                          {selectedCameraLabel}
+                        </span>
+                        <ChevronDown
+                          size={14}
+                          className="text-white/60 shrink-0"
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-88 max-w-[calc(100vw-2rem)] bg-zinc-900 border-white/15 text-white"
+                    >
+                      <DropdownMenuLabel className="text-white/60">
+                        Cameras
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuRadioGroup
+                        value={selectedCameraId}
+                        onValueChange={(value) => {
+                          void handleCameraDeviceChange(value);
+                        }}
+                      >
                         <DropdownMenuRadioItem
-                          key={device.deviceId}
-                          value={device.deviceId}
+                          value=""
                           className="text-white/85 focus:bg-white/10 focus:text-white"
                         >
-                          {device.label || `Camera ${index + 1}`}
+                          System default camera
                         </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
+                        {videoInputs.map((device, index) => (
+                          <DropdownMenuRadioItem
+                            key={device.deviceId}
+                            value={device.deviceId}
+                            className="text-white/85 focus:bg-white/10 focus:text-white"
+                          >
+                            {device.label || `Camera ${index + 1}`}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
 
             <div className="flex items-center justify-center gap-4">
               {(status === "idle" || status === "error") && (
@@ -1630,11 +1693,10 @@ function LiveInterviewContent() {
                 <>
                   <button
                     onClick={toggleCamera}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                      cameraOn
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${cameraOn
                         ? "bg-orange/20 text-orange border-orange/40"
                         : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
-                    }`}
+                      }`}
                     title={cameraOn ? "Disable webcam" : "Enable webcam"}
                   >
                     {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
@@ -1642,11 +1704,10 @@ function LiveInterviewContent() {
 
                   <button
                     onClick={toggleMute}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                      !muted
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${!muted
                         ? "bg-orange/20 text-orange border-orange/40"
                         : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
-                    }`}
+                      }`}
                     title={muted ? "Unmute" : "Mute"}
                   >
                     {muted ? <MicOff size={18} /> : <Mic size={18} />}

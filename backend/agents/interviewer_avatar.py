@@ -21,7 +21,15 @@ import re
 from typing import Optional
 
 import vertexai
+from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import storage
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+    before_sleep_log,
+)
 from vertexai.preview.vision_models import ImageGenerationModel
 
 logger = logging.getLogger(__name__)
@@ -143,14 +151,25 @@ class InterviewerAvatarAgent:
             )
             prompt = _build_prompt(name, persona)
             model = self._get_model()
-            response = model.generate_images(
-                prompt=prompt,
-                number_of_images=1,
-                aspect_ratio="1:1",
-                person_generation="allow_adult",
-                language="en",
-                safety_filter_level="block_few",
+
+            @retry(
+                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+                wait=wait_random_exponential(multiplier=1, max=60),
+                stop=stop_after_attempt(5),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True,
             )
+            def _generate_with_retry():
+                return model.generate_images(
+                    prompt=prompt,
+                    number_of_images=1,
+                    aspect_ratio="1:1",
+                    person_generation="allow_adult",
+                    language="en",
+                    safety_filter_level="block_few",
+                )
+
+            response = _generate_with_retry()
 
             if not response.images:
                 logger.warning(

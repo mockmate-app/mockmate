@@ -1,36 +1,280 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MockMate — Frontend
 
-## Getting Started
+Next.js web application for MockMate — the real-time AI mock interview platform. Handles Google OAuth, résumé upload, live voice/video interview streaming, and post-session feedback display.
 
-First, run the development server:
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "Next.js App"
+        MW[Middleware<br/>Auth Guard]
+        LP[Landing Page]
+        LG[Login<br/>Google OAuth]
+        DB[Dashboard]
+        RU[Résumé Upload]
+        IS[Interview Setup]
+        LI[Live Interview]
+        FB[Feedback Report]
+    end
+
+    subgraph "Browser APIs"
+        MIC[Microphone<br/>AudioWorklet]
+        CAM[Webcam<br/>MediaStream]
+        WS1[WebSocket<br/>Audio]
+        WS2[WebSocket<br/>Vision]
+    end
+
+    subgraph "Backend"
+        API[FastAPI REST]
+        WSA[WS /interview]
+        WSV[WS /vision]
+    end
+
+    subgraph "External"
+        GA[Google OAuth]
+        PG[(PostgreSQL<br/>Auth DB)]
+    end
+
+    LP --> LG
+    LG --> GA
+    LG --> PG
+    MW --> DB & RU & IS & LI & FB
+
+    RU -- "POST /resume/upload" --> API
+    IS -- "POST /session/start" --> API
+    FB -- "POST /feedback/generate" --> API
+
+    MIC --> WS1 --> WSA
+    CAM --> WS2 --> WSV
+```
+
+---
+
+## Pages & User Flow
+
+```mermaid
+graph LR
+    A["/  Landing"] --> B["/login"]
+    B --> C["/dashboard"]
+    C --> D["/resume/upload"]
+    D --> E["/interview/setup"]
+    E --> F["/interview/live"]
+    F --> G["/interview/feedback"]
+    G --> C
+```
+
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page — hero, features, personas, how-it-works |
+| `/login` | Google OAuth sign-in |
+| `/dashboard` | Session history, stats, résumé preview, quick actions |
+| `/resume/upload` | Drag-and-drop résumé upload (PDF/DOCX/TXT) |
+| `/resume` | View parsed résumé data |
+| `/interview/setup` | Pick job role → persona → difficulty level |
+| `/interview/live` | **Core** — real-time voice interview with webcam posture capture |
+| `/interview/feedback` | Feedback report with scores, strengths, decision letter |
+| `/sessions` | Full session history |
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+|----------|-----------|
+| **Framework** | Next.js 16 (App Router, Turbopack) |
+| **UI** | React 19, TailwindCSS 4, Radix UI |
+| **Data Fetching** | TanStack React Query |
+| **Auth** | Better Auth (Google OAuth) → PostgreSQL |
+| **Real-time Audio** | AudioWorklet (PCM Int16, 16 kHz capture / 24 kHz playback) |
+| **Video** | react-webcam (768×768 JPEG frames every 10s) |
+| **Icons** | Lucide React |
+| **Styling** | Tailwind + class-variance-authority + tailwind-merge |
+
+---
+
+## Local Setup
+
+### Prerequisites
+
+- **Node.js 18+**
+- **PostgreSQL** (for Better Auth session storage)
+- Backend running on `http://localhost:8080` (see [backend README](../backend/README.md))
+
+### 1. Install dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Fill in your values:
+
+```dotenv
+# Backend API URL (WebSocket URL is derived automatically: http → ws, https → wss)
+NEXT_PUBLIC_API_URL=http://localhost:8080
+
+# Better Auth
+BETTER_AUTH_SECRET=your-secret
+BETTER_AUTH_URL=http://localhost:3000
+
+# Google OAuth credentials
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+
+# PostgreSQL (Better Auth session store)
+PGHOST=localhost
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=your-password
+PGDATABASE=mockmate
+```
+
+### 3. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App available at **http://localhost:3000**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Key Components
 
-## Learn More
+### Live Interview Engine (`/interview/live`)
 
-To learn more about Next.js, take a look at the following resources:
+The core of MockMate — a real-time bidirectional audio interview interface:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```mermaid
+graph LR
+    subgraph Browser
+        MIC[Microphone] --> AW[AudioWorklet<br/>PCM Capture]
+        AW --> WS[WebSocket]
+        WS --> AC[AudioContext<br/>Playback Queue]
+        AC --> SPK[Speaker]
+        CAM[Webcam] --> FC[Frame Capture<br/>every 10s]
+        FC --> WS
+    end
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+    subgraph Backend
+        WS --> IE[Interview Engine]
+        IE --> GL[Gemini Live API]
+    end
+```
 
-## Deploy on Vercel
+**Features:**
+- 16-bit PCM audio at 16 kHz input, 24 kHz output
+- Automatic speech detection and transcript display
+- Mute/unmute and camera toggle controls
+- Device selection (mic + camera)
+- Auto-reconnect (3 attempts) with session resumption
+- Posture frame capture at 768×768 JPEG, 0.7 quality
+- Graceful interview end detection (interviewer goodbye phrases)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Feedback Report (`/interview/feedback`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Displays the AI-generated feedback with:
+- Overall score ring (color-coded: green ≥70, amber ≥40, red <40)
+- 6 dimension score bars (communication, confidence, structure, technical depth, domain vocabulary, posture)
+- Strengths and improvement areas
+- Tone analysis and vocabulary calibration
+- Filler word detection
+- Mock offer or rejection letter
+- Full interview transcript sidebar
+
+### Dashboard
+
+- Session history table with persona badges and scores
+- Stats cards (total sessions, average score, monthly count)
+- Résumé preview with top skills
+- Quick actions to start new interviews
+
+---
+
+## Auth Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as Next.js
+    participant BA as Better Auth
+    participant Google as Google OAuth
+    participant PG as PostgreSQL
+
+    User->>App: Click "Sign in with Google"
+    App->>Google: OAuth redirect
+    Google-->>App: Auth code
+    App->>BA: Exchange code
+    BA->>PG: Create/update session
+    BA-->>App: Session cookie
+    App->>App: Redirect to /dashboard
+```
+
+Protected routes (`/dashboard`, `/interview/*`, `/resume/*`) are guarded by middleware that checks the session cookie.
+
+---
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx               # Root layout (React Query, fonts)
+│   │   ├── page.tsx                 # Landing page
+│   │   ├── not-found.tsx            # 404 page
+│   │   ├── login/page.tsx           # Google OAuth login
+│   │   ├── dashboard/page.tsx       # User dashboard
+│   │   ├── interview/
+│   │   │   ├── setup/page.tsx       # Persona & difficulty selection
+│   │   │   ├── live/page.tsx        # Real-time interview engine
+│   │   │   └── feedback/page.tsx    # Feedback report
+│   │   ├── resume/
+│   │   │   ├── page.tsx             # View parsed résumé
+│   │   │   └── upload/page.tsx      # Upload résumé
+│   │   ├── sessions/                # Session history
+│   │   ├── api/auth/[...all]/       # Better Auth API route
+│   │   └── globals.css              # Tailwind styles
+│   ├── components/
+│   │   ├── AppHeader.tsx            # Sticky header with user menu
+│   │   ├── Navbar.tsx               # Landing page nav
+│   │   ├── Hero.tsx                 # Hero section
+│   │   ├── Features.tsx             # Feature cards grid
+│   │   ├── HowItWorks.tsx           # How it works section
+│   │   ├── Personas.tsx             # Persona showcase
+│   │   ├── SessionStatusPill.tsx    # Status badge component
+│   │   ├── UserMenu.tsx             # User dropdown menu
+│   │   └── ui/                      # shadcn/ui components
+│   ├── lib/
+│   │   ├── api.ts                   # Backend API client
+│   │   ├── auth.ts                  # Better Auth server config
+│   │   ├── auth-client.ts           # Better Auth client hooks
+│   │   ├── query-client.tsx         # React Query provider
+│   │   └── utils.ts                 # Tailwind cn() helper
+│   ├── constants/common.ts          # App name, description, URL
+│   └── middleware.ts                # Cookie-based route protection
+├── public/
+│   └── audio-processor.worklet.js   # PCM audio capture worklet
+├── package.json
+├── next.config.ts
+└── tsconfig.json
+```
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server with Turbopack |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |

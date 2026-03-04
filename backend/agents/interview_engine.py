@@ -12,6 +12,7 @@ Handles:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -22,7 +23,10 @@ import uuid
 import pathlib
 import warnings
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agents.posture_analyzer import PostureAnalyzerAgent
 
 import vertexai
 from fastapi import WebSocket, WebSocketDisconnect
@@ -669,7 +673,13 @@ class InterviewEngineAgent:
     # Live streaming  (ADK bidirectional streaming)
     # ------------------------------------------------------------------
 
-    async def run_live_session(self, websocket: WebSocket, session_id: str, caller_user_id: str | None = None) -> None:
+    async def run_live_session(
+        self,
+        websocket: WebSocket,
+        session_id: str,
+        caller_user_id: str | None = None,
+        posture_analyzer: PostureAnalyzerAgent | None = None,
+    ) -> None:
         """
         Bidirectional audio bridge between the browser WebSocket and the
         Gemini Live API via google-adk.
@@ -851,7 +861,7 @@ Instead:
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
                     end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
-                    silence_duration_ms=3000,  # wait 3 s of silence before ending turn
+                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
                     prefix_padding_ms=300,     # capture speech onset with padding
                 ),
             ),
@@ -937,6 +947,11 @@ Instead:
             except Exception:
                 _ws_open = False
 
+        # ── Posture analysis queue ─────────────────────────────────────────
+        # Video frames from the browser are routed here (NOT to the live
+        # audio agent) for asynchronous posture scoring.
+        _posture_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=30)
+
         async def _upstream() -> None:
             """Receive mixed browser frames (text control + binary PCM) → Gemini."""
             try:
@@ -958,6 +973,17 @@ Instead:
                             break
                         if payload.get("type") == "pong":
                             # Client heartbeat response — keeps connection alive
+                            continue
+                        if payload.get("type") == "video_frame":
+                            # Route video frames to posture analysis — NOT to
+                            # the live audio agent (it shouldn't see the video).
+                            frame_b64 = payload.get("data", "")
+                            if frame_b64 and posture_analyzer:
+                                try:
+                                    frame_bytes = base64.b64decode(frame_b64)
+                                    _posture_queue.put_nowait(frame_bytes)
+                                except Exception:
+                                    pass  # drop frame on decode error / full queue
                             continue
                         if payload.get("type") == "text":
                             live_request_queue.send_content(
@@ -999,6 +1025,52 @@ Instead:
                     await _safe_send_text(json.dumps({"type": "ping"}))
             except Exception:
                 pass  # connection already closed
+
+        # ── Posture analysis background task ──────────────────────────────
+        # Consumes JPEG frames from _posture_queue, scores them with
+        # PostureAnalyzerAgent, and persists each result to Firestore.
+        # Runs entirely in the background — never blocks the audio stream.
+        _posture_frame_count = 0
+
+        async def _posture_analysis() -> None:
+            """Consume video frames from queue and analyse posture."""
+            nonlocal _posture_frame_count
+            if not posture_analyzer:
+                return  # Camera is not enabled or analyzer not available
+
+            try:
+                while _ws_open:
+                    try:
+                        frame_bytes = await asyncio.wait_for(
+                            _posture_queue.get(), timeout=2.0,
+                        )
+                    except asyncio.TimeoutError:
+                        continue  # check _ws_open flag periodically
+
+                    score = await posture_analyzer.analyse_frame(frame_bytes)
+                    if not score:
+                        continue  # frame analysis failed — skip
+
+                    score["frame_index"] = _posture_frame_count
+                    score["session_id"] = session_id
+                    score["timestamp_ms"] = int(
+                        (time.monotonic() - _session_start_time) * 1000
+                    )
+                    await posture_analyzer.persist_score(
+                        session_id, _posture_frame_count, score,
+                    )
+                    _posture_frame_count += 1
+                    logger.debug(
+                        "Posture frame %d scored — session_id=%s  "
+                        "presence=%s",
+                        _posture_frame_count, session_id,
+                        score.get("overall_presence_score", "?"),
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Posture analysis task ended: %s: %s",
+                    type(exc).__name__, exc,
+                )
 
         # Transcript turns accumulated in memory across downstream events.
         # Pre-populate with prior turns on resume so the final saved
@@ -1190,6 +1262,7 @@ Instead:
                 _upstream(),
                 _downstream(),
                 _heartbeat(),
+                _posture_analysis(),
                 return_exceptions=True,
             )
         except Exception as exc:
@@ -1201,14 +1274,13 @@ Instead:
             # ── Phase 4: terminate ────────────────────────────────────────────
             live_request_queue.close()   # idempotent
             # Save transcript to its own collection (keeps session doc lean).
-            # For retried/resumed sessions, prepend the prior turns so the
-            # saved transcript always reflects the FULL conversation history
-            # (not just the turns from this connection).
+            # _transcript_turns is pre-populated with prior turns on resume,
+            # so it already contains the full gap-free conversation history.
             if _transcript_turns:
-                merged_turns = _prior_transcript_turns + _transcript_turns
-                await self._save_transcript(session_id, merged_turns)
+                await self._save_transcript(session_id, _transcript_turns)
             await self.end_session(session_id)
             logger.info(
-                "Live session ended — session_id=%s  transcript_turns=%d",
-                session_id, len(_transcript_turns),
+                "Live session ended — session_id=%s  transcript_turns=%d  "
+                "posture_frames=%d",
+                session_id, len(_transcript_turns), _posture_frame_count,
             )

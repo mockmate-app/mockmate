@@ -407,8 +407,14 @@ async def websocket_interview(websocket: WebSocket, session_id: str, user_id: st
     """
     await websocket.accept()
     engine: InterviewEngineAgent = websocket.app.state.interview_engine
+    analyzer: PostureAnalyzerAgent = websocket.app.state.posture_analyzer
     try:
-        await engine.run_live_session(websocket, session_id, caller_user_id=user_id)
+        await engine.run_live_session(
+            websocket,
+            session_id,
+            caller_user_id=user_id,
+            posture_analyzer=analyzer,
+        )
     except WebSocketDisconnect:
         logger.debug("Browser disconnected from /ws/interview/%s", session_id)
     except Exception as exc:

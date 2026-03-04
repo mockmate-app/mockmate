@@ -19,6 +19,9 @@ google-cloud-pubsub==2.27.1
 # google-adk missing transitive dep
 deprecated>=1.2.14
 
+# Retry with exponential backoff for LLM 429/503 errors
+tenacity>=8.2.0
+
 # Data & validation
 pydantic==2.12.5
 pydantic-settings==2.7.1

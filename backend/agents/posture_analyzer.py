@@ -1,10 +1,19 @@
 """
 PostureAnalyzerAgent
 ---------------------
-Receives base-64 encoded video frames from the browser over a WebSocket,
-sends them to Gemini 2.0 Flash (vision) for real-time posture and presence
-scoring, persists scores per-frame in Firestore, and streams scored results
-back to the browser.
+Analyses video frames from the candidate's webcam during a live mock
+interview using Gemini Flash (vision).  Provides two usage modes:
+
+1. **Standalone WebSocket** (`run_live_analysis`) — legacy mode where the
+   browser opens a dedicated `/ws/vision/{session_id}` connection.
+2. **Inline analysis** (`analyse_frame` / `persist_score`) — called from
+   `InterviewEngineAgent` during a live session.  Video frames arrive
+   through the main interview WebSocket, and the interview engine routes
+   them here for scoring & persistence.
+
+Scores are persisted per-frame in Firestore's `posture_scores` collection
+and aggregated by `FeedbackCompilerAgent` when generating the post-session
+report.
 """
 
 from __future__ import annotations
@@ -13,12 +22,21 @@ import base64
 import json
 import logging
 import os
+import traceback
 from datetime import datetime, timezone
 from typing import Any
 
 import vertexai
 from fastapi import WebSocket
+from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+    before_sleep_log,
+)
 from vertexai.generative_models import GenerationConfig, GenerativeModel, Image, Part
 
 logger = logging.getLogger(__name__)
@@ -39,7 +57,7 @@ _PROJECT    = _require("GOOGLE_CLOUD_PROJECT")
 _REGION     = _require("GOOGLE_CLOUD_LOCATION")
 _COLLECTION = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores")  # optional
 _DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")                  # optional
-_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")             # optional
+_MODEL      = os.getenv("POSTURE_MODEL", "gemini-2.5-flash-lite")           # optional
 
 ANALYSIS_PROMPT = """
 You are a professional interview coach analysing a single video frame from a
@@ -65,7 +83,7 @@ Keep observations concise (≤10 words each).
 
 
 class PostureAnalyzerAgent:
-    """Streams per-frame posture scores using Gemini 2.0 Flash vision."""
+    """Analyses candidate webcam frames for posture & presence scoring."""
 
     def __init__(self) -> None:
         logger.info(
@@ -78,7 +96,64 @@ class PostureAnalyzerAgent:
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
 
     # ------------------------------------------------------------------
-    # Live analysis loop
+    # Public API — inline analysis (used by InterviewEngineAgent)
+    # ------------------------------------------------------------------
+
+    async def analyse_frame(self, frame_bytes: bytes) -> dict[str, Any]:
+        """Analyse a single JPEG frame and return the score dict.
+
+        Returns an empty dict on failure so as not to crash the caller.
+        """
+        try:
+            image_part = Part.from_image(Image.from_bytes(frame_bytes))
+            text_part = Part.from_text(ANALYSIS_PROMPT)
+
+            @retry(
+                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+                wait=wait_random_exponential(multiplier=1, max=30),
+                stop=stop_after_attempt(3),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True,
+            )
+            async def _generate_with_retry():
+                return await self._model.generate_content_async(
+                    [image_part, text_part],
+                    generation_config=GenerationConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1,
+                        max_output_tokens=512,
+                    ),
+                )
+
+            response = await _generate_with_retry()
+            return json.loads(response.text)
+        except Exception as exc:
+            logger.warning(
+                "Posture analysis failed for frame: %s: %s\n%s",
+                type(exc).__name__, exc, traceback.format_exc(),
+            )
+            return {}
+
+    async def persist_score(
+        self, session_id: str, frame_index: int, score: dict[str, Any],
+    ) -> None:
+        """Persist a single frame score to Firestore."""
+        try:
+            doc_id = f"{session_id}_frame_{frame_index:06d}"
+            score["recorded_at"] = datetime.now(timezone.utc).isoformat()
+            await (
+                self._db.collection(_COLLECTION)
+                .document(doc_id)
+                .set(score)
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist posture score — session=%s frame=%d: %s",
+                session_id, frame_index, exc,
+            )
+
+    # ------------------------------------------------------------------
+    # Legacy WebSocket mode (standalone /ws/vision endpoint)
     # ------------------------------------------------------------------
 
     async def run_live_analysis(self, websocket: WebSocket, session_id: str) -> None:
@@ -88,7 +163,7 @@ class PostureAnalyzerAgent:
 
         For each frame, this method:
           1. Decodes the JPEG bytes.
-          2. Sends the frame to Gemini 2.0 Flash for vision analysis.
+          2. Sends the frame to Gemini Flash for vision analysis.
           3. Persists the scored result in Firestore.
           4. Sends the score JSON back to the browser.
         """
@@ -102,39 +177,13 @@ class PostureAnalyzerAgent:
                 continue
 
             frame_bytes = base64.b64decode(frame_b64)
-            score = await self._analyse_frame(frame_bytes)
+            score = await self.analyse_frame(frame_bytes)
+            if not score:
+                continue
             score["frame_index"] = frame_count
             score["timestamp_ms"] = timestamp_ms
             score["session_id"] = session_id
 
-            await self._persist(session_id, frame_count, score)
+            await self.persist_score(session_id, frame_count, score)
             await websocket.send_text(json.dumps(score))
             frame_count += 1
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    async def _analyse_frame(self, frame_bytes: bytes) -> dict[str, Any]:
-        image_part = Part.from_image(Image.from_bytes(frame_bytes))
-        text_part = Part.from_text(ANALYSIS_PROMPT)
-        response = await self._model.generate_content_async(
-            [image_part, text_part],
-            generation_config=GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.1,
-                max_output_tokens=512,
-            ),
-        )
-        return json.loads(response.text)
-
-    async def _persist(
-        self, session_id: str, frame_index: int, score: dict[str, Any]
-    ) -> None:
-        doc_id = f"{session_id}_frame_{frame_index:06d}"
-        score["recorded_at"] = datetime.now(timezone.utc).isoformat()
-        await (
-            self._db.collection(_COLLECTION)
-            .document(doc_id)
-            .set(score)
-        )

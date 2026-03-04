@@ -271,7 +271,7 @@ function SessionsContent() {
                     <TableHead className="text-xs font-medium text-muted hidden md:table-cell">Interviewer</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden lg:table-cell">Duration</TableHead>
-                    <TableHead className="text-xs font-medium text-muted text-center hidden sm:table-cell">Questions</TableHead>
+                    {/* <TableHead className="text-xs font-medium text-muted text-center hidden sm:table-cell">Questions</TableHead> */}
                     <TableHead className="text-xs font-medium text-muted text-center">Score</TableHead>
                     <TableHead className="text-xs font-medium text-muted">Status</TableHead>
                     <TableHead className="text-xs font-medium text-muted text-right"></TableHead>
@@ -295,9 +295,9 @@ function SessionsContent() {
                       <TableCell className="text-xs text-muted hidden lg:table-cell whitespace-nowrap">
                         {fmtDuration(s.live_started_at ?? s.created_at, s.ended_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-center text-muted hidden sm:table-cell">
+                      {/* <TableCell className="text-xs text-center text-muted hidden sm:table-cell">
                         {s.question_count > 0 ? s.question_count : "—"}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell className="text-center">
                         {s.overall_score !== null ? (
                           <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>

@@ -29,8 +29,16 @@ from typing import Any
 import PyPDF2
 import docx
 import vertexai
+from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore, storage
 from google.cloud.exceptions import GoogleCloudError
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+    before_sleep_log,
+)
 from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 logger = logging.getLogger(__name__)
@@ -288,10 +296,20 @@ class ResumeParserAgent:
             max_output_tokens=4096,
         )
 
-        response = await self._model.generate_content_async(
-            [Part.from_text(prompt)],
-            generation_config=generation_config,
+        @retry(
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            wait=wait_random_exponential(multiplier=1, max=60),
+            stop=stop_after_attempt(5),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
         )
+        async def _generate_with_retry():
+            return await self._model.generate_content_async(
+                [Part.from_text(prompt)],
+                generation_config=generation_config,
+            )
+
+        response = await _generate_with_retry()
 
         raw_text = response.text.strip()
 

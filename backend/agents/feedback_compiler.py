@@ -20,7 +20,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 import vertexai
+from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+    before_sleep_log,
+)
 from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 logger = logging.getLogger(__name__)
@@ -93,9 +101,10 @@ Scoring rules (enforce strictly):
 - domain_vocabulary: correct and sophisticated use of role-appropriate
   terminology; senior/specialist roles demand higher precision.
   Score based ONLY on vocabulary the CANDIDATE used in their own turns.
-- posture_presence: based solely on posture data provided.
+{posture_scoring_rule}
 - overall_score  : weighted average reflecting the whole picture faithfully,
   anchored to the target role's expectations.
+  {overall_posture_note}
 
 Tone & professionalism:
 - If the candidate was rude, sarcastic, hostile, dismissive, or used
@@ -116,15 +125,13 @@ no extra keys, no trailing commas:
     "confidence": <0-100>,
     "structure": <0-100>,
     "technical_depth": <0-100>,
-    "domain_vocabulary": <0-100>,
-    "posture_presence": <0-100>
+    "domain_vocabulary": <0-100>{posture_dimension_schema}
   }},
   "strengths": ["<specific strength from transcript>", ...],
   "improvement_areas": ["<specific, actionable improvement>", ...],
   "filler_words": {{"count": <int>, "examples": ["<word>", ...]}},
   "vocabulary_calibration": "<assessment with examples from transcript>",
-  "tone_analysis": "<honest assessment of tone, attitude, and professionalism — cite specific moments>",
-  "posture_summary": "<assessment based strictly on posture data>",
+  "tone_analysis": "<honest assessment of tone, attitude, and professionalism — cite specific moments>",{posture_summary_schema}
   "decision": "offer" | "rejection",
   "decision_letter": "<full text of the mock offer or rejection letter, signed 'The MockMate Hiring Committee'>"
 }}
@@ -136,8 +143,7 @@ no extra keys, no trailing commas:
 (Format: SPEAKER: text — INTERVIEWER is the AI, CANDIDATE is the person being evaluated)
 {transcript}
 
---- Posture scores (aggregated) ---
-{posture_summary}
+{posture_data_section}
 """
 
 
@@ -209,6 +215,7 @@ class FeedbackCompilerAgent:
 
         avg = {k: (sum(v) / len(v) if v else 0) for k, v in scores.items()}
         avg["top_observations"] = list(set(observations))[:5]
+        avg["frames_analysed"] = max(len(v) for v in scores.values()) if any(scores.values()) else 0
         return avg
 
     async def _generate_report(
@@ -239,11 +246,49 @@ class FeedbackCompilerAgent:
         else:
             transcript_text = "(no transcript recorded — do not fabricate content; set all scores to 0)"
 
+        has_posture = posture_avg.get("frames_analysed", 0) > 0
+
+        if has_posture:
+            posture_scoring_rule = (
+                "- posture_presence: based solely on the posture data provided below.\n"
+                "  Score posture, eye contact, facial confidence, and overall presence."
+            )
+            overall_posture_note = ""
+            posture_dimension_schema = ',\n    "posture_presence": <0-100>'
+            posture_summary_schema = '\n  "posture_summary": "<assessment based strictly on posture data>",'
+            posture_data_section = (
+                "--- Posture scores (aggregated) ---\n"
+                + json.dumps(posture_avg, indent=2)
+            )
+        else:
+            posture_scoring_rule = (
+                "- posture_presence: DO NOT include this dimension — the candidate's\n"
+                "  camera was not enabled so no posture data was captured.\n"
+                "  Do NOT include posture_presence in dimension_scores.\n"
+                "  Do NOT include posture_summary in the output."
+            )
+            overall_posture_note = (
+                "Posture data is unavailable (camera was off). Compute overall_score\n"
+                "  from the five remaining dimensions only — do NOT penalise or\n"
+                "  reward for posture."
+            )
+            posture_dimension_schema = ""
+            posture_summary_schema = ""
+            posture_data_section = (
+                "--- Posture scores ---\n"
+                "(Camera was not enabled — no posture data captured. "
+                "Exclude posture from all scoring.)"
+            )
+
         prompt = FEEDBACK_PROMPT.format(
             job_role=job_role,
             session_meta=json.dumps(meta, indent=2),
             transcript=transcript_text,
-            posture_summary=json.dumps(posture_avg, indent=2),
+            posture_scoring_rule=posture_scoring_rule,
+            overall_posture_note=overall_posture_note,
+            posture_dimension_schema=posture_dimension_schema,
+            posture_summary_schema=posture_summary_schema,
+            posture_data_section=posture_data_section,
         )
 
         logger.info(
@@ -255,16 +300,27 @@ class FeedbackCompilerAgent:
 
         _FEEDBACK_TIMEOUT = 180  # seconds — generous for long transcripts
 
+        # Inner call wrapped with tenacity for 429 / 503 resilience.
+        @retry(
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            wait=wait_random_exponential(multiplier=1, max=60),
+            stop=stop_after_attempt(5),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        )
+        async def _generate_with_retry():
+            return await self._model.generate_content_async(
+                [Part.from_text(prompt)],
+                generation_config=GenerationConfig(
+                    response_mime_type="application/json",
+                    temperature=0.3,
+                    max_output_tokens=8192,
+                ),
+            )
+
         try:
             response = await asyncio.wait_for(
-                self._model.generate_content_async(
-                    [Part.from_text(prompt)],
-                    generation_config=GenerationConfig(
-                        response_mime_type="application/json",
-                        temperature=0.3,
-                        max_output_tokens=8192,
-                    ),
-                ),
+                _generate_with_retry(),
                 timeout=_FEEDBACK_TIMEOUT,
             )
         except asyncio.TimeoutError:
