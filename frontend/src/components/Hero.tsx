@@ -68,7 +68,7 @@ export default function Hero() {
 
         {/* Trust line */}
         <p className="mt-8 text-xs text-light/30 tracking-wide">
-          No credit card required &nbsp;·&nbsp; Free mock session to start
+          No credit card required &nbsp;·&nbsp; Mock sessions generated instantly
         </p>
 
         {/* Feature pill strip */}

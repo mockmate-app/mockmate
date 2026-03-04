@@ -185,7 +185,7 @@ sequenceDiagram
 
 ### Interviewer Personas
 
-10 distinct personas available: `neutral`, `startup_founder`, `investment_banker`, `tech_lead`, `hr_manager`, `product_manager`, `vp_engineering`, `management_consultant`, `cto`, `recruiter`
+12 distinct personas available: `neutral`, `startup_founder`, `investment_banker`, `tech_lead`, `hr_manager`, `product_manager`, `vp_engineering`, `management_consultant`, `cto`, `recruiter`, `algorithm_guru`, `system_designer`
 
 Each has 4–6 named interviewers with unique voices and accents.
 

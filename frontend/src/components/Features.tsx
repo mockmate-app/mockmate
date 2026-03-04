@@ -23,9 +23,9 @@ const FEATURES = [
   },
   {
     icon: <Zap size={22} />,
-    title: "Stress Injection Engine",
+    title: "Adaptive Follow-ups",
     description:
-      "Mid-interview, MockMate deliberately interrupts, challenges your answers, or introduces surprise questions. Real interviews are unpredictable; your practice should be too.",
+      "The interviewer probes deeper, challenges weak answers, and asks tough follow-ups based on what you actually say — just like a real interviewer would.",
   },
   {
     icon: <Eye size={22} />,
@@ -66,7 +66,7 @@ export default function Features() {
         </div>
 
         {/* Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <Card
               key={f.title}
@@ -78,7 +78,7 @@ export default function Features() {
                 </div>
                 <h3 className="text-base font-semibold text-dark">{f.title}</h3>
               </CardHeader>
-              <CardContent className="px-6 pt-4 pb-6">
+              <CardContent className="px-6 pt-2 pb-6">
                 <p className="text-sm leading-relaxed text-muted">{f.description}</p>
               </CardContent>
             </Card>

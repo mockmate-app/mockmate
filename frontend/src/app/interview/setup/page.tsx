@@ -22,6 +22,8 @@ import {
   BarChart2,
   Cpu,
   UserCheck,
+  Binary,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,7 +110,7 @@ const PERSONAS: Persona[] = [
     label: "Consultant",
     tagline: "Structured & hypothesis-led",
     description:
-      "Expects MECE thinking, quantified analysis, and a clear recommendation. Interrupts if you ramble.",
+      "Expects MECE thinking, quantified analysis, and a clear recommendation. Keeps you focused if you ramble.",
     icon: <BarChart2 size={20} className="text-orange" />,
   },
   {
@@ -127,6 +129,22 @@ const PERSONAS: Persona[] = [
       "Explores your motivations, career transitions, and what you're optimising for. Warm but probing.",
     icon: <UserCheck size={20} className="text-orange" />,
   },
+  {
+    id: "algorithm_guru",
+    label: "Algorithm Guru",
+    tagline: "DSA & problem solving",
+    description:
+      "Tests algorithmic thinking, data structures, and complexity analysis. Pushes for optimal solutions.",
+    icon: <Binary size={20} className="text-orange" />,
+  },
+  {
+    id: "system_designer",
+    label: "System Designer",
+    tagline: "Architecture & scalability",
+    description:
+      "Probes distributed systems, trade-offs, and failure modes. Expects structured, top-down thinking.",
+    icon: <Network size={20} className="text-orange" />,
+  },
 ];
 
 const DIFFICULTIES = [
@@ -138,12 +156,12 @@ const DIFFICULTIES = [
   {
     id: "medium",
     label: "Medium",
-    description: "Realistic interview pressure with some curveballs.",
+    description: "Realistic interview pressure with probing follow-ups.",
   },
   {
     id: "hard",
     label: "Hard",
-    description: "Aggressive follow-ups, deep technical dives, stress testing.",
+    description: "Aggressive follow-ups, deep technical dives, tough challenges.",
   },
 ];
 
@@ -216,6 +234,7 @@ function SetupContent({
     staleTime: 10 * 60 * 1000,
   });
   const hasResume = resumeLoading ? null : (resumeCheckData !== null && resumeCheckData !== undefined);
+  const suggestedTitles: string[] = resumeCheckData?.resume_data?.suggested_job_titles ?? [];
 
   const startSessionMutation = useMutation({
     mutationFn: startSession,
@@ -315,6 +334,26 @@ function SetupContent({
             onChange={(e) => setJobRole(e.target.value)}
             className="rounded-xl border-border bg-light focus:ring-orange/40 focus:border-orange"
           />
+          {suggestedTitles.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">Suggestions</span>
+              {suggestedTitles.map((title) => (
+                <Button
+                  key={title}
+                  type="button"
+                  variant="outline"
+                  onClick={() => setJobRole(title)}
+                  className={[
+                    "text-xs px-3 py-1.5 rounded-full border transition-all hover:bg-inherit hover:text-inherit",
+                    jobRole === title
+                      && "border-orange text-orange"
+                  ].join(" ")}
+                >
+                  {title}
+                </Button>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Step 2 — Persona */}

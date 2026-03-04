@@ -17,7 +17,7 @@ const STEPS = [
     step: "03",
     title: "Sit the interview live",
     description:
-      "Speak naturally. MockMate listens, responds, follows up, and injects curveballs in real time. Your webcam tracks posture and presence throughout.",
+      "Speak naturally. MockMate listens, responds, and asks probing follow-ups in real time. Your webcam tracks posture and presence throughout.",
   },
   {
     step: "04",
@@ -42,7 +42,7 @@ export default function HowItWorks() {
         </div>
 
         {/* Steps */}
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
             <Card key={s.step} className="relative border-border bg-surface rounded-2xl">
               <CardContent>

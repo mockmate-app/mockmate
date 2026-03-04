@@ -73,9 +73,10 @@ interface FeedbackReport {
   };
   strengths: string[];
   improvement_areas: string[];
-  filler_words: { count: number; examples: string[] };
+  filler_words: { total_count: number; words: { word: string; count: number }[] };
   vocabulary_calibration: string;
   tone_analysis: string;
+  technical_depth_analysis: string;
   posture_summary?: string;
   decision: "offer" | "rejection";
   decision_letter: string;
@@ -204,10 +205,12 @@ function TranscriptList({
   turns,
   interviewerName,
   interviewerAvatarUrl,
+  userImage,
 }: {
   turns: TranscriptTurn[];
   interviewerName?: string;
   interviewerAvatarUrl?: string;
+  userImage?: string | null;
 }) {
   if (turns.length === 0) {
     return <p className="text-xs text-white/30 italic px-1">No transcript turns recorded.</p>;
@@ -228,7 +231,18 @@ function TranscriptList({
               }`}
             >
               {isUser ? (
-                <User className="h-3.5 w-3.5" />
+                userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="You"
+                    width={24}
+                    height={24}
+                    unoptimized
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-3.5 w-3.5" />
+                )
               ) : (
                 <InterviewerAvatarImg
                   src={interviewerAvatarUrl}
@@ -333,13 +347,6 @@ function FeedbackContent() {
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
               <div className="flex items-center gap-2 mt-1">
-                {interviewerAvatarUrl && (
-                  <InterviewerAvatarImg
-                    src={interviewerAvatarUrl}
-                    label={sessionMeta.interviewer_name}
-                    initial={sessionMeta.interviewer_name.trim()[0].toUpperCase()}
-                  />
-                )}
                 <p className="text-white/40 text-xs md:text-sm">
                   <span className="text-primary">Job role </span>{sessionMeta.job_role}
                   {" · "}
@@ -347,6 +354,13 @@ function FeedbackContent() {
                   {" · "}
                   <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
                 </p>
+                {interviewerAvatarUrl && (
+                  <InterviewerAvatarImg
+                    src={interviewerAvatarUrl}
+                    label={sessionMeta.interviewer_name}
+                    initial={sessionMeta.interviewer_name.trim()[0].toUpperCase()}
+                  />
+                )}
               </div>
             ) : (
               <p className="text-white/40 text-xs mt-1">Loading interview info…</p>
@@ -406,15 +420,15 @@ function FeedbackContent() {
                     <p className="text-xs text-white/40 mb-1">Vocabulary Calibration</p>
                     <p className="text-sm text-white/85 leading-relaxed">{report.vocabulary_calibration}</p>
                   </div>
-                  {report.filler_words.count > 0 && (
+                  {report.filler_words.total_count > 0 && (
                     <div>
                       <p className="text-xs text-white/40 mb-1">
-                        Filler Words — <span className="text-amber-400">{report.filler_words.count} detected</span>
+                        Filler Words — <span className="text-amber-400">{report.filler_words.total_count} detected</span>
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {report.filler_words.examples.map((w) => (
-                          <span key={w} className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">
-                            {w}
+                        {report.filler_words.words.map(({ word, count }) => (
+                          <span key={word} className="text-xs bg-white/10 px-2.5 py-0.5 rounded-full text-white/60">
+                            {word} <span className="text-amber-400 font-medium">×{count}</span>
                           </span>
                         ))}
                       </div>
@@ -449,6 +463,13 @@ function FeedbackContent() {
               {report.posture_summary && (
                 <Section title="Posture & Presence">
                   <p className="text-sm text-white/80 leading-relaxed">{report.posture_summary}</p>
+                </Section>
+              )}
+
+              {/* Technical depth analysis */}
+              {report.technical_depth_analysis && (
+                <Section title="Technical Depth">
+                  <p className="text-sm text-white/80 leading-relaxed">{report.technical_depth_analysis}</p>
                 </Section>
               )}
 
@@ -494,6 +515,7 @@ function FeedbackContent() {
                     turns={turns}
                     interviewerName={sessionMeta?.interviewer_name}
                     interviewerAvatarUrl={interviewerAvatarUrl}
+                    userImage={session?.user?.image}
                   />
                 )}
               </div>
@@ -546,6 +568,7 @@ function FeedbackContent() {
                     turns={turns}
                     interviewerName={sessionMeta?.interviewer_name}
                     interviewerAvatarUrl={interviewerAvatarUrl}
+                    userImage={session?.user?.image}
                   />
                 )}
               </div>

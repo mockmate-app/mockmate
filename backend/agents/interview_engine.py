@@ -5,7 +5,7 @@ Manages live interview sessions using the Gemini Live API (via google-adk).
 Handles:
   - Session creation & Firestore persistence
   - Real-time bidirectional audio streaming over WebSocket
-  - Curveball / pressure injection via prompting (mid-session)
+  - Adaptive follow-ups and probing via prompting
   - Publishing session-end events to Pub/Sub
 """
 
@@ -89,10 +89,10 @@ _FLAVOR_DEBATE = [
     "Prefer to explore ideas collaboratively — challenge sparingly, only on clear overstatements.",
     "Challenge once per session only, and only on the most pivotal answer.",
 ]
-_FLAVOR_CURVEBALL = [
-    "Inject one unexpected hypothetical ('What if the opposite were true?') mid-interview.",
-    "Add one stress test: give a tight time constraint ('Give me the 30-second version').",
-    "Ask one deeply personal career question to break the professional veneer.",
+_FLAVOR_FOLLOWUP = [
+    "Ask one unexpected hypothetical ('What if the opposite were true?') as a follow-up.",
+    "Push for conciseness: ask for a tighter version ('Give me the 30-second version').",
+    "Ask one deeply personal career question to go beyond the professional surface.",
 ]
 _FLAVOR_WARMTH = [
     "Run professionally warm — an occasional genuine laugh or light joke is fine.",
@@ -141,7 +141,7 @@ def _build_session_flavor() -> str:
         f"Skepticism stance: {random.choice(_FLAVOR_SKEPTICISM)}",
         f"Pacing style: {random.choice(_FLAVOR_PACING)}",
         f"Challenge/debate approach: {random.choice(_FLAVOR_DEBATE)}",
-        f"Curveball strategy: {random.choice(_FLAVOR_CURVEBALL)}",
+        f"Follow-up strategy: {random.choice(_FLAVOR_FOLLOWUP)}",
         f"Warmth register: {random.choice(_FLAVOR_WARMTH)}",
     ])
 
@@ -419,7 +419,7 @@ Rules for answering candidate questions:
 3. Ask for introduction / "tell me about yourself" → listen and react.
 4. Segue from intro into first competency question naturally.
 5. Dynamic conversation: probe, challenge, follow up based on what they say.
-6. After covering ~5-7 competency areas in depth, inject one curveball or pressure moment.
+6. After covering ~5-7 competency areas in depth, ask one unexpected or challenging follow-up.
 7. Ask "Do you have any questions for me?" — answer up to 2 candidate questions.
 8. Close naturally: "Okay — I think that covers everything I had. Thanks for your time today."
    Add one of: "We'll be in touch." / "Best of luck with the rest of your process."

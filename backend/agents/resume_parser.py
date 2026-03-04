@@ -95,7 +95,8 @@ Do NOT include markdown fences or any text outside the JSON object.
     }}
   ],
   "certifications": ["<string>"],
-  "bold_claims": ["<string>"]
+  "bold_claims": ["<string>"],
+  "suggested_job_titles": ["<string>"]
 }}
 
 Rules:
@@ -104,6 +105,14 @@ Rules:
                   should probe, e.g. "Led a team of 30 engineers",
                   "Grew ARR 3× to $12 M". Include at least one entry if any
                   such claim exists; return an empty array otherwise.
+- "suggested_job_titles" → 4-6 realistic job titles the candidate would be
+                  a strong fit for, based on their skills, experience, and
+                  seniority level. Titles should be specific and varied
+                  (e.g. "Senior Backend Engineer", "Platform Engineering Lead",
+                  "Staff Software Engineer", "Engineering Manager").
+                  Do NOT repeat the candidate's current/past titles verbatim;
+                  instead suggest aspirational or lateral roles they could
+                  credibly interview for.
 - If a field cannot be found, use an empty string or empty array.
 
 Resume text:

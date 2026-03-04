@@ -108,6 +108,16 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
         "cultural fit, and self-awareness. Asks what the candidate is optimising for next and "
         "probes soft skills like communication and adaptability."
     ),
+    "algorithm_guru": (
+        "An algorithms and data structures specialist who tests problem-solving ability, "
+        "complexity analysis, and optimal data structure selection. Asks candidates to walk "
+        "through their approach, probes edge cases, and pushes for more efficient solutions."
+    ),
+    "system_designer": (
+        "A system design and architecture interviewer who evaluates scalability, reliability, "
+        "and trade-off reasoning. Expects candidates to clarify requirements, break problems into "
+        "components, and address failure modes and capacity estimation."
+    ),
 }
 
 _VALID_DIFFICULTIES = {"easy", "medium", "hard"}

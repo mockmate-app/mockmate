@@ -137,14 +137,22 @@ class PostureAnalyzerAgent:
     async def persist_score(
         self, session_id: str, frame_index: int, score: dict[str, Any],
     ) -> None:
-        """Persist a single frame score to Firestore."""
+        """Append a frame score to the single per-session posture document.
+
+        All frame scores for a session are batched into one Firestore
+        document (keyed by session_id) with a ``frames`` array.  This
+        cuts Firestore document count from O(N) to O(1) per session.
+        """
         try:
-            doc_id = f"{session_id}_frame_{frame_index:06d}"
             score["recorded_at"] = datetime.now(timezone.utc).isoformat()
-            await (
-                self._db.collection(_COLLECTION)
-                .document(doc_id)
-                .set(score)
+            doc_ref = self._db.collection(_COLLECTION).document(session_id)
+            await doc_ref.set(
+                {
+                    "session_id": session_id,
+                    "frames": firestore.ArrayUnion([score]),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                merge=True,
             )
         except Exception as exc:
             logger.warning(

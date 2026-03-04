@@ -28,6 +28,7 @@ export interface ParsedResume {
   }[];
   certifications: string[];
   bold_claims: string[];
+  suggested_job_titles?: string[];
   resume_id: string;
   user_id: string;
   gcs_uri: string;

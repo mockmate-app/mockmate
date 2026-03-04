@@ -30,8 +30,8 @@ graph LR
 | Feature | Description |
 |---------|-------------|
 | 📄 **Résumé-Aware Questions** | Reads your actual résumé and generates hyper-personalized questions. Claim you led a team of 30? Expect to be asked how you handled underperformance. |
-| 🎭 **10 Interviewer Personas** | From a warm HR manager to an aggressive investment banker — each with distinct questioning styles, pressure levels, and follow-up behaviors. |
-| ⚡ **Stress Injection Engine** | Mid-interview interruptions, curveballs, and challenges. Real interviews are unpredictable; your practice should be too. |
+| 🎭 **12 Interviewer Personas** | From a warm HR manager to an aggressive investment banker, an algorithm guru to a system designer — each with distinct questioning styles, pressure levels, and follow-up behaviors. |
+| ⚡ **Adaptive Follow-ups** | The interviewer asks probing follow-ups, challenges weak answers, and digs deeper into your claims — just like a real interviewer would. |
 | 👁️ **Posture & Presence Vision** | Webcam-based scoring of posture, eye contact, and facial confidence in real time using Gemini Vision. |
 | 📬 **Mock Hiring Decision** | A simulated offer or rejection letter with personalized reasoning — making feedback feel consequential. |
 | 📈 **Skill Progression Dashboard** | Tracks improvement across communication, confidence, structure, technical depth, and domain vocabulary. |
@@ -276,13 +276,13 @@ graph TD
 
 ## 🏆 What Makes MockMate Different
 
-Most interview platforms evaluate **what you say**. MockMate evaluates **who you are under pressure** — your voice, your body language, your vocabulary, your resilience when interrupted.
+Most interview platforms evaluate **what you say**. MockMate evaluates **who you are under pressure** — your voice, your body language, your vocabulary, your ability to handle tough follow-ups.
 
 It is the only platform that combines:
 - ✅ Live voice interviewing (not text-based)
 - ✅ Real-time vision analysis (not post-session)
 - ✅ Résumé personalization (not generic questions)
-- ✅ Adversarial stress injection (not predictable)
+- ✅ Adaptive follow-ups and challenges (not predictable)
 - ✅ Consequential hiring decisions (not vague feedback)
 
 All in a single, seamless session.

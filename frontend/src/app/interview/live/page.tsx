@@ -79,9 +79,9 @@ const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
 const WS_RECONNECT_MAX_ATTEMPTS = 3;
 const WS_RECONNECT_DELAY_MS = 2000;
-const POSTURE_FRAME_INTERVAL_MS = 10_000; // capture a frame every 10 seconds
-const POSTURE_FRAME_QUALITY = 0.7;        // JPEG quality (0-1)
-const POSTURE_FRAME_SIZE = 768;           // resize to 768x768 for the model
+const POSTURE_FRAME_INTERVAL_MS = 30_000; // capture a frame every 30 seconds
+const POSTURE_FRAME_QUALITY = 0.5;        // JPEG quality (0-1)
+const POSTURE_FRAME_SIZE = 512;           // resize to 512x512 for the model
 
 const PERSONA_LABELS: Record<string, string> = {
   neutral: "Professional",

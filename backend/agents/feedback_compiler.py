@@ -91,7 +91,7 @@ CRITICAL — speaker attribution (MUST enforce):
 
 Scoring rules (enforce strictly):
 - communication  : clarity, articulation, active listening, professional tone.
-  Deduct heavily for interrupting, rudeness, hostility, dismissiveness.
+  Deduct heavily for unprofessional behavior, rudeness, hostility, dismissiveness.
 - confidence     : calm, grounded delivery — NOT arrogance or aggression.
 - structure      : organised, logical answers (STAR / clear reasoning).
 - technical_depth: depth and accuracy of domain knowledge demonstrated,
@@ -129,9 +129,10 @@ no extra keys, no trailing commas:
   }},
   "strengths": ["<specific strength from transcript>", ...],
   "improvement_areas": ["<specific, actionable improvement>", ...],
-  "filler_words": {{"count": <int>, "examples": ["<word>", ...]}},
+  "filler_words": {{"total_count": <int>, "words": [{{"word": "<filler word>", "count": <int>}}, ...]}},
   "vocabulary_calibration": "<assessment with examples from transcript>",
-  "tone_analysis": "<honest assessment of tone, attitude, and professionalism — cite specific moments>",{posture_summary_schema}
+  "tone_analysis": "<honest assessment of tone, attitude, and professionalism — cite specific moments>",
+  "technical_depth_analysis": "<detailed analysis of the candidate's technical depth: evaluate specificity of technical answers, use of concrete examples vs vague generalities, accuracy of technical terminology, depth of system design or architectural reasoning, and whether they demonstrated hands-on expertise or only surface-level knowledge. Cite specific moments from the transcript.>",{posture_summary_schema}
   "decision": "offer" | "rejection",
   "decision_letter": "<full text of the mock offer or rejection letter, signed 'The MockMate Hiring Committee'>"
 }}
@@ -193,25 +194,41 @@ class FeedbackCompilerAgent:
         return doc.to_dict().get("turns", [])
 
     async def _aggregate_posture(self, session_id: str) -> dict[str, Any]:
-        """Compute mean posture scores across all frames for the session."""
-        query = (
-            self._db.collection(_COL_POSTURE)
-            .where("session_id", "==", session_id)
-        )
-        docs = query.stream()
-        scores = {
+        """Compute mean posture scores across all frames for the session.
+
+        Posture data is stored as a single document per session with a
+        ``frames`` array.  Falls back to the legacy per-frame document
+        layout for sessions recorded before the migration.
+        """
+        scores: dict[str, list[float]] = {
             "posture_score": [],
             "eye_contact_score": [],
             "facial_confidence_score": [],
             "overall_presence_score": [],
         }
         observations: list[str] = []
-        async for doc in docs:
+
+        # ── New format: single document keyed by session_id ──────────
+        doc = await self._db.collection(_COL_POSTURE).document(session_id).get()
+        if doc.exists:
             data = doc.to_dict()
-            for key in scores:
-                if key in data:
-                    scores[key].append(data[key])
-            observations.extend(data.get("observations", []))
+            for frame in data.get("frames", []):
+                for key in scores:
+                    if key in frame:
+                        scores[key].append(frame[key])
+                observations.extend(frame.get("observations", []))
+        else:
+            # ── Legacy fallback: one document per frame ───────────────
+            query = (
+                self._db.collection(_COL_POSTURE)
+                .where("session_id", "==", session_id)
+            )
+            async for legacy_doc in query.stream():
+                data = legacy_doc.to_dict()
+                for key in scores:
+                    if key in data:
+                        scores[key].append(data[key])
+                observations.extend(data.get("observations", []))
 
         avg = {k: (sum(v) / len(v) if v else 0) for k, v in scores.items()}
         avg["top_observations"] = list(set(observations))[:5]
