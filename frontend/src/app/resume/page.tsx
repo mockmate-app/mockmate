@@ -236,22 +236,22 @@ function ResumeContent() {
                     <User size={18} className="text-orange" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-dark text-base">{resume.name}</p>
-                    {resume.email && <p className="text-xs text-muted mt-0.5">{resume.email}</p>}
-                    {resume.phone && <p className="text-xs text-muted">{resume.phone}</p>}
+                    <p className="font-bold text-dark text-base lg:text-lg">{resume.name}</p>
+                    {resume.email && <p className="text-sm text-muted mt-1">{resume.email}</p>}
+                    {resume.phone && <p className="text-sm text-muted mt-1">{resume.phone}</p>}
                   </div>
                 </div>
                 {resume.summary && (
-                  <p className="text-sm text-muted leading-relaxed mt-3">{resume.summary}</p>
+                  <p className="text-sm lg:text-base leading-relaxed mt-3">{resume.summary}</p>
                 )}
               </Section>
 
               {/* Skills */}
               {resume.skills && resume.skills.length > 0 && (
-                <Section title="Skills" icon={<Cpu size={14} className="text-orange" />}>
+                <Section title="Skills" icon={<Cpu size={16} className="text-orange" />}>
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {resume.skills.map(skill => (
-                      <Badge key={skill} variant="outline" className="rounded-md border-border text-dark text-xs px-2.5 py-1">
+                      <Badge key={skill} variant="outline" className="rounded-md border-border text-dark text-sm px-2.5 py-1">
                         {skill}
                       </Badge>
                     ))}
@@ -261,10 +261,10 @@ function ResumeContent() {
 
               {/* Bold claims */}
               {resume.bold_claims && resume.bold_claims.length > 0 && (
-                <Section title="Key achievements" icon={<Star size={14} className="text-orange" />}>
+                <Section title="Key achievements" icon={<Star size={16} className="text-orange" />}>
                   <ul className="mt-3 flex flex-col gap-1.5">
                     {resume.bold_claims.map((claim, i) => (
-                      <li key={i} className="text-xs text-dark flex items-start gap-2">
+                      <li key={i} className="text-sm text-dark flex items-start gap-2">
                         <span className="text-orange mt-0.5 shrink-0">•</span>
                         {claim}
                       </li>
@@ -275,17 +275,17 @@ function ResumeContent() {
 
               {/* Experience */}
               {resume.experience && resume.experience.length > 0 && (
-                <Section title="Experience" icon={<Briefcase size={14} className="text-orange" />}>
+                <Section title="Experience" icon={<Briefcase size={16} className="text-orange" />}>
                   <div className="mt-3 flex flex-col gap-4">
                     {resume.experience.map((exp, i) => (
                       <div key={i}>
-                        <p className="text-sm font-semibold text-dark">{exp.title}</p>
-                        <p className="text-xs text-muted mt-0.5">{exp.company} · {exp.duration}</p>
+                        <p className="text-sm lg:text-base font-semibold text-dark">{exp.title}</p>
+                        <p className="text-xs lg:text-sm text-muted mt-0.5">{exp.company} · {exp.duration}</p>
                         {exp.highlights && exp.highlights.length > 0 && (
                           <ul className="mt-1.5 flex flex-col gap-1">
                             {exp.highlights.map((h, j) => (
-                              <li key={j} className="text-xs text-muted flex items-start gap-1.5">
-                                <span className="text-orange mt-0.5 shrink-0">–</span>
+                              <li key={j} className="text-sm flex items-start gap-1.5">
+                                <span className="text-orange shrink-0">–</span>
                                 {h}
                               </li>
                             ))}
@@ -299,12 +299,12 @@ function ResumeContent() {
 
               {/* Education */}
               {resume.education && resume.education.length > 0 && (
-                <Section title="Education" icon={<GraduationCap size={14} className="text-orange" />}>
+                <Section title="Education" icon={<GraduationCap size={16} className="text-orange" />}>
                   <div className="mt-3 flex flex-col gap-3">
                     {resume.education.map((edu, i) => (
                       <div key={i}>
-                        <p className="text-sm font-semibold text-dark">{edu.degree}</p>
-                        <p className="text-xs text-muted mt-0.5">{edu.institution} · {edu.year}</p>
+                        <p className="text-sm lg:text-base font-semibold text-dark">{edu.degree}</p>
+                        <p className="text-xs lg:text-sm text-muted mt-0.5">{edu.institution} · {edu.year}</p>
                       </div>
                     ))}
                   </div>
@@ -313,10 +313,10 @@ function ResumeContent() {
 
               {/* Certifications */}
               {resume.certifications && resume.certifications.length > 0 && (
-                <Section title="Certifications" icon={<Star size={14} className="text-orange" />}>
+                <Section title="Certifications" icon={<Star size={16} className="text-orange" />}>
                   <ul className="mt-3 flex flex-col gap-1.5">
                     {resume.certifications.map((cert, i) => (
-                      <li key={i} className="text-xs text-dark flex items-start gap-2">
+                      <li key={i} className="text-sm text-dark flex items-start gap-2">
                         <span className="text-orange mt-0.5 shrink-0">•</span>
                         {cert}
                       </li>
@@ -394,7 +394,7 @@ function Section({
         {title && (
           <div className="flex items-center gap-1.5 mb-1">
             {icon}
-            <p className="text-xs font-semibold text-dark uppercase tracking-wide">{title}</p>
+            <p className="text-sm font-semibold text-dark uppercase tracking-wide">{title}</p>
           </div>
         )}
         {children}
