@@ -13,7 +13,7 @@
   text-box: trim-both cap alphabetic;
 }
 
-@theme {
+@theme extend {
   /* Brand palette */
   --color-dark:   #252525;
   --color-light:  #ffffff;

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { MessageSquareText, User } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -123,6 +123,8 @@ const PERSONA_LABELS: Record<string, string> = {
   management_consultant:"Consultant",
   cto:                  "CTO",
   recruiter:            "Recruiter",
+  algorithm_guru:       "Algorithm Guru",
+  system_designer:      "System Designer",
 };
 
 /* ── Small components ──────────────────────────────────────────────────── */
@@ -199,6 +201,33 @@ function InterviewerAvatarImg({
     </div>
   );
 }
+/* Stateful user avatar: shows Google photo or falls back to initials. */
+function UserAvatarImg({ src, name, email }: { src?: string | null; name?: string | null; email?: string | null }) {
+  const [err, setErr] = useState(false);
+  const initials = name
+    ? name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
+    : (email?.[0]?.toUpperCase() ?? "U");
+
+  if (src && !err) {
+    return (
+      <Image
+        src={src}
+        alt="You"
+        width={24}
+        height={24}
+        unoptimized
+        onError={() => setErr(true)}
+        className="h-6 w-6 rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-orange text-white text-[10px] font-bold">
+      {initials}
+    </div>
+  );
+}
+
 /* ── Transcript list (shared between sidebar and sheet) ────────────────── */
 
 function TranscriptList({
@@ -206,11 +235,15 @@ function TranscriptList({
   interviewerName,
   interviewerAvatarUrl,
   userImage,
+  userName,
+  userEmail,
 }: {
   turns: TranscriptTurn[];
   interviewerName?: string;
   interviewerAvatarUrl?: string;
   userImage?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
 }) {
   if (turns.length === 0) {
     return <p className="text-xs text-white/30 italic px-1">No transcript turns recorded.</p>;
@@ -225,24 +258,9 @@ function TranscriptList({
         const isUser = turn.speaker === "user";
         return (
           <div key={i} className={`flex gap-2.5 ${isUser ? "" : ""}` }>
-            <div
-              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                isUser ? "bg-orange/20 text-orange" : ""
-              }`}
-            >
+            <div className="mt-0.5 shrink-0">
               {isUser ? (
-                userImage ? (
-                  <Image
-                    src={userImage}
-                    alt="You"
-                    width={24}
-                    height={24}
-                    unoptimized
-                    className="h-6 w-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <User className="h-3.5 w-3.5" />
-                )
+                <UserAvatarImg src={userImage} name={userName} email={userEmail} />
               ) : (
                 <InterviewerAvatarImg
                   src={interviewerAvatarUrl}
@@ -346,14 +364,14 @@ function FeedbackContent() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-white/40 text-xs md:text-sm">
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-white/40 text-sm">
+                {/* <p className="text-white/40 text-xs md:text-sm"> */}
                   <span className="text-primary">Job role </span>{sessionMeta.job_role}
                   {" · "}
                   <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
                   {" · "}
                   <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
-                </p>
+                {/* </p> */}
                 {interviewerAvatarUrl && (
                   <InterviewerAvatarImg
                     src={interviewerAvatarUrl}
@@ -363,7 +381,7 @@ function FeedbackContent() {
                 )}
               </div>
             ) : (
-              <p className="text-white/40 text-xs mt-1">Loading interview info…</p>
+              <p className="text-white/40 text-sm mt-2">Loading interview info…</p>
             )}
           </div>
 
@@ -516,6 +534,8 @@ function FeedbackContent() {
                     interviewerName={sessionMeta?.interviewer_name}
                     interviewerAvatarUrl={interviewerAvatarUrl}
                     userImage={session?.user?.image}
+                    userName={session?.user?.name}
+                    userEmail={session?.user?.email}
                   />
                 )}
               </div>
@@ -569,6 +589,8 @@ function FeedbackContent() {
                     interviewerName={sessionMeta?.interviewer_name}
                     interviewerAvatarUrl={interviewerAvatarUrl}
                     userImage={session?.user?.image}
+                    userName={session?.user?.name}
+                    userEmail={session?.user?.email}
                   />
                 )}
               </div>

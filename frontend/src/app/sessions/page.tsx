@@ -59,10 +59,11 @@ interface SessionsPage {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PERSONA_LABELS: Record<string, string> = {
-  neutral: "Neutral", startup_founder: "Startup Founder",
+  neutral: "Professional", startup_founder: "Startup Founder",
   investment_banker: "Investment Banker", tech_lead: "Tech Lead", hr_manager: "HR Manager",
   product_manager: "Product Manager", vp_engineering: "VP of Engineering",
   management_consultant: "Consultant", cto: "CTO", recruiter: "Recruiter",
+  algorithm_guru: "Algorithm Guru", system_designer: "System Designer",
 };
 const PERSONA_COLORS: Record<string, string> = {
   neutral: "bg-zinc-100 text-zinc-600", startup_founder: "bg-purple-100 text-purple-700",
@@ -70,6 +71,7 @@ const PERSONA_COLORS: Record<string, string> = {
   hr_manager: "bg-pink-100 text-pink-700", product_manager: "bg-amber-100 text-amber-700",
   vp_engineering: "bg-indigo-100 text-indigo-700", management_consultant: "bg-teal-100 text-teal-700",
   cto: "bg-red-100 text-red-700", recruiter: "bg-lime-100 text-lime-700",
+  algorithm_guru: "bg-cyan-100 text-cyan-700", system_designer: "bg-violet-100 text-violet-700",
 };
 function personaLabel(p: string) { return PERSONA_LABELS[p] ?? p; }
 function personaColor(p: string) { return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600"; }
@@ -267,7 +269,7 @@ function SessionsContent() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface">
-                    <TableHead className="text-xs font-medium text-muted">Job title / Persona</TableHead>
+                    <TableHead className="text-xs font-medium text-muted">Job role & Persona</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden md:table-cell">Interviewer</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden lg:table-cell">Duration</TableHead>

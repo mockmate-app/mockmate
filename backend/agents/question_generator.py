@@ -226,7 +226,7 @@ class QuestionGeneratorAgent:
         ----------
         user_id    : str   Authenticated user's ID.
         persona    : str   One of the keys in PERSONA_DESCRIPTIONS.
-        job_role   : str   Target job title / role description.
+        job_role   : str   Target job role / role description.
         difficulty : str   "easy" | "medium" | "hard".
         session_id : str   Unused — kept for backwards-compat only.
 

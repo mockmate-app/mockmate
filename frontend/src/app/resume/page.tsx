@@ -90,7 +90,7 @@ function ResumeContent() {
         image={session.user.image}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-10 flex flex-col gap-8">
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-12 flex flex-col gap-8">
         {/* Breadcrumb + actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
@@ -179,7 +179,7 @@ function ResumeContent() {
               </Card>
             </div>
 
-            {/* Right: document preview skeleton */}
+            {/* Right: resume preview skeleton */}
             <div className="lg:col-span-3">
               <Card className="rounded-xl border border-border overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -330,7 +330,7 @@ function ResumeContent() {
             <div className="lg:col-span-3">
               <Card className="rounded-xl border border-border overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <p className="text-sm font-medium text-dark">Document preview</p>
+                  <p className="text-sm font-medium text-dark">Résumé preview</p>
                   {pdfUrl && (
                     <a
                       href={pdfUrl}

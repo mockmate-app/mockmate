@@ -72,7 +72,7 @@ interface ResumeData {
 // ─── Persona helpers ───────────────────────────────────────────────────────────
 
 const PERSONA_LABELS: Record<string, string> = {
-  neutral: "Neutral",
+  neutral: "Professional",
   startup_founder: "Startup Founder",
   investment_banker: "Investment Banker",
   tech_lead: "Tech Lead",
@@ -82,6 +82,8 @@ const PERSONA_LABELS: Record<string, string> = {
   management_consultant: "Consultant",
   cto: "CTO",
   recruiter: "Recruiter",
+  algorithm_guru: "Algorithm Guru",
+  system_designer: "System Designer",
 };
 
 const PERSONA_COLORS: Record<string, string> = {
@@ -95,6 +97,8 @@ const PERSONA_COLORS: Record<string, string> = {
   management_consultant: "bg-teal-100 text-teal-700",
   cto: "bg-red-100 text-red-700",
   recruiter: "bg-lime-100 text-lime-700",
+  algorithm_guru: "bg-cyan-100 text-cyan-700",
+  system_designer: "bg-violet-100 text-violet-700",
 };
 
 function personaLabel(p: string) {
@@ -376,7 +380,7 @@ function DashboardContent() {
                   <TableHeader>
                     <TableRow className="bg-surface">
                       <TableHead className="text-xs font-medium text-muted">
-                        Job Title / Persona
+                        Job role & Persona
                       </TableHead>
                       <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">
                         Last active

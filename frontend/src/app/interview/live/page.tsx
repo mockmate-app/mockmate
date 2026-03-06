@@ -94,6 +94,8 @@ const PERSONA_LABELS: Record<string, string> = {
   management_consultant: "Consultant",
   cto: "CTO",
   recruiter: "Recruiter",
+  algorithm_guru: "Algorithm Guru",
+  system_designer: "System Designer",
 };
 
 function int16ToFloat32(buffer: ArrayBuffer): Float32Array<ArrayBuffer> {

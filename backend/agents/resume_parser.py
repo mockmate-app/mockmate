@@ -103,9 +103,9 @@ Rules:
 - "skills"      → flat list of individual skills/technologies.
 - "bold_claims" → extraordinary or quantified achievements an interviewer
                   should probe, e.g. "Led a team of 30 engineers",
-                  "Grew ARR 3× to $12 M". Include at least one entry if any
+                  "Grew ARR 3x to $12 M". Include at least one entry if any
                   such claim exists; return an empty array otherwise.
-- "suggested_job_titles" → 4-6 realistic job titles the candidate would be
+- "suggested_job_titles" → 4-6 realistic job roles the candidate would be
                   a strong fit for, based on their skills, experience, and
                   seniority level. Titles should be specific and varied
                   (e.g. "Senior Backend Engineer", "Platform Engineering Lead",
