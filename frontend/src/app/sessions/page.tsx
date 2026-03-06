@@ -267,7 +267,7 @@ function SessionsContent() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface">
-                    <TableHead className="text-xs font-medium text-muted">Persona / Role</TableHead>
+                    <TableHead className="text-xs font-medium text-muted">Job title / Persona</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden md:table-cell">Interviewer</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
                     <TableHead className="text-xs font-medium text-muted hidden lg:table-cell">Duration</TableHead>
@@ -280,11 +280,11 @@ function SessionsContent() {
                 <TableBody>
                   {filtered.map(s => (
                     <TableRow key={s.session_id} className="hover:bg-surface/60">
-                      <TableCell className="py-3.5 max-w-32">
-                        <Badge variant="secondary" className={`text-xs font-medium ${personaColor(s.persona)}`}>
+                      <TableCell className="py-3.5 max-w-64">
+                        <p className="mx-0.5 text-xs text-muted truncate w-full">{s.job_role}</p>
+                        <Badge variant="secondary" className={`mt-2 text-xs font-medium ${personaColor(s.persona)}`}>
                           {personaLabel(s.persona)}
                         </Badge>
-                        <p className="mt-2 mx-0.5 text-xs text-muted truncate w-full">{s.job_role}</p>
                       </TableCell>
                       <TableCell className="text-xs text-muted hidden md:table-cell">
                         {s.interviewer_name ?? "—"}

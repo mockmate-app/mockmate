@@ -7,9 +7,18 @@ import { useSession } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import {
-  Mic, FileText, BarChart2, ChevronRight,
-  Calendar, Award, Clock, User, Briefcase, RotateCcw,
-} from "lucide-react";import { Card, CardContent } from "@/components/ui/card";
+  Mic,
+  FileText,
+  BarChart2,
+  ChevronRight,
+  Calendar,
+  Award,
+  Clock,
+  User,
+  Briefcase,
+  RotateCcw,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,33 +72,37 @@ interface ResumeData {
 // ─── Persona helpers ───────────────────────────────────────────────────────────
 
 const PERSONA_LABELS: Record<string, string> = {
-  neutral:              "Neutral",
-  startup_founder:      "Startup Founder",
-  investment_banker:    "Investment Banker",
-  tech_lead:            "Tech Lead",
-  hr_manager:           "HR Manager",
-  product_manager:      "Product Manager",
-  vp_engineering:       "VP of Engineering",
-  management_consultant:"Consultant",
-  cto:                  "CTO",
-  recruiter:            "Recruiter",
+  neutral: "Neutral",
+  startup_founder: "Startup Founder",
+  investment_banker: "Investment Banker",
+  tech_lead: "Tech Lead",
+  hr_manager: "HR Manager",
+  product_manager: "Product Manager",
+  vp_engineering: "VP of Engineering",
+  management_consultant: "Consultant",
+  cto: "CTO",
+  recruiter: "Recruiter",
 };
 
 const PERSONA_COLORS: Record<string, string> = {
-  neutral:              "bg-zinc-100 text-zinc-600",
-  startup_founder:      "bg-purple-100 text-purple-700",
-  investment_banker:    "bg-blue-100 text-blue-700",
-  tech_lead:            "bg-green-100 text-green-700",
-  hr_manager:           "bg-pink-100 text-pink-700",
-  product_manager:      "bg-amber-100 text-amber-700",
-  vp_engineering:       "bg-indigo-100 text-indigo-700",
-  management_consultant:"bg-teal-100 text-teal-700",
-  cto:                  "bg-red-100 text-red-700",
-  recruiter:            "bg-lime-100 text-lime-700",
+  neutral: "bg-zinc-100 text-zinc-600",
+  startup_founder: "bg-purple-100 text-purple-700",
+  investment_banker: "bg-blue-100 text-blue-700",
+  tech_lead: "bg-green-100 text-green-700",
+  hr_manager: "bg-pink-100 text-pink-700",
+  product_manager: "bg-amber-100 text-amber-700",
+  vp_engineering: "bg-indigo-100 text-indigo-700",
+  management_consultant: "bg-teal-100 text-teal-700",
+  cto: "bg-red-100 text-red-700",
+  recruiter: "bg-lime-100 text-lime-700",
 };
 
-function personaLabel(p: string) { return PERSONA_LABELS[p] ?? p; }
-function personaColor(p: string) { return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600"; }
+function personaLabel(p: string) {
+  return PERSONA_LABELS[p] ?? p;
+}
+function personaColor(p: string) {
+  return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600";
+}
 
 // ─── Score helpers ─────────────────────────────────────────────────────────────
 
@@ -151,21 +164,21 @@ function DashboardContent() {
   const { data: sessionsData, isLoading: loadingSessions } = useQuery({
     queryKey: ["sessions", uid],
     queryFn: () =>
-      fetch(`${API_BASE}/sessions/user/${uid}?limit=5`)
-        .then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/sessions/user/${uid}?limit=5`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
     enabled: !!uid,
   });
 
   const { data: resumeData, isLoading: loadingResume } = useQuery({
     queryKey: ["resume", uid],
     queryFn: () =>
-      fetch(`${API_BASE}/resume/${uid}`)
-        .then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/resume/${uid}`).then((r) => (r.ok ? r.json() : null)),
     enabled: !!uid,
   });
 
   const sessions: SessionSummary[] = sessionsData?.sessions ?? [];
-  const resume: ResumeData | null  = resumeData?.resume_data ?? null;
+  const resume: ResumeData | null = resumeData?.resume_data ?? null;
 
   // Use useEffect to avoid calling router.replace() during render
   useEffect(() => {
@@ -205,19 +218,26 @@ function DashboardContent() {
 
       {/* ── Main ── */}
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-12">
-
         {/* New-user banner */}
         {isNewUser && (
           <Alert className="mb-6 border-orange/30 bg-orange/10 rounded-xl">
             <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="font-semibold text-dark">Welcome to MockMate! 🎉</p>
+                <p className="font-semibold text-dark">
+                  Welcome to MockMate! 🎉
+                </p>
                 <p className="text-sm text-muted mt-1">
-                  Get started by uploading your résumé and running your first mock interview.
+                  Get started by uploading your résumé and running your first
+                  mock interview.
                 </p>
               </div>
-              <Button asChild className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
-                <Link href="/resume/upload?from=dashboard">Start onboarding</Link>
+              <Button
+                asChild
+                className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange"
+              >
+                <Link href="/resume/upload?from=dashboard">
+                  Start onboarding
+                </Link>
               </Button>
             </AlertDescription>
           </Alert>
@@ -226,16 +246,30 @@ function DashboardContent() {
         {/* Greeting + primary CTA */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">Hi, {firstName} 👋</h1>
-            <p className="mt-1.5 text-sm text-muted">Here&apos;s your interview practice overview</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">
+              Hi, {firstName} 👋
+            </h1>
+            <p className="mt-1.5 text-sm text-muted">
+              Here&apos;s your interview practice overview
+            </p>
           </div>
           <Button
             asChild
             className="shrink-0 rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange gap-2 hidden sm:inline-flex"
             disabled={loadingResume}
           >
-            <Link href={!loadingResume && !resume ? "/resume/upload?from=dashboard" : "/interview/setup?from=dashboard"}>
-              {!loadingResume && !resume ? <FileText size={15} /> : <Mic size={15} />}
+            <Link
+              href={
+                !loadingResume && !resume
+                  ? "/resume/upload?from=dashboard"
+                  : "/interview/setup?from=dashboard"
+              }
+            >
+              {!loadingResume && !resume ? (
+                <FileText size={15} />
+              ) : (
+                <Mic size={15} />
+              )}
               {!loadingResume && !resume ? "Upload résumé" : "Start interview"}
             </Link>
           </Button>
@@ -253,20 +287,30 @@ function DashboardContent() {
             label="Avg. score"
             value={avgScore !== null ? String(avgScore) : "—"}
             unit={avgScore !== null ? "/ 100" : undefined}
-            valueClass={avgScore !== null ? scoreTextColor(avgScore) : undefined}
+            valueClass={
+              avgScore !== null ? scoreTextColor(avgScore) : undefined
+            }
           />
           <StatCard
             icon={<Calendar size={18} className="text-orange" />}
             label="This month"
             value={thisMonth === 0 ? "—" : String(thisMonth)}
-            unit={thisMonth > 0 ? "session" + (thisMonth !== 1 ? "s" : "") : undefined}
+            unit={
+              thisMonth > 0
+                ? "session" + (thisMonth !== 1 ? "s" : "")
+                : undefined
+            }
           />
           <StatCard
             icon={<Clock size={18} className="text-orange" />}
             label="Last interview"
             value={
               lastSession
-                ? daysSince(lastSession.last_retried_at ?? lastSession.live_started_at ?? lastSession.created_at) === 0
+                ? daysSince(
+                    lastSession.last_retried_at ??
+                      lastSession.live_started_at ??
+                      lastSession.created_at,
+                  ) === 0
                   ? "Today"
                   : `${daysSince(lastSession.last_retried_at ?? lastSession.live_started_at ?? lastSession.created_at)}d ago`
                 : "—"
@@ -280,18 +324,37 @@ function DashboardContent() {
             asChild
             className="w-full rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2"
           >
-            <Link href={!loadingResume && !resume ? "/resume/upload?from=dashboard" : "/interview/setup?from=dashboard"}>
-              {!loadingResume && !resume ? <FileText size={15} /> : <Mic size={15} />}
-              {!loadingResume && !resume ? "Upload résumé to start" : "Start interview"}
+            <Link
+              href={
+                !loadingResume && !resume
+                  ? "/resume/upload?from=dashboard"
+                  : "/interview/setup?from=dashboard"
+              }
+            >
+              {!loadingResume && !resume ? (
+                <FileText size={15} />
+              ) : (
+                <Mic size={15} />
+              )}
+              {!loadingResume && !resume
+                ? "Upload résumé to start"
+                : "Start interview"}
             </Link>
           </Button>
-          <QuickLink href="/resume/upload?from=dashboard" icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
-          <QuickLink href="/sessions" icon={<BarChart2 size={15} className="text-orange" />} label="View all sessions" />
+          <QuickLink
+            href="/resume/upload?from=dashboard"
+            icon={<FileText size={15} className="text-orange" />}
+            label="Upload / update résumé"
+          />
+          <QuickLink
+            href="/sessions"
+            icon={<BarChart2 size={15} className="text-orange" />}
+            label="View all sessions"
+          />
         </div>
 
         {/* ── Main grid ── */}
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
-
           {/* Recent sessions — 2/3 width */}
           <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
             <SectionHeader title="Recent sessions" href="/sessions" />
@@ -312,27 +375,47 @@ function DashboardContent() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-surface">
-                      <TableHead className="text-xs font-medium text-muted">Persona / Role</TableHead>
-                      <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
-                      <TableHead className="text-xs font-medium text-muted text-center">Score</TableHead>
+                      <TableHead className="text-xs font-medium text-muted">
+                        Job Title / Persona
+                      </TableHead>
+                      <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">
+                        Last active
+                      </TableHead>
+                      <TableHead className="text-xs font-medium text-muted text-center">
+                        Score
+                      </TableHead>
                       <TableHead className="text-xs font-medium text-muted text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map(s => (
-                      <TableRow key={s.session_id} className="hover:bg-surface/60">
-                        <TableCell className="py-3.5 max-w-32">
-                          <Badge variant="secondary" className={`text-xs font-medium ${personaColor(s.persona)}`}>
+                    {sessions.map((s) => (
+                      <TableRow
+                        key={s.session_id}
+                        className="hover:bg-surface/60"
+                      >
+                        <TableCell className="py-3.5 max-w-64">
+                          <p className="mx-0.5 text-xs text-muted truncate w-full">
+                            {s.job_role}
+                          </p>
+                          <Badge
+                            variant="secondary"
+                            className={`mt-2 text-xs font-medium ${personaColor(s.persona)}`}
+                          >
                             {personaLabel(s.persona)}
                           </Badge>
-                          <p className="mt-2 mx-0.5 text-xs text-muted truncate w-full">{s.job_role}</p>
                         </TableCell>
                         <TableCell className="text-xs text-muted hidden sm:table-cell whitespace-nowrap">
-                          {fmtDate(s.last_retried_at ?? s.live_started_at ?? s.created_at)}
+                          {fmtDate(
+                            s.last_retried_at ??
+                              s.live_started_at ??
+                              s.created_at,
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           {s.overall_score !== null ? (
-                            <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>
+                            <Badge
+                              className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}
+                            >
                               {s.overall_score}
                             </Badge>
                           ) : (
@@ -352,7 +435,9 @@ function DashboardContent() {
                               Feedback <ChevronRight size={12} />
                             </Link>
                           ) : s.status === "active" ? (
-                            <span className="text-xs text-muted italic">In progress</span>
+                            <span className="text-xs text-muted italic">
+                              In progress
+                            </span>
                           ) : canRetry(s) ? (
                             <Link
                               href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}${s.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(s.interviewer_avatar_url)}` : ""}`}
@@ -370,100 +455,117 @@ function DashboardContent() {
                 </Table>
               )}
             </Card>
-
           </div>
 
           {/* Right sidebar */}
           <div className="flex flex-col gap-6">
-
             {/* Résumé card */}
             <div className="flex flex-col gap-3">
-            <SectionHeader title="Your résumé" />
+              <SectionHeader title="Your résumé" />
               <Card className="rounded-xl border border-border">
                 <CardContent className="p-4">
-                {loadingResume ? (
-                  <div className="flex flex-col gap-3 py-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-9 w-9 rounded-full" />
-                      <div className="flex flex-col gap-1.5 flex-1">
-                        <Skeleton className="h-4 w-3/4 rounded" />
-                        <Skeleton className="h-3 w-1/2 rounded" />
+                  {loadingResume ? (
+                    <div className="flex flex-col gap-3 py-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 rounded-full" />
+                        <div className="flex flex-col gap-1.5 flex-1">
+                          <Skeleton className="h-4 w-3/4 rounded" />
+                          <Skeleton className="h-3 w-1/2 rounded" />
+                        </div>
                       </div>
+                      <Skeleton className="h-6 w-full rounded" />
+                      <Skeleton className="h-6 w-full rounded" />
                     </div>
-                    <Skeleton className="h-6 w-full rounded" />
-                    <Skeleton className="h-6 w-full rounded" />
-                  </div>
-                ) : resume ? (
-                  <div className="flex flex-col gap-4">
-                    {/* Identity */}
-                    <div className="flex items-start gap-3">
-                      <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-orange/10">
-                        <User size={16} className="text-orange" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-dark text-sm truncate">{resume.name}</p>
-                        {resume.experience?.[0] && (
-                          <p className="text-xs text-muted mt-0.5 truncate">
-                            {resume.experience[0].title} · {resume.experience[0].company}
+                  ) : resume ? (
+                    <div className="flex flex-col gap-4">
+                      {/* Identity */}
+                      <div className="flex items-start gap-3">
+                        <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-orange/10">
+                          <User size={16} className="text-orange" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-dark text-sm truncate">
+                            {resume.name}
                           </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Skills */}
-                    {resume.skills && resume.skills.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted mb-2">Top skills</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {resume.skills.slice(0, 8).map(skill => (
-                            <Badge
-                              key={skill}
-                              variant="outline"
-                              className="px-2 py-0.5 text-xs text-dark border-border bg-surface rounded-md"
-                            >
-                              {skill}
-                            </Badge>
-                          ))}
-                          {resume.skills.length > 8 && (
-                            <Badge variant="outline" className="px-2 py-0.5 text-xs text-muted border-border bg-surface rounded-md">
-                              +{resume.skills.length - 8} more
-                            </Badge>
+                          {resume.experience?.[0] && (
+                            <p className="text-xs text-muted mt-0.5 truncate">
+                              {resume.experience[0].title} ·{" "}
+                              {resume.experience[0].company}
+                            </p>
                           )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Experience */}
-                    {resume.experience && resume.experience.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted mb-2">Experience</p>
-                        <div className="flex flex-col gap-3">
-                          {resume.experience.slice(0, 2).map((exp, i) => (
-                            <div key={i} className="flex items-start gap-2.5">
-                              <Briefcase size={12} className="text-muted mt-0.5 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium text-dark truncate">{exp.title}</p>
-                                <p className="text-xs text-muted truncate">{exp.company} · {exp.duration}</p>
-                              </div>
-                            </div>
-                          ))}
+                      {/* Skills */}
+                      {resume.skills && resume.skills.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted mb-2">
+                            Top skills
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {resume.skills.slice(0, 8).map((skill) => (
+                              <Badge
+                                key={skill}
+                                variant="outline"
+                                className="px-2 py-0.5 text-xs text-dark border-border bg-surface rounded-md"
+                              >
+                                {skill}
+                              </Badge>
+                            ))}
+                            {resume.skills.length > 8 && (
+                              <Badge
+                                variant="outline"
+                                className="px-2 py-0.5 text-xs text-muted border-border bg-surface rounded-md"
+                              >
+                                +{resume.skills.length - 8} more
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <Link
-                      href="/resume?from=dashboard"
-                      className="text-xs text-orange hover:underline inline-flex items-center gap-1 w-fit"
-                    >
-                      View résumé <ChevronRight size={12} />
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 py-6 text-center">
-                    <FileText size={28} className="text-muted opacity-40" />
-                    <p className="text-sm text-muted">No résumé uploaded yet.</p>
-                  </div>
-                )}
+                      {/* Experience */}
+                      {resume.experience && resume.experience.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted mb-2">
+                            Experience
+                          </p>
+                          <div className="flex flex-col gap-3">
+                            {resume.experience.slice(0, 2).map((exp, i) => (
+                              <div key={i} className="flex items-start gap-2.5">
+                                <Briefcase
+                                  size={12}
+                                  className="text-muted mt-0.5 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium text-dark truncate">
+                                    {exp.title}
+                                  </p>
+                                  <p className="text-xs text-muted truncate">
+                                    {exp.company} · {exp.duration}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <Link
+                        href="/resume?from=dashboard"
+                        className="text-xs text-orange hover:underline inline-flex items-center gap-1 w-fit"
+                      >
+                        View résumé <ChevronRight size={12} />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center">
+                      <FileText size={28} className="text-muted opacity-40" />
+                      <p className="text-sm text-muted">
+                        No résumé uploaded yet.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -472,11 +574,18 @@ function DashboardContent() {
             <div className="hidden lg:flex flex-col gap-3">
               <p className="text-sm font-semibold text-dark">Quick actions</p>
               <div className="flex flex-col gap-2">
-                <QuickLink href="/resume/upload?from=dashboard"   icon={<FileText size={15} className="text-orange" />} label="Upload / update résumé" />
-                <QuickLink href="/sessions"        icon={<BarChart2 size={15} className="text-orange" />} label="View all sessions" />
+                <QuickLink
+                  href="/resume/upload?from=dashboard"
+                  icon={<FileText size={15} className="text-orange" />}
+                  label="Upload / update résumé"
+                />
+                <QuickLink
+                  href="/sessions"
+                  icon={<BarChart2 size={15} className="text-orange" />}
+                  label="View all sessions"
+                />
               </div>
             </div>
-
           </div>
         </div>
       </main>
@@ -507,7 +616,9 @@ function StatCard({
           <span className="text-xs font-medium">{label}</span>
         </div>
         <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className={`text-xl sm:text-2xl font-bold tracking-tight ${valueClass ?? "text-dark"}`}>
+          <span
+            className={`text-xl sm:text-2xl font-bold tracking-tight ${valueClass ?? "text-dark"}`}
+          >
             {value}
           </span>
           {unit && <span className="text-xs text-muted">{unit}</span>}
@@ -522,7 +633,10 @@ function SectionHeader({ title, href }: { title: string; href?: string }) {
     <div className="flex items-center justify-between">
       <p className="text-sm font-semibold text-dark">{title}</p>
       {href && (
-        <Link href={href} className="text-xs text-orange hover:underline inline-flex items-center gap-0.5">
+        <Link
+          href={href}
+          className="text-xs text-orange hover:underline inline-flex items-center gap-0.5"
+        >
           View all <ChevronRight size={12} />
         </Link>
       )}
@@ -530,7 +644,17 @@ function SectionHeader({ title, href }: { title: string; href?: string }) {
   );
 }
 
-function QuickLink({ href, icon, label, disabled }: { href: string; icon: React.ReactNode; label: string; disabled?: boolean }) {
+function QuickLink({
+  href,
+  icon,
+  label,
+  disabled,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+}) {
   if (disabled) {
     return (
       <Button
@@ -544,7 +668,9 @@ function QuickLink({ href, icon, label, disabled }: { href: string; icon: React.
             {icon}
           </span>
           <span className="text-sm text-muted">{label}</span>
-          <span className="ml-auto text-xs text-muted">Upload résumé first</span>
+          <span className="ml-auto text-xs text-muted">
+            Upload résumé first
+          </span>
         </Link>
       </Button>
     );
@@ -559,8 +685,13 @@ function QuickLink({ href, icon, label, disabled }: { href: string; icon: React.
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange/10 shrink-0">
           {icon}
         </span>
-        <span className="text-sm text-dark group-hover:text-orange transition-colors">{label}</span>
-        <ChevronRight size={14} className="ml-auto text-muted group-hover:text-orange transition-colors" />
+        <span className="text-sm text-dark group-hover:text-orange transition-colors">
+          {label}
+        </span>
+        <ChevronRight
+          size={14}
+          className="ml-auto text-muted group-hover:text-orange transition-colors"
+        />
       </Link>
     </Button>
   );

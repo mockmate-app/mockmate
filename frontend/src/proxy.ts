@@ -8,7 +8,7 @@ import { getSessionCookie } from "better-auth/cookies";
  * Each protected page/route performs the definitive server-side validation
  * (ownership checks, full session validation) as a second layer.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
