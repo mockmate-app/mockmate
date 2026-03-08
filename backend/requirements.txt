@@ -34,3 +34,6 @@ passlib[bcrypt]==1.7.4
 # Resume parsing
 PyPDF2==3.0.1
 python-docx==1.1.2
+
+# PostgreSQL analytics cache / materialized views
+asyncpg>=0.29.0

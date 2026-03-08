@@ -3,8 +3,9 @@
 import Image from "next/image";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageSquareText } from "lucide-react";
+import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/sheet";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const FEEDBACK_RETRY_COOLDOWN_MS = 8000;
+const FEEDBACK_RETRY_MAX_ATTEMPTS = 3;
 
 /* ── Data fetchers ─────────────────────────────────────────────────────── */
 
@@ -37,6 +40,23 @@ async function fetchOrGenerateFeedback(sessionId: string): Promise<FeedbackRepor
   if (getRes.ok) return getRes.json();
 
   // Not found — generate it
+  const res = await fetch(`${API_BASE}/feedback/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body?.detail ?? detail;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function regenerateFeedback(sessionId: string): Promise<FeedbackReport> {
   const res = await fetch(`${API_BASE}/feedback/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -113,18 +133,19 @@ interface SessionMeta {
 }
 
 const PERSONA_LABELS: Record<string, string> = {
-  neutral:              "Professional",
-  startup_founder:      "Startup Founder",
-  investment_banker:    "Investment Banker",
-  tech_lead:            "Tech Lead",
-  hr_manager:           "HR Manager",
-  product_manager:      "Product Manager",
-  vp_engineering:       "VP of Engineering",
-  management_consultant:"Consultant",
-  cto:                  "CTO",
-  recruiter:            "Recruiter",
-  algorithm_guru:       "Algorithm Guru",
-  system_designer:      "System Designer",
+  neutral: "Professional",
+  startup_founder: "Startup Founder",
+  investment_banker: "Investment Banker",
+  tech_lead: "Tech Lead",
+  hr_manager: "HR Manager",
+  product_manager: "Product Manager",
+  vp_engineering: "VP of Engineering",
+  management_consultant: "Consultant",
+  cto: "CTO",
+  recruiter: "Recruiter",
+  algorithm_guru: "Algorithm Guru",
+  system_designer: "System Designer",
+  ai_engineer: "AI Engineer",
 };
 
 /* ── Small components ──────────────────────────────────────────────────── */
@@ -257,7 +278,7 @@ function TranscriptList({
       {turns.map((turn, i) => {
         const isUser = turn.speaker === "user";
         return (
-          <div key={i} className={`flex gap-2.5 ${isUser ? "" : ""}` }>
+          <div key={i} className={`flex gap-2.5 ${isUser ? "" : ""}`}>
             <div className="mt-0.5 shrink-0">
               {isUser ? (
                 <UserAvatarImg src={userImage} name={userName} email={userEmail} />
@@ -287,9 +308,13 @@ function TranscriptList({
 function FeedbackContent() {
   const params = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session, isPending: sessionPending } = useSession();
   const sessionId = params.get("session_id") ?? "";
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  const [lastRetryAt, setLastRetryAt] = useState(0);
+  const [nowMs, setNowMs] = useState(0);
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -335,6 +360,39 @@ function FeedbackContent() {
     refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now());
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const retryCooldownLeft = Math.max(
+    0,
+    FEEDBACK_RETRY_COOLDOWN_MS - (nowMs - lastRetryAt),
+  );
+  const retryLimitReached = retryAttempts >= FEEDBACK_RETRY_MAX_ATTEMPTS;
+
+  const retryFeedbackMutation = useMutation({
+    mutationFn: () => regenerateFeedback(sessionId),
+    onSuccess: (newReport) => {
+      queryClient.setQueryData(["feedback", sessionId], newReport);
+      setRetryAttempts((prev) => prev + 1);
+      setLastRetryAt(Date.now());
+      toast.success("Feedback has been regenerated.");
+    },
+    onError: () => {
+      setRetryAttempts((prev) => prev + 1);
+      setLastRetryAt(Date.now());
+    },
+  });
+
+  const retryDisabled =
+    !sessionId ||
+    retryFeedbackMutation.isPending ||
+    retryLimitReached ||
+    retryCooldownLeft > 0;
+
   // sessionMeta already declared above for the ownership guard
 
   const turns = transcript?.turns ?? [];
@@ -366,11 +424,11 @@ function FeedbackContent() {
             {sessionMeta ? (
               <div className="flex flex-wrap items-center gap-2 mt-2 text-white/40 text-sm">
                 {/* <p className="text-white/40 text-xs md:text-sm"> */}
-                  <span className="text-primary">Job role </span>{sessionMeta.job_role}
-                  {" · "}
-                  <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
-                  {" · "}
-                  <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
+                <span className="text-primary">Job role </span>{sessionMeta.job_role}
+                {" · "}
+                <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
+                {" · "}
+                <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
                 {/* </p> */}
                 {interviewerAvatarUrl && (
                   <InterviewerAvatarImg
@@ -400,6 +458,16 @@ function FeedbackContent() {
             </Alert>
           )}
 
+          {retryFeedbackMutation.isError && (
+            <Alert variant="destructive" className="rounded-xl border-red-500/25 bg-red-500/10 text-red-300">
+              <AlertDescription>
+                {retryFeedbackMutation.error instanceof Error
+                  ? retryFeedbackMutation.error.message
+                  : "Retry failed. Please try again."}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {!loading && !error && report && (
             <>
               {/* Overall score + decision */}
@@ -407,11 +475,10 @@ function FeedbackContent() {
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <ScoreRing score={report.overall_score} />
                   <Badge
-                    className={`text-sm px-4 py-1 rounded-full font-semibold ${
-                      report.decision === "offer"
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                        : "bg-red-500/20 text-red-400 border border-red-500/30"
-                    }`}
+                    className={`text-sm px-4 py-1 rounded-full font-semibold ${report.decision === "offer"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-red-500/20 text-red-400 border border-red-500/30"
+                      }`}
                   >
                     {report.decision === "offer" ? "✓ Would Hire" : "✗ Rejection"}
                   </Badge>
@@ -500,13 +567,39 @@ function FeedbackContent() {
             </>
           )}
 
-          <Button
-            onClick={() => router.back()}
-            className="self-start rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5 mx-auto"
-          >
-            Go back
-          </Button>
+          <div className="flex justify-center gap-2">
+            <Button
+              onClick={() => router.back()}
+              className="hidden lg:flex z-40 rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
+            >
+              Go back
+            </Button>
+
+            {!loading && !!sessionId && (
+              <div className="flex flex-col items-center gap-2 pb-12 lg:pb-0">
+                <Button
+                  onClick={() => retryFeedbackMutation.mutate()}
+                  disabled={retryDisabled}
+                  variant="ghost"
+                  className="rounded-full border-white/20 bg-white/5"
+                >
+                  {retryFeedbackMutation.isPending ? "Regenerating…" : "Retry feedback generation"}
+                </Button>
+                {!retryFeedbackMutation.isPending && retryCooldownLeft > 0 && !retryLimitReached && (
+                  <span className="text-xs text-white/40">
+                    Retry in {Math.ceil(retryCooldownLeft / 1000)}s
+                  </span>
+                )}
+                {retryLimitReached && (
+                  <span className="text-xs text-white/40">
+                    Retry limit reached
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
 
         {/* ── Desktop transcript sidebar (hidden on <lg) ───────────────── */}
         <aside className="hidden lg:flex w-85 xl:w-95 shrink-0 flex-col sticky top-20 max-h-[calc(100vh-6rem)]">
@@ -545,7 +638,13 @@ function FeedbackContent() {
       </div>
 
       {/* ── Mobile transcript bottom button + sheet (visible on <lg) ───── */}
-      <div className="lg:hidden fixed bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none">
+      <div className="lg:hidden fixed bottom-6 left-0 right-0 flex gap-2 justify-center z-50 pointer-events-none">
+        <Button
+          onClick={() => router.back()}
+          className="z-40 rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
+        >
+          Go back
+        </Button>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button

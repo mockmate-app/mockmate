@@ -24,6 +24,7 @@ import {
   UserCheck,
   Binary,
   Network,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,6 +145,14 @@ const PERSONAS: Persona[] = [
     description:
       "Probes distributed systems, trade-offs, and failure modes. Expects structured, top-down thinking.",
     icon: <Network size={20} className="text-orange" />,
+  },
+  {
+    id: "ai_engineer",
+    label: "AI Engineer",
+    tagline: "LLMs, ML systems & GenAI",
+    description:
+      "Focuses on AI/ML fundamentals, LLM application design, evaluation, safety, and production trade-offs.",
+    icon: <Bot size={20} className="text-orange" />,
   },
 ];
 

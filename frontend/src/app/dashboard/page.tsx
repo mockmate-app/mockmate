@@ -25,6 +25,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SessionStatusPill, canRetry } from "@/components/SessionStatusPill";
 import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  PolarAngleAxis,
+  PolarGrid,
+  Radar,
+  RadarChart,
+  YAxis,
+} from "recharts";
+import {
   Table,
   TableBody,
   TableCell,
@@ -69,6 +87,32 @@ interface ResumeData {
   experience?: ResumeExperience[];
 }
 
+interface ProgressionPoint {
+  session_id: string;
+  overall_score: number;
+  created_at: string;
+}
+
+interface DimensionAverages {
+  communication: number | null;
+  confidence: number | null;
+  structure: number | null;
+  technical_depth: number | null;
+  domain_vocabulary: number | null;
+  posture_presence: number | null;
+}
+
+interface DashboardAnalytics {
+  user_id: string;
+  progression: ProgressionPoint[];
+  user_average_dimensions: DimensionAverages;
+  global_average_dimensions: DimensionAverages;
+  sample_sizes: {
+    user_sessions: number;
+    global_feedback_reports: number;
+  };
+}
+
 // ─── Persona helpers ───────────────────────────────────────────────────────────
 
 const PERSONA_LABELS: Record<string, string> = {
@@ -84,6 +128,7 @@ const PERSONA_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
   algorithm_guru: "Algorithm Guru",
   system_designer: "System Designer",
+  ai_engineer: "AI Engineer",
 };
 
 const PERSONA_COLORS: Record<string, string> = {
@@ -99,6 +144,7 @@ const PERSONA_COLORS: Record<string, string> = {
   recruiter: "bg-lime-100 text-lime-700",
   algorithm_guru: "bg-cyan-100 text-cyan-700",
   system_designer: "bg-violet-100 text-violet-700",
+  ai_engineer: "bg-fuchsia-100 text-fuchsia-700",
 };
 
 function personaLabel(p: string) {
@@ -181,6 +227,15 @@ function DashboardContent() {
     enabled: !!uid,
   });
 
+  const { data: analyticsData, isLoading: loadingAnalytics } = useQuery<DashboardAnalytics | null>({
+    queryKey: ["dashboard-analytics", uid],
+    queryFn: () =>
+      fetch(`${API_BASE}/analytics/dashboard/${uid}?limit=7`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+    enabled: !!uid,
+  });
+
   const sessions: SessionSummary[] = sessionsData?.sessions ?? [];
   const resume: ResumeData | null = resumeData?.resume_data ?? null;
 
@@ -212,7 +267,7 @@ function DashboardContent() {
   const thisMonth: number = sessionsData?.this_month ?? 0;
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
+    <div className="min-h-screen bg-surface flex flex-col overflow-x-hidden">
       <AppHeader
         homeHref="/"
         name={session.user.name}
@@ -320,6 +375,39 @@ function DashboardContent() {
                 : "—"
             }
           />
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <Card className="rounded-xl border border-border min-w-0 overflow-hidden">
+            <CardContent className="p-4 min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-dark">Score progression</p>
+                <p className="text-xs text-muted">Last 7 interviews</p>
+              </div>
+              {loadingAnalytics ? (
+                <Skeleton className="h-64 w-full rounded-lg" />
+              ) : (
+                <ProgressionLineChart points={analyticsData?.progression ?? []} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border border-border min-w-0 overflow-hidden">
+            <CardContent className="p-4 min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-dark">Skill Benchmark</p>
+                <p className="text-xs text-muted">You vs all users</p>
+              </div>
+              {loadingAnalytics ? (
+                <Skeleton className="h-64 w-full rounded-lg" />
+              ) : (
+                <RadarComparisonChart
+                  userAvg={analyticsData?.user_average_dimensions ?? null}
+                  globalAvg={analyticsData?.global_average_dimensions ?? null}
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* ── Mobile quick actions (shown only below lg) ── */}
@@ -698,5 +786,130 @@ function QuickLink({
         />
       </Link>
     </Button>
+  );
+}
+
+function ProgressionLineChart({ points }: { points: ProgressionPoint[] }) {
+  if (!points.length) {
+    return (
+      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted">
+        Complete interviews to see your trend.
+      </div>
+    );
+  }
+
+  const chartData = points.map((point) => ({
+    score: point.overall_score,
+  }));
+
+  const chartConfig: ChartConfig = {
+    score: {
+      label: "Score",
+      color: "var(--color-primary)",
+    },
+  };
+
+  return (
+    <div className="h-64 rounded-lg border border-border bg-surface/40 p-2">
+      <ChartContainer config={chartConfig} className="h-full w-full min-w-0 aspect-auto">
+        <LineChart data={chartData} margin={{ top: 12, right: 12, left: 6, bottom: 12 }}>
+          <CartesianGrid vertical={false} />
+          <YAxis
+            domain={[0, 100]}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            width={34}
+          />
+          <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+          <Line
+            dataKey="score"
+            type="monotone"
+            stroke="var(--color-score)"
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: "var(--color-score)" }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
+function RadarComparisonChart({
+  userAvg,
+  globalAvg,
+}: {
+  userAvg: DimensionAverages | null;
+  globalAvg: DimensionAverages | null;
+}) {
+  if (!userAvg || !globalAvg) {
+    return (
+      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted">
+        Not enough feedback data for benchmark yet.
+      </div>
+    );
+  }
+
+  const dims: Array<keyof DimensionAverages> = [
+    "structure",
+    "technical_depth",
+    "communication",
+    "confidence",
+    "domain_vocabulary",
+  ];
+  const labels: Record<keyof DimensionAverages, string> = {
+    structure: "Structure",
+    technical_depth: "Technical",
+    communication: "Communication",
+    confidence: "Confidence",
+    domain_vocabulary: "Vocabulary",
+    posture_presence: "Posture",
+  };
+
+  const chartData = dims.map((dimension) => ({
+    dimension: labels[dimension],
+    user: userAvg[dimension] ?? 0,
+    global: globalAvg[dimension] ?? 0,
+  }));
+
+  const chartConfig: ChartConfig = {
+    user: {
+      label: "You",
+      color: "var(--color-primary)",
+    },
+    global: {
+      label: "All users",
+      color: "var(--color-chart-4)",
+    },
+  };
+
+  return (
+    <div className="h-64 rounded-lg border border-border bg-surface/40 p-2">
+      <ChartContainer config={chartConfig} className="h-full w-full min-w-0 aspect-auto">
+        <RadarChart data={chartData} outerRadius="80%">
+          <PolarGrid />
+          <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Radar
+            name="global"
+            dataKey="global"
+            stroke="var(--color-global)"
+            fill="var(--color-global)"
+            fillOpacity={0.2}
+            strokeWidth={2}
+          />
+          <Radar
+            name="user"
+            dataKey="user"
+            stroke="var(--color-user)"
+            fill="var(--color-user)"
+            fillOpacity={0.25}
+            strokeWidth={2}
+          />
+        </RadarChart>
+      </ChartContainer>
+    </div>
   );
 }

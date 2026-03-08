@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/query-client";
 import { APP_DESCRIPTION, APP_NAME } from "@/constants/common";
+import { Toaster } from "@/components/ui/sonner";
 
 export const viewport: Viewport = {
   viewportFit: "cover",
@@ -33,6 +34,7 @@ export default function RootLayout({
       >
         <ReactQueryProvider>
           {children}
+          <Toaster />
         </ReactQueryProvider>
       </body>
     </html>

@@ -5,6 +5,9 @@ const PERSONAS = [
   { name: "Startup Founder",        tag: "Culture fit & ownership",       emoji: "🚀" },
   { name: "Investment Banker",      tag: "Precision & numbers",           emoji: "📊" },
   { name: "Tech Lead",              tag: "Depth & trade-offs",            emoji: "⚙️" },
+  { name: "Algorithm Guru",         tag: "DSA & complexity",              emoji: "🧠" },
+  { name: "System Designer",        tag: "Architecture & scalability",    emoji: "🏛️" },
+  { name: "AI Engineer",            tag: "LLMs, ML & GenAI",              emoji: "🤖" },
   { name: "HR Manager",             tag: "Behavioural & values",          emoji: "🤝" },
   { name: "Product Manager",        tag: "User empathy & data",           emoji: "🗺️" },
   { name: "VP of Engineering",      tag: "Leadership & scale",            emoji: "🏗️" },
@@ -25,7 +28,7 @@ export default function Personas() {
             Choose your challenge
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
-            Nine distinct interviewers. Each one pushes differently — from an
+            Twelve distinct interviewers. Each one pushes differently — from an
             aggressive investment banker to a visionary CTO. The experience
             changes entirely depending on who you practise against.
           </p>

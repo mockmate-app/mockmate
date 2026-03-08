@@ -79,6 +79,8 @@ const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
 const WS_RECONNECT_MAX_ATTEMPTS = 3;
 const WS_RECONNECT_DELAY_MS = 2000;
+const TRANSCRIPT_SYNC_MAX_WAIT_MS = 30_000;
+const TRANSCRIPT_SYNC_POLL_MS = 800;
 const POSTURE_FRAME_INTERVAL_MS = 30_000; // capture a frame every 30 seconds
 const POSTURE_FRAME_QUALITY = 0.5;        // JPEG quality (0-1)
 const POSTURE_FRAME_SIZE = 512;           // resize to 512x512 for the model
@@ -96,6 +98,7 @@ const PERSONA_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
   algorithm_guru: "Algorithm Guru",
   system_designer: "System Designer",
+  ai_engineer: "AI Engineer",
 };
 
 function int16ToFloat32(buffer: ArrayBuffer): Float32Array<ArrayBuffer> {
@@ -605,6 +608,35 @@ function LiveInterviewContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId],
   );
+
+  const waitForTranscriptUpload = useCallback(async () => {
+    if (!sessionId) return false;
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < TRANSCRIPT_SYNC_MAX_WAIT_MS) {
+      try {
+        const res = await fetch(
+          `${API_BASE}/transcript/${encodeURIComponent(sessionId)}`,
+          {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          },
+        );
+
+        if (res.ok) {
+          return true;
+        }
+      } catch {
+        // retry until timeout
+      }
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, TRANSCRIPT_SYNC_POLL_MS);
+      });
+    }
+
+    return false;
+  }, [sessionId]);
 
   const sendAudioChunk = useCallback(
     (buffer: ArrayBuffer) => {
@@ -1189,17 +1221,27 @@ function LiveInterviewContent() {
       setYourTurn(false);
       speechStreakRef.current = 0;
       await persistSessionEnd(endedBy, finalTranscript);
-      // Give the backend time to save transcript in the WebSocket finally block
-      // (the WS close triggers transcript persistence on the server side).
-      await new Promise((r) => setTimeout(r, 2500));
+      const transcriptUploaded = await waitForTranscriptUpload();
       // Bust the React Query cache for this session so the feedback page
       // always fetches the latest transcript and regenerates feedback from
       // the full (prior + new) transcript rather than showing stale data.
       queryClient.removeQueries({ queryKey: ["feedback", sessionId] });
       queryClient.removeQueries({ queryKey: ["transcript", sessionId] });
-      setFeedbackReady(true);
+      if (transcriptUploaded) {
+        setFeedbackReady(true);
+      } else {
+        setError(
+          "Transcript is still syncing. Please wait a moment and try again.",
+        );
+      }
     },
-    [closeAudioContextSafely, persistSessionEnd, queryClient, sessionId],
+    [
+      closeAudioContextSafely,
+      persistSessionEnd,
+      queryClient,
+      sessionId,
+      waitForTranscriptUpload,
+    ],
   );
 
   const endInterviewRef = useRef(endInterview);

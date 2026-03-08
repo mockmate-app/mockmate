@@ -118,6 +118,12 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
         "and trade-off reasoning. Expects candidates to clarify requirements, break problems into "
         "components, and address failure modes and capacity estimation."
     ),
+    "ai_engineer": (
+        "An AI/ML interviewer focused on machine learning fundamentals, LLM application design, "
+        "prompting and evaluation strategy, model quality trade-offs, safety/guardrails, and "
+        "production AI system architecture. Expects concrete discussion of metrics, data quality, "
+        "and operational reliability for AI features."
+    ),
 }
 
 _VALID_DIFFICULTIES = {"easy", "medium", "hard"}

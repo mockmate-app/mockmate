@@ -63,7 +63,7 @@ const PERSONA_LABELS: Record<string, string> = {
   investment_banker: "Investment Banker", tech_lead: "Tech Lead", hr_manager: "HR Manager",
   product_manager: "Product Manager", vp_engineering: "VP of Engineering",
   management_consultant: "Consultant", cto: "CTO", recruiter: "Recruiter",
-  algorithm_guru: "Algorithm Guru", system_designer: "System Designer",
+  algorithm_guru: "Algorithm Guru", system_designer: "System Designer", ai_engineer: "AI Engineer",
 };
 const PERSONA_COLORS: Record<string, string> = {
   neutral: "bg-zinc-100 text-zinc-600", startup_founder: "bg-purple-100 text-purple-700",
@@ -71,7 +71,7 @@ const PERSONA_COLORS: Record<string, string> = {
   hr_manager: "bg-pink-100 text-pink-700", product_manager: "bg-amber-100 text-amber-700",
   vp_engineering: "bg-indigo-100 text-indigo-700", management_consultant: "bg-teal-100 text-teal-700",
   cto: "bg-red-100 text-red-700", recruiter: "bg-lime-100 text-lime-700",
-  algorithm_guru: "bg-cyan-100 text-cyan-700", system_designer: "bg-violet-100 text-violet-700",
+  algorithm_guru: "bg-cyan-100 text-cyan-700", system_designer: "bg-violet-100 text-violet-700", ai_engineer: "bg-fuchsia-100 text-fuchsia-700",
 };
 function personaLabel(p: string) { return PERSONA_LABELS[p] ?? p; }
 function personaColor(p: string) { return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600"; }

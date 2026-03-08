@@ -53,6 +53,12 @@ _COL_SESSIONS     = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")       
 _COL_TRANSCRIPTS  = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts") # optional
 _COL_POSTURE      = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores") # optional
 _COL_FEEDBACK     = os.getenv("FIRESTORE_FEEDBACK_COLLECTION", "feedback")      # optional
+_COL_RESUMES      = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")         # optional
+_PGHOST = os.getenv("PGHOST", "").strip()
+_PGPORT = int(os.getenv("PGPORT", "5432"))
+_PGUSER = os.getenv("PGUSER", "").strip()
+_PGPASSWORD = os.getenv("PGPASSWORD", "").strip()
+_PGDATABASE = os.getenv("PGDATABASE", "").strip()
 
 FEEDBACK_PROMPT = """
 You are a rigorous, unbiased interview coach and senior hiring manager.
@@ -61,20 +67,37 @@ in what actually happened in the transcript below. Do NOT invent positives
 or soften negatives — if the candidate was rude, disrespectful, incoherent,
 or unprofessional, say so directly and reflect it in every relevant score.
 
-Target role context (apply before scoring anything):
-- The candidate is interviewing for: {job_role}
-- Infer the typical years of experience (YoE) a competitive hire for this role
-  would have (e.g. Junior SWE ≈ 0-2 yrs, Senior SWE ≈ 5+ yrs, Staff ≈ 8+ yrs,
-  VP/Director ≈ 12+ yrs). State that assumed YoE range in your feedback.
-- Calibrate every dimension score against the bar expected for THAT role at THAT
-  seniority level — not against a generic standard.
-  * A junior candidate who gives textbook answers for their level should score
-    well, even if a senior engineer would have gone deeper.
-  * A candidate interviewing for a senior/principal/director role who gives
-    shallow or junior-level answers should score poorly, even if those answers
-    would be acceptable for an early-career hire.
-- In decision_letter, explicitly state the assumed YoE bar for the role and
-  explain whether the candidate met, exceeded, or fell short of it.
+Personalization context (MUST apply before scoring):
+- Evaluate using ALL FOUR inputs together:
+    1) Candidate resume (including inferred candidate YoE, past scope, claims, skills)
+    2) Interview target role ({job_role}) and expected role bar
+    3) Transcript evidence (primary source of what the candidate actually demonstrated)
+    4) Posture data if present
+- Infer candidate YoE from resume (use experience durations + seniority cues).
+- Infer expected YoE range for this target role (e.g. Junior SWE ≈ 0-2,
+    Mid ≈ 2-5, Senior ≈ 5-8, Staff+ ≈ 8+, Director/VP ≈ 12+).
+- Calibrate scores based on gap/alignment between candidate YoE/profile and role bar.
+
+Calibration rules (strict):
+- Lower YoE candidates:
+    * prioritize clarity, fundamentals, breadth, learning mindset, and structured thinking.
+    * tolerate moderate filler words and limited depth if reasoning is sound.
+- Higher YoE / senior-role candidates:
+    * require stronger depth, tradeoff analysis, precision, ownership impact, and architecture-level reasoning.
+    * tolerate less vagueness, filler-heavy communication, or shallow examples.
+- Resume alignment:
+    * Compare transcript performance against what the resume implies.
+    * Call out over-claiming or mismatch (e.g., resume suggests deep expertise but answers are superficial).
+    * Reward consistency when transcript evidence supports resume claims.
+- Role alignment:
+    * Judge suitability for the specific interview role, not generic employability.
+
+Decision-letter requirements (must include):
+- inferred candidate YoE,
+- inferred YoE bar for the target role,
+- resume-to-role fit,
+- transcript-backed strengths and gaps,
+- posture impact if available.
 
 CRITICAL — speaker attribution (MUST enforce):
 - The transcript labels each line as CANDIDATE or INTERVIEWER.
@@ -140,6 +163,9 @@ no extra keys, no trailing commas:
 --- Session metadata ---
 {session_meta}
 
+--- Parsed resume context ---
+{resume_context}
+
 --- Interview transcript ---
 (Format: SPEAKER: text — INTERVIEWER is the AI, CANDIDATE is the person being evaluated)
 {transcript}
@@ -160,6 +186,8 @@ class FeedbackCompilerAgent:
         vertexai.init(project=_PROJECT, location=_REGION)
         self._model = GenerativeModel(_MODEL)
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
+        self._pg_pool = None
+        self._pg_ready = False
 
     # ------------------------------------------------------------------
     # Public
@@ -169,10 +197,16 @@ class FeedbackCompilerAgent:
         session = await self._fetch_session(session_id)
         transcript_turns = await self._fetch_transcript(session_id)
         posture_avg = await self._aggregate_posture(session_id)
-        report = await self._generate_report(session, transcript_turns, posture_avg)
+        resume_data = await self._fetch_resume(session.get("user_id"))
+        report = await self._generate_report(
+            session,
+            transcript_turns,
+            posture_avg,
+            resume_data,
+        )
         report["session_id"] = session_id
         report["compiled_at"] = datetime.now(timezone.utc).isoformat()
-        await self._persist(session_id, report)
+        await self._persist(session_id, report, session)
         return report
 
     # ------------------------------------------------------------------
@@ -192,6 +226,16 @@ class FeedbackCompilerAgent:
             logger.warning("No transcript found for session '%s'", session_id)
             return []
         return doc.to_dict().get("turns", [])
+
+    async def _fetch_resume(self, user_id: str | None) -> dict[str, Any] | None:
+        """Fetch parsed resume for a user, or None if unavailable."""
+        if not user_id:
+            return None
+        doc = await self._db.collection(_COL_RESUMES).document(user_id).get()
+        if not doc.exists:
+            logger.info("No resume found for user '%s'", user_id)
+            return None
+        return doc.to_dict()
 
     async def _aggregate_posture(self, session_id: str) -> dict[str, Any]:
         """Compute mean posture scores across all frames for the session.
@@ -236,7 +280,11 @@ class FeedbackCompilerAgent:
         return avg
 
     async def _generate_report(
-        self, session: dict[str, Any], transcript_turns: list[dict[str, Any]], posture_avg: dict[str, Any]
+        self,
+        session: dict[str, Any],
+        transcript_turns: list[dict[str, Any]],
+        posture_avg: dict[str, Any],
+        resume_data: dict[str, Any] | None,
     ) -> dict[str, Any]:
         meta = {
             "user_id": session.get("user_id"),
@@ -246,6 +294,7 @@ class FeedbackCompilerAgent:
             "status": session.get("status"),
             "created_at": session.get("created_at"),
             "ended_at": session.get("ended_at"),
+            "resume_available": bool(resume_data),
         }
 
         job_role = meta["job_role"]
@@ -300,6 +349,7 @@ class FeedbackCompilerAgent:
         prompt = FEEDBACK_PROMPT.format(
             job_role=job_role,
             session_meta=json.dumps(meta, indent=2),
+            resume_context=json.dumps(resume_data, indent=2) if resume_data else "(No parsed resume available for this user)",
             transcript=transcript_text,
             posture_scoring_rule=posture_scoring_rule,
             overall_posture_note=overall_posture_note,
@@ -379,7 +429,12 @@ class FeedbackCompilerAgent:
                 "Feedback model returned invalid JSON. Please try again."
             ) from exc
 
-    async def _persist(self, session_id: str, report: dict[str, Any]) -> None:
+    async def _persist(
+        self,
+        session_id: str,
+        report: dict[str, Any],
+        session: dict[str, Any],
+    ) -> None:
         await self._db.collection(_COL_FEEDBACK).document(session_id).set(report)
         # Write top-level score back to the session doc so dashboard queries
         # can show scores without loading the full feedback document.
@@ -392,9 +447,148 @@ class FeedbackCompilerAgent:
         except Exception:  # noqa: BLE001
             pass  # best-effort; don't fail the whole compile if this update fails
 
+        # Best-effort Postgres analytics cache + materialized views.
+        try:
+            await self._upsert_postgres_analytics(session, report)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Postgres analytics update skipped: %s", exc)
+
     async def get_feedback(self, session_id: str) -> dict[str, Any] | None:
         """Return a previously compiled feedback report, or None if not found."""
         doc = await self._db.collection(_COL_FEEDBACK).document(session_id).get()
         if not doc.exists:
             return None
         return doc.to_dict()
+
+    async def _get_pg_pool(self):
+        """Lazily create a Postgres pool when PG env vars are configured."""
+        if not (_PGHOST and _PGUSER and _PGPASSWORD and _PGDATABASE):
+            return None
+        if self._pg_pool is not None:
+            return self._pg_pool
+
+        import asyncpg
+
+        self._pg_pool = await asyncpg.create_pool(
+            host=_PGHOST,
+            port=_PGPORT,
+            user=_PGUSER,
+            password=_PGPASSWORD,
+            database=_PGDATABASE,
+            min_size=1,
+            max_size=5,
+        )
+        return self._pg_pool
+
+    async def _ensure_pg_analytics_objects(self, conn) -> None:
+        if self._pg_ready:
+            return
+
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analytics_feedback_scores (
+              session_id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              created_at TIMESTAMPTZ NOT NULL,
+              overall_score DOUBLE PRECISION,
+              communication DOUBLE PRECISION,
+              confidence DOUBLE PRECISION,
+              structure DOUBLE PRECISION,
+              technical_depth DOUBLE PRECISION,
+              domain_vocabulary DOUBLE PRECISION,
+              posture_presence DOUBLE PRECISION
+            )
+            """
+        )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS analytics_feedback_scores_user_created_idx "
+            "ON analytics_feedback_scores (user_id, created_at DESC)"
+        )
+
+        await conn.execute(
+            """
+            CREATE MATERIALIZED VIEW IF NOT EXISTS analytics_user_dimension_averages AS
+            SELECT
+              user_id,
+              ROUND(AVG(communication)::numeric, 1) AS communication,
+              ROUND(AVG(confidence)::numeric, 1) AS confidence,
+              ROUND(AVG(structure)::numeric, 1) AS structure,
+              ROUND(AVG(technical_depth)::numeric, 1) AS technical_depth,
+              ROUND(AVG(domain_vocabulary)::numeric, 1) AS domain_vocabulary,
+              ROUND(AVG(posture_presence)::numeric, 1) AS posture_presence,
+              COUNT(*)::INT AS sessions_count
+            FROM analytics_feedback_scores
+            GROUP BY user_id
+            """
+        )
+        await conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS analytics_user_dimension_averages_user_uidx "
+            "ON analytics_user_dimension_averages (user_id)"
+        )
+
+        await conn.execute(
+            """
+            CREATE MATERIALIZED VIEW IF NOT EXISTS analytics_global_dimension_averages AS
+            SELECT
+              ROUND(AVG(communication)::numeric, 1) AS communication,
+              ROUND(AVG(confidence)::numeric, 1) AS confidence,
+              ROUND(AVG(structure)::numeric, 1) AS structure,
+              ROUND(AVG(technical_depth)::numeric, 1) AS technical_depth,
+              ROUND(AVG(domain_vocabulary)::numeric, 1) AS domain_vocabulary,
+              ROUND(AVG(posture_presence)::numeric, 1) AS posture_presence,
+              COUNT(*)::INT AS reports_count
+            FROM analytics_feedback_scores
+            """
+        )
+        self._pg_ready = True
+
+    async def _upsert_postgres_analytics(
+        self,
+        session: dict[str, Any],
+        report: dict[str, Any],
+    ) -> None:
+        pool = await self._get_pg_pool()
+        if pool is None:
+            return
+
+        dim = report.get("dimension_scores", {})
+        created_at_raw = report.get("compiled_at") or session.get("ended_at") or session.get("created_at")
+        try:
+            created_at = datetime.fromisoformat(str(created_at_raw)) if created_at_raw else datetime.now(timezone.utc)
+        except Exception:  # noqa: BLE001
+            created_at = datetime.now(timezone.utc)
+
+        async with pool.acquire() as conn:
+            await self._ensure_pg_analytics_objects(conn)
+            await conn.execute(
+                """
+                INSERT INTO analytics_feedback_scores (
+                  session_id, user_id, created_at, overall_score,
+                  communication, confidence, structure,
+                  technical_depth, domain_vocabulary, posture_presence
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                ON CONFLICT (session_id) DO UPDATE SET
+                  user_id = EXCLUDED.user_id,
+                  created_at = EXCLUDED.created_at,
+                  overall_score = EXCLUDED.overall_score,
+                  communication = EXCLUDED.communication,
+                  confidence = EXCLUDED.confidence,
+                  structure = EXCLUDED.structure,
+                  technical_depth = EXCLUDED.technical_depth,
+                  domain_vocabulary = EXCLUDED.domain_vocabulary,
+                  posture_presence = EXCLUDED.posture_presence
+                """,
+                str(report.get("session_id") or session.get("session_id") or ""),
+                str(session.get("user_id") or ""),
+                created_at,
+                report.get("overall_score"),
+                dim.get("communication"),
+                dim.get("confidence"),
+                dim.get("structure"),
+                dim.get("technical_depth"),
+                dim.get("domain_vocabulary"),
+                dim.get("posture_presence"),
+            )
+
+            await conn.execute("REFRESH MATERIALIZED VIEW analytics_user_dimension_averages")
+            await conn.execute("REFRESH MATERIALIZED VIEW analytics_global_dimension_averages")

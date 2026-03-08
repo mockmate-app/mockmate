@@ -342,6 +342,16 @@ async def list_user_sessions(user_id: str, limit: int = 10, offset: int = 0):
     }
 
 
+@app.get("/analytics/dashboard/{user_id}", tags=["session"])
+async def get_dashboard_analytics(user_id: str, limit: int = 7):
+    """Return progression + benchmark analytics for dashboard charts."""
+    data = await app.state.interview_engine.get_user_dashboard_analytics(
+        user_id=user_id,
+        limit=limit,
+    )
+    return data
+
+
 @app.get("/transcript/{session_id}", tags=["session"])
 async def get_transcript(session_id: str):
     """Return the full transcript (list of turns) for a session."""
