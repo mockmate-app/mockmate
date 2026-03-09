@@ -3,6 +3,7 @@ import "./globals.css";
 import { ReactQueryProvider } from "@/lib/query-client";
 import { APP_DESCRIPTION, APP_NAME } from "@/constants/common";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/next"
 
 export const viewport: Viewport = {
   viewportFit: "cover",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <ReactQueryProvider>
           {children}
           <Toaster />
+          <Analytics />
         </ReactQueryProvider>
       </body>
     </html>
