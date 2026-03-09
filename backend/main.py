@@ -14,6 +14,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -97,6 +98,7 @@ class FeedbackRequest(BaseModel):
 
 class SessionEndRequest(BaseModel):
     ended_by: str | None = None
+    transcript: list[dict[str, Any]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +251,7 @@ async def start_session(config: SessionConfig, background_tasks: BackgroundTasks
         app.state.avatar_agent.get_or_generate,
         session_meta["interviewer_name"],
         config.persona,
+        session_meta.get("interviewer_gender_hint"),
     )
     return {
         "session_id":             session_meta["session_id"],
@@ -268,7 +271,11 @@ async def start_session(config: SessionConfig, background_tasks: BackgroundTasks
 # ---------------------------------------------------------------------------
 
 @app.get("/interviewer-avatar/{name}", tags=["assets"])
-async def get_interviewer_avatar(name: str, persona: str = "neutral"):
+async def get_interviewer_avatar(
+    name: str,
+    persona: str = "neutral",
+    gender_hint: str | None = None,
+):
     """
     Serve the AI-generated profile picture for an interviewer.
 
@@ -278,7 +285,11 @@ async def get_interviewer_avatar(name: str, persona: str = "neutral"):
     - Responses are cache-controlled for 7 days so the browser/CDN rarely
       needs to re-fetch (interviewer avatars are immutable once generated).
     """
-    img_bytes = await app.state.avatar_agent.get_or_generate(name, persona)
+    img_bytes = await app.state.avatar_agent.get_or_generate(
+        name,
+        persona,
+        gender_hint,
+    )
     if not img_bytes:
         raise HTTPException(
             status_code=404,
@@ -323,6 +334,7 @@ async def end_session(session_id: str, req: SessionEndRequest | None = None):
     await app.state.interview_engine.end_session(
         session_id,
         ended_by=req.ended_by if req else None,
+        transcript=req.transcript if req else None,
     )
     return {"session_id": session_id, "status": "ended"}
 

@@ -98,6 +98,7 @@ const PERSONA_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
   algorithm_guru: "Algorithm Guru",
   system_designer: "System Designer",
+  prompt_wizard: "Prompt Wizard",
   ai_engineer: "AI Engineer",
 };
 
@@ -789,12 +790,16 @@ function LiveInterviewContent() {
         // Session metadata from backend — tells us if this is a resume
         if (msg.type === "session_meta") {
           isResumeRef.current = msg.resume ?? false;
-          if (msg.resume && wsRef.current?.readyState === WebSocket.OPEN) {
+          if ((msg.resume || reconnectingRef.current) && wsRef.current?.readyState === WebSocket.OPEN) {
+            const hasLocalHistory = transcriptRef.current.some(
+              (entry) => entry.speaker === "you" || entry.speaker === "interviewer",
+            );
+
             // Populate the chat with prior transcript turns so the user
             // can see the full conversation history from before the drop.
             // Only load prior transcript once — on reconnection the
             // session_meta fires again but we already have the turns.
-            if (!priorTranscriptLoadedRef.current) {
+            if (!hasLocalHistory && !priorTranscriptLoadedRef.current) {
               priorTranscriptLoadedRef.current = true;
               if (msg.transcript && Array.isArray(msg.transcript)) {
                 const priorEntries: TranscriptEntry[] = msg.transcript
@@ -815,6 +820,35 @@ function LiveInterviewContent() {
                 `Resuming interview (${msg.prior_turns ?? 0} prior exchanges loaded)`,
               );
             }
+
+            // Use client-side transcript as a fallback resume context so the
+            // interviewer can continue naturally even if backend transcript
+            // persistence lagged during a reconnect race.
+            const clientContextTurns = transcriptRef.current
+              .filter(
+                (entry) =>
+                  (entry.speaker === "you" || entry.speaker === "interviewer") &&
+                  !!entry.text?.trim(),
+              )
+              .slice(-40)
+              .map((entry) =>
+                `${entry.speaker === "you" ? "CANDIDATE" : "INTERVIEWER"}: ${entry.text.trim()}`,
+              )
+              .join("\n");
+
+            if (clientContextTurns) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: "text",
+                  text:
+                    `[CONNECTION RESUME CONTEXT]\n` +
+                    `Use this as prior conversation history and continue from where you left off. ` +
+                    `Do not restart the interview or repeat already covered questions.\n\n` +
+                    clientContextTurns,
+                }),
+              );
+            }
+
             // Tell the AI the candidate has reconnected — different from
             // the fresh-start kickstart so the AI continues naturally.
             wsRef.current.send(
