@@ -72,8 +72,7 @@ _PERSONA_DESCRIPTOR: dict[str, str] = {
     "management_consultant": "management consultant in formal business wear",
     "cto":                   "Chief Technology Officer with an authoritative presence",
     "recruiter":             "corporate talent recruiter with a welcoming expression",
-    "prompt_wizard":         "AI engineer and machine learning specialist in modern tech attire",
-    "ai_engineer":           "AI engineer and machine learning specialist in modern tech attire",
+    "prompt_wizard":         "AI engineer and machine learning specialist in modern tech attire"
 }
 
 

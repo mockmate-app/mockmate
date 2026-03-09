@@ -128,8 +128,7 @@ const PERSONA_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
   algorithm_guru: "Algorithm Guru",
   system_designer: "System Designer",
-  prompt_wizard: "Prompt Wizard",
-  ai_engineer: "AI Engineer",
+  prompt_wizard: "Prompt Wizard"
 };
 
 const PERSONA_COLORS: Record<string, string> = {

@@ -7,7 +7,7 @@ const PERSONAS = [
   { name: "Tech Lead",              tag: "Depth & trade-offs",            emoji: "⚙️" },
   { name: "Algorithm Guru",         tag: "DSA & complexity",              emoji: "🧠" },
   { name: "System Designer",        tag: "Architecture & scalability",    emoji: "🏛️" },
-  { name: "AI Engineer",            tag: "LLMs, ML & GenAI",              emoji: "🤖" },
+  { name: "Prompt Wizard",            tag: "LLMs, ML & GenAI",              emoji: "🤖" },
   { name: "HR Manager",             tag: "Behavioural & values",          emoji: "🤝" },
   { name: "Product Manager",        tag: "User empathy & data",           emoji: "🗺️" },
   { name: "VP of Engineering",      tag: "Leadership & scale",            emoji: "🏗️" },

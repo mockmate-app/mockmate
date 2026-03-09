@@ -63,7 +63,7 @@ const PERSONA_LABELS: Record<string, string> = {
   investment_banker: "Investment Banker", tech_lead: "Tech Lead", hr_manager: "HR Manager",
   product_manager: "Product Manager", vp_engineering: "VP of Engineering",
   management_consultant: "Consultant", cto: "CTO", recruiter: "Recruiter",
-  algorithm_guru: "Algorithm Guru", system_designer: "System Designer", prompt_wizard: "Prompt Wizard", ai_engineer: "AI Engineer",
+  algorithm_guru: "Algorithm Guru", system_designer: "System Designer", prompt_wizard: "Prompt Wizard" 
 };
 const PERSONA_COLORS: Record<string, string> = {
   neutral: "bg-zinc-100 text-zinc-600", startup_founder: "bg-purple-100 text-purple-700",
