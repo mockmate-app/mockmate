@@ -46,7 +46,7 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <AppHeader homeHref="/" showUserMenu={false} />
+      <AppHeader homeHref="/" showUserMenu={false} showProButton={false} />
 
       {/* Centered card */}
       <main className="flex-1 flex items-center justify-center px-4">

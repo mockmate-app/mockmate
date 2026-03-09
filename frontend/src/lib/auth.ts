@@ -1,15 +1,40 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
-import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth"; 
+import { polar, checkout, portal } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
 
-const polarClient = new Polar({ 
-    accessToken: process.env.POLAR_ACCESS_TOKEN, 
+const polarClient = new Polar({
+    accessToken: process.env.POLAR_ACCESS_TOKEN,
     // Use 'sandbox' if you're using the Polar Sandbox environment
     // Remember that access tokens, products, etc. are completely separated between environments.
     // Access tokens obtained in Production are for instance not usable in the Sandbox environment.
-    server: 'sandbox'
-}); 
+    server: process.env.POLAR_SERVER === "production" ? "production" : "sandbox",
+});
+
+const polarProMonthlyProductId = process.env.POLAR_PRO_MONTHLY_PRODUCT_ID?.trim();
+const polarProYearlyProductId = process.env.POLAR_PRO_YEARLY_PRODUCT_ID?.trim();
+
+const checkoutProducts = [
+    polarProMonthlyProductId
+        ? {
+            productId: polarProMonthlyProductId,
+            slug: "pro-monthly",
+        }
+        : null,
+    polarProYearlyProductId
+        ? {
+            productId: polarProYearlyProductId,
+            slug: "pro-yearly",
+        }
+        : null,
+].filter((product): product is { productId: string; slug: string } => Boolean(product));
+
+if (checkoutProducts.length === 0) {
+    console.warn(
+        "[auth] Polar checkout is enabled but no products are configured. " +
+        "Set POLAR_PRO_MONTHLY_PRODUCT_ID and/or POLAR_PRO_YEARLY_PRODUCT_ID.",
+    );
+}
 
 const pool = new Pool({
     host: process.env.PGHOST,
@@ -42,20 +67,7 @@ export const auth = betterAuth({
             createCustomerOnSignUp: true,
             use: [
                 checkout({
-                    products: [
-                        {
-                            productId: "221cd4df-10f9-4035-9dab-9c441619068d",
-                            slug: "Pro" // Custom slug for easy reference in Checkout URL, e.g. /checkout/Pro
-                        },
-                        {
-                            productId: "f4d27ae1-06bf-45bf-acd2-5b8cc96648ee",
-                            slug: "Pro" // Custom slug for easy reference in Checkout URL, e.g. /checkout/Pro
-                        },
-                        {
-                            productId: "5acc849d-c821-4f7c-ae17-46264e9633f0",
-                            slug: "Free" // Custom slug for easy reference in Checkout URL, e.g. /checkout/Free
-                        }
-                    ],
+                    products: checkoutProducts,
                     successUrl: process.env.POLAR_SUCCESS_URL,
                     authenticatedUsersOnly: true
                 }),

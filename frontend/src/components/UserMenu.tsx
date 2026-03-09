@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
-import { signOut } from "@/lib/auth-client";
+import { CreditCard, LogOut } from "lucide-react";
+import { openPolarPortal, signOut } from "@/lib/auth-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ interface UserMenuProps {
 export default function UserMenu({ name, email, image, variant = "light" }: UserMenuProps) {
   const isDark = variant === "dark";
   const router = useRouter();
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   const initials = name
     ? name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
@@ -30,6 +32,17 @@ export default function UserMenu({ name, email, image, variant = "light" }: User
 
   const handleSignOut = () => {
     signOut({ fetchOptions: { onSuccess: () => router.push("/login") } });
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      setOpeningPortal(true);
+      await openPolarPortal();
+    } catch {
+      router.push("/pro");
+    } finally {
+      setOpeningPortal(false);
+    }
   };
 
   return (
@@ -76,6 +89,15 @@ export default function UserMenu({ name, email, image, variant = "light" }: User
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onClick={() => void handleManageSubscription()}
+          disabled={openingPortal}
+          className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted hover:text-dark cursor-pointer"
+        >
+          <CreditCard size={14} />
+          {openingPortal ? "Opening billing portal..." : "Manage subscription"}
+        </DropdownMenuItem>
 
         <DropdownMenuItem
           onClick={handleSignOut}

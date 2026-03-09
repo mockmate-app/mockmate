@@ -242,7 +242,7 @@ function ResumeContent({
                 <div className="h-12 w-12 rounded-full border-4 border-orange border-t-transparent animate-spin" />
                 <div className="w-full max-w-xs">
                   <div className="flex justify-between text-xs text-muted mb-1.5">
-                    <span>Parsing with Gemini…</span>
+                    <span>Parsing résumé…</span>
                     <span>{progress}%</span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden">

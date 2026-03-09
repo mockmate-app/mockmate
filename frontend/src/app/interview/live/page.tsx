@@ -20,8 +20,9 @@ import {
   VideoOff,
   ChevronDown,
 } from "lucide-react";
-import { useSession } from "@/lib/auth-client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession, getPolarCustomerState } from "@/lib/auth-client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { resolvePlanFromCustomerState } from "@/lib/billing";
 import AppHeader from "@/components/AppHeader";
 import {
   AlertDialog,
@@ -412,6 +413,14 @@ function LiveInterviewContent() {
   // Resolve avatar URL: path stored in Firestore + returned from session/start
   const interviewerAvatarUrl = avatarUrlPath ? `${API_BASE}${avatarUrlPath}` : null;
   const userImage = session?.user?.image ?? null;
+
+  const { data: customerStateData } = useQuery({
+    queryKey: ["polar-customer-state", session?.user?.id],
+    queryFn: getPolarCustomerState,
+    enabled: !!session?.user?.id,
+    staleTime: 30 * 1000,
+  });
+  const isPro = resolvePlanFromCustomerState(customerStateData) === "pro";
 
   const [status, setStatus] = useState<InterviewStatus>("idle");
   const [muted, setMuted] = useState(false);
@@ -1263,6 +1272,11 @@ function LiveInterviewContent() {
   }, []);
 
   const toggleCamera = useCallback(async () => {
+    if (!isPro) {
+      setError("Posture & presence analysis is available on Pro. Upgrade to enable camera analysis.");
+      return;
+    }
+
     if (cameraOn) {
       camStreamRef.current?.getTracks().forEach((track) => track.stop());
       camStreamRef.current = null;
@@ -1278,7 +1292,7 @@ function LiveInterviewContent() {
     } catch {
       setError("Camera access denied. Please allow webcam access and retry.");
     }
-  }, [cameraOn, selectedCameraId, startCameraStream]);
+  }, [cameraOn, isPro, selectedCameraId, startCameraStream]);
 
   const handleMicDeviceChange = useCallback(
     async (deviceId: string) => {
@@ -1478,11 +1492,20 @@ function LiveInterviewContent() {
 
         <main className="flex-1 min-h-0 flex flex-col">
           {/* Sticky camera-on reminder for posture analysis */}
-          {isActive && !cameraOn && (
+          {isActive && !cameraOn && isPro && (
             <div className="p-4">
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange/15 border border-orange/30 text-orange text-xs font-medium w-fit mx-auto">
                 <Video size={14} className="shrink-0" />
                 <span>Turn on your camera (from bottom toolbar) to enable AI posture &amp; presence analysis</span>
+              </div>
+            </div>
+          )}
+          {isActive && !isPro && (
+            <div className="p-4">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange/15 border border-orange/30 text-orange text-xs font-medium w-fit mx-auto">
+                <VideoOff size={14} className="shrink-0" />
+                <span>Posture &amp; presence analysis is available on Pro.</span>
+                <Link href="/pro" className="underline font-semibold">Upgrade</Link>
               </div>
             </div>
           )}
@@ -1661,7 +1684,7 @@ function LiveInterviewContent() {
                     <DropdownMenuTrigger asChild>
                       <button
                         disabled={
-                          status === "connecting" || videoInputs.length === 0
+                          status === "connecting" || videoInputs.length === 0 || !isPro
                         }
                         className="w-full flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 disabled:opacity-50"
                       >
@@ -1737,11 +1760,14 @@ function LiveInterviewContent() {
                 <>
                   <button
                     onClick={toggleCamera}
+                    disabled={!isPro}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${cameraOn
                         ? "bg-orange/20 text-orange border-orange/40"
-                        : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
+                        : !isPro
+                          ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
+                          : "bg-white/10 text-white/80 border-white/10 hover:bg-white/15"
                       }`}
-                    title={cameraOn ? "Disable webcam" : "Enable webcam"}
+                    title={!isPro ? "Upgrade to Pro for posture analysis" : cameraOn ? "Disable webcam" : "Enable webcam"}
                   >
                     {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
                   </button>

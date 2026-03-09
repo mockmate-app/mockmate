@@ -267,7 +267,7 @@ function DashboardContent() {
   const thisMonth: number = sessionsData?.this_month ?? 0;
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-surface flex flex-col">
       <AppHeader
         homeHref="/"
         name={session.user.name}

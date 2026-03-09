@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useSession } from "@/lib/auth-client";
+import { useSession, getPolarCustomerState } from "@/lib/auth-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { startSession } from "@/lib/api";
+import {
+  BILLING_PLANS,
+  FREE_TIER_PERSONA_IDS,
+  resolvePlanFromCustomerState,
+} from "@/lib/billing";
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,6 +30,7 @@ import {
   Binary,
   Network,
   Bot,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -233,6 +239,16 @@ function SetupContent({
   const [difficulty, setDifficulty] = useState("medium");
   const [error, setError]           = useState("");
 
+  const { data: customerStateData } = useQuery({
+    queryKey: ["polar-customer-state", userId],
+    queryFn: getPolarCustomerState,
+    enabled: !!userId,
+    staleTime: 30 * 1000,
+  });
+
+  const plan = resolvePlanFromCustomerState(customerStateData);
+  const isPro = plan === "pro";
+
   // Check if the user has a resume
   const { data: resumeCheckData, isLoading: resumeLoading } = useQuery({
     queryKey: ["resume", userId],
@@ -245,12 +261,43 @@ function SetupContent({
   const hasResume = resumeLoading ? null : (resumeCheckData !== null && resumeCheckData !== undefined);
   const suggestedTitles: string[] = resumeCheckData?.resume_data?.suggested_job_titles ?? [];
 
+  const { data: monthlyUsageData } = useQuery({
+    queryKey: ["monthly-usage", userId],
+    queryFn: () =>
+      fetch(`${API_BASE}/sessions/user/${userId}?limit=1`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+    enabled: !!userId,
+  });
+
+  const thisMonthCount: number = monthlyUsageData?.this_month ?? 0;
+  const freeInterviewLimitReached =
+    !isPro && thisMonthCount >= BILLING_PLANS.free.interviewsPerMonth;
+
+  const allowedPersonaIds = useMemo(
+    () =>
+      isPro
+        ? new Set(PERSONAS.map((personaItem) => personaItem.id))
+        : new Set<string>(FREE_TIER_PERSONA_IDS),
+    [isPro],
+  );
+
+  const selectablePersonas = useMemo(
+    () => PERSONAS.filter((personaItem) => allowedPersonaIds.has(personaItem.id)),
+    [allowedPersonaIds],
+  );
+
+  const selectedPersonaId = useMemo(() => {
+    if (allowedPersonaIds.has(persona)) return persona;
+    return selectablePersonas[0]?.id ?? "neutral";
+  }, [allowedPersonaIds, persona, selectablePersonas]);
+
   const startSessionMutation = useMutation({
     mutationFn: startSession,
     onSuccess: (result) => {
       router.push(
         `/interview/live?session_id=${result.session_id}` +
-        `&persona=${encodeURIComponent(persona)}` +
+        `&persona=${encodeURIComponent(selectedPersonaId)}` +
         `&job_role=${encodeURIComponent(jobRole.trim())}` +
         `&interviewer_name=${encodeURIComponent(result.interviewer_name ?? "Alex")}` +
         (result.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(result.interviewer_avatar_url)}` : ""),
@@ -271,14 +318,18 @@ function SetupContent({
     from === "sessions" ? "Back to sessions" :
     "Back to dashboard";
 
-  const canSubmit = jobRole.trim().length > 0 && !startSessionMutation.isPending && hasResume === true;
+  const canSubmit =
+    jobRole.trim().length > 0 &&
+    !startSessionMutation.isPending &&
+    hasResume === true &&
+    !freeInterviewLimitReached;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     setError("");
     startSessionMutation.mutate({
       user_id: userId,
-      persona,
+      persona: selectedPersonaId,
       job_role: jobRole.trim(),
       difficulty,
     });
@@ -333,6 +384,19 @@ function SetupContent({
           </p>
         </div>
 
+        {freeInterviewLimitReached && (
+          <Alert className="border-orange/30 bg-orange/10 rounded-xl">
+            <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-sm text-dark">
+                You&apos;ve reached the Free limit of {BILLING_PLANS.free.interviewsPerMonth} interviews this month.
+              </span>
+              <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
+                <Link href="/pro">Get Pro</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Step 1 — Job role */}
         <section className="flex flex-col gap-3">
           <SectionLabel step={1} label="Target job role" />
@@ -368,12 +432,13 @@ function SetupContent({
         {/* Step 2 — Persona */}
         <section className="flex flex-col gap-3">
           <SectionLabel step={2} label="Choose interviewer persona" />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {PERSONAS.map((p) => (
               <PersonaCard
                 key={p.id}
                 persona={p}
-                selected={persona === p.id}
+                selected={selectedPersonaId === p.id}
+                locked={!allowedPersonaIds.has(p.id)}
                 onSelect={() => setPersona(p.id)}
               />
             ))}
@@ -469,33 +534,55 @@ function SectionLabel({ step, label }: { step: number; label: string }) {
 function PersonaCard({
   persona,
   selected,
+  locked,
   onSelect,
 }: {
   persona: Persona;
   selected: boolean;
+  locked?: boolean;
   onSelect: () => void;
 }) {
   return (
     <Card
-      onClick={onSelect}
+      onClick={() => {
+        if (!locked) onSelect();
+      }}
       className={[
-        "cursor-pointer rounded-xl border transition-all",
+        "rounded-xl border transition-all",
+        locked ? "cursor-not-allowed opacity-75" : "cursor-pointer",
         selected
           ? "border-orange bg-orange/5 ring-1 ring-orange/30"
           : "border-border bg-light hover:border-orange/40",
       ].join(" ")}
     >
       <CardContent className="p-4 flex flex-col gap-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange/10">
-            {persona.icon}
+        <div className="flex items-start gap-3 justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange/10">
+              {persona.icon}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-dark truncate">{persona.label}</p>
+              <p className="text-xs text-muted truncate">{persona.tagline}</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-dark truncate">{persona.label}</p>
-            <p className="text-xs text-muted truncate">{persona.tagline}</p>
-          </div>
+          {locked && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-orange/30 bg-orange/10 px-2 py-0.5 text-[10px] font-semibold text-orange">
+              <Lock size={10} /> PRO
+            </span>
+          )}
         </div>
         <p className="text-xs text-muted leading-relaxed">{persona.description}</p>
+        {locked && (
+          <Link
+            href="/pro"
+            className="text-xs font-medium text-orange hover:underline w-fit flex items-center gap-1"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Unlock with Pro
+            <ArrowRight height={14} width={14} />
+          </Link>
+        )}
       </CardContent>
     </Card>
   );
