@@ -28,8 +28,15 @@ export default function UserMenu({ name, email, image, variant = "light" }: User
     ? name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
     : (email?.[0]?.toUpperCase() ?? "U");
 
-  const handleSignOut = () => {
-    signOut({ fetchOptions: { onSuccess: () => router.push("/login") } });
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      router.replace("/login");
+      router.refresh();
+    }
   };
 
   return (
@@ -78,7 +85,7 @@ export default function UserMenu({ name, email, image, variant = "light" }: User
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          onClick={handleSignOut}
+          onSelect={handleSignOut}
           className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted hover:text-dark cursor-pointer"
         >
           <LogOut size={14} />
