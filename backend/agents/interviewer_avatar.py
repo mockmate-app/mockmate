@@ -53,6 +53,7 @@ _REGION        = _require("GOOGLE_CLOUD_LOCATION")
 _BUCKET        = _require("GCS_BUCKET")
 _AVATAR_PREFIX = "interviewer-avatars"
 _IMAGEN_MODEL  = os.getenv("IMAGEN_MODEL", "imagen-3.0-fast-generate-001")
+_AVATAR_CACHE_VERSION = "v2"
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ _PERSONA_DESCRIPTOR: dict[str, str] = {
     "management_consultant": "management consultant in formal business wear",
     "cto":                   "Chief Technology Officer with an authoritative presence",
     "recruiter":             "corporate talent recruiter with a welcoming expression",
+    "prompt_wizard":         "AI engineer and machine learning specialist in modern tech attire",
     "ai_engineer":           "AI engineer and machine learning specialist in modern tech attire",
 }
 
@@ -84,11 +86,20 @@ def _name_to_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.strip().lower()).strip("_")
 
 
-def _build_prompt(name: str, persona: str) -> str:
+def _build_prompt(name: str, persona: str, gender_hint: str | None = None) -> str:
     descriptor = _PERSONA_DESCRIPTOR.get(persona, "professional interviewer")
+    gender_clause = ""
+    if gender_hint:
+        normalized = gender_hint.strip().lower()
+        if normalized == "male":
+            gender_clause = " presenting as male."
+        elif normalized == "female":
+            gender_clause = " presenting as female."
+        elif normalized in {"nonbinary", "non-binary"}:
+            gender_clause = " presenting as non-binary."
     return (
         f"Professional LinkedIn-style headshot portrait photograph of {name}, "
-        f"a {descriptor}. "
+        f"a {descriptor}.{gender_clause} "
         "Clean neutral studio background, business attire, "
         "soft professional studio lighting, looking directly at camera with a "
         "confident and approachable expression, photorealistic, high quality, "
@@ -120,37 +131,43 @@ class InterviewerAvatarAgent:
             self._model = ImageGenerationModel.from_pretrained(_IMAGEN_MODEL)
         return self._model
 
-    def _blob_name(self, name: str) -> str:
-        return f"{_AVATAR_PREFIX}/{_name_to_slug(name)}.jpg"
+    def _blob_name(self, name: str, persona: str, gender_hint: str | None = None) -> str:
+        gender_slug = (gender_hint or "unspecified").strip().lower().replace("-", "_")
+        if not gender_slug:
+            gender_slug = "unspecified"
+        return (
+            f"{_AVATAR_PREFIX}/{_AVATAR_CACHE_VERSION}/"
+            f"{_name_to_slug(name)}__{_name_to_slug(persona)}__{_name_to_slug(gender_slug)}.jpg"
+        )
 
-    def _exists_in_gcs(self, name: str) -> bool:
-        return self._bucket.blob(self._blob_name(name)).exists()
+    def _exists_in_gcs(self, name: str, persona: str, gender_hint: str | None = None) -> bool:
+        return self._bucket.blob(self._blob_name(name, persona, gender_hint)).exists()
 
-    def _download_from_gcs(self, name: str) -> bytes:
-        blob = self._bucket.blob(self._blob_name(name))
+    def _download_from_gcs(self, name: str, persona: str, gender_hint: str | None = None) -> bytes:
+        blob = self._bucket.blob(self._blob_name(name, persona, gender_hint))
         return blob.download_as_bytes()
 
-    def _upload_to_gcs(self, name: str, image_bytes: bytes) -> None:
-        blob = self._bucket.blob(self._blob_name(name))
+    def _upload_to_gcs(self, name: str, persona: str, gender_hint: str | None, image_bytes: bytes) -> None:
+        blob = self._bucket.blob(self._blob_name(name, persona, gender_hint))
         blob.upload_from_string(image_bytes, content_type="image/jpeg")
         logger.info(
             "Interviewer avatar uploaded to GCS — name=%s  blob=%s",
             name, blob.name,
         )
 
-    def _sync_get_or_generate(self, name: str, persona: str) -> Optional[bytes]:
+    def _sync_get_or_generate(self, name: str, persona: str, gender_hint: str | None = None) -> Optional[bytes]:
         """Synchronous core: check GCS → generate if missing → return bytes."""
         try:
-            if self._exists_in_gcs(name):
+            if self._exists_in_gcs(name, persona, gender_hint):
                 logger.debug("Avatar cache hit for '%s'", name)
-                return self._download_from_gcs(name)
+                return self._download_from_gcs(name, persona, gender_hint)
 
             # Generate with Imagen
             logger.info(
                 "No cached avatar for '%s' — generating with Imagen (persona=%s)",
                 name, persona,
             )
-            prompt = _build_prompt(name, persona)
+            prompt = _build_prompt(name, persona, gender_hint)
             model = self._get_model()
 
             @retry(
@@ -179,7 +196,7 @@ class InterviewerAvatarAgent:
                 return None
 
             image_bytes: bytes = response.images[0]._image_bytes
-            self._upload_to_gcs(name, image_bytes)
+            self._upload_to_gcs(name, persona, gender_hint, image_bytes)
             return image_bytes
 
         except Exception:
@@ -191,7 +208,7 @@ class InterviewerAvatarAgent:
     # ------------------------------------------------------------------
 
     async def get_or_generate(
-        self, name: str, persona: str = "neutral"
+        self, name: str, persona: str = "neutral", gender_hint: str | None = None
     ) -> Optional[bytes]:
         """
         Return avatar JPEG bytes for *name*.
@@ -203,5 +220,5 @@ class InterviewerAvatarAgent:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, self._sync_get_or_generate, name, persona
+            None, self._sync_get_or_generate, name, persona, gender_hint
         )

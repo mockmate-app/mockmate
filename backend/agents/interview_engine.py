@@ -478,7 +478,7 @@ class InterviewEngineAgent:
         questions: list[dict[str, Any]],
         persona: str,
         job_role: str = "Software Engineer",
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         # Abandon any orphaned sessions before creating a new one so the user
         # never sees duplicate in-progress entries on the dashboard.
         await self._abandon_stale_sessions(user_id)
@@ -490,9 +490,10 @@ class InterviewEngineAgent:
         interviewer_name = profile.get("name", _DEFAULT_INTERVIEWER_PROFILE["name"])
         voice = profile.get("voice", _DEFAULT_INTERVIEWER_PROFILE["voice"])
         accent_hint = profile.get("accent_hint", _DEFAULT_INTERVIEWER_PROFILE["accent_hint"])
+        interviewer_gender_hint = profile.get("gender_hint")
 
         # Fetch candidate name from their parsed résumé.
-        candidate_name = "there"  # fallback
+        candidate_name = "MockMate user"  # fallback
         try:
             resume_doc = await self._db.collection(_RESUME_COLLECTION).document(user_id).get()
             if resume_doc.exists:
@@ -508,7 +509,12 @@ class InterviewEngineAgent:
         # Build a stable, predictable URL path for the interviewer avatar.
         # The actual image is generated lazily by the /interviewer-avatar/{name}
         # endpoint the first time it is requested; subsequent calls hit GCS cache.
-        interviewer_avatar_url = f"/interviewer-avatar/{interviewer_name}"
+        avatar_query: list[str] = [f"persona={persona}"]
+        if interviewer_gender_hint:
+            avatar_query.append(f"gender_hint={interviewer_gender_hint}")
+        interviewer_avatar_url = (
+            f"/interviewer-avatar/{interviewer_name}?{'&'.join(avatar_query)}"
+        )
 
         doc: dict[str, Any] = {
             "session_id": session_id,
@@ -518,6 +524,7 @@ class InterviewEngineAgent:
             "voice": voice,
             "interviewer_name": interviewer_name,
             "interviewer_avatar_url": interviewer_avatar_url,
+            "interviewer_gender_hint": interviewer_gender_hint,
             "accent_hint": accent_hint,
             "candidate_name": candidate_name,
             "questions": questions,
@@ -530,6 +537,7 @@ class InterviewEngineAgent:
             "session_id": session_id,
             "interviewer_name": interviewer_name,
             "interviewer_avatar_url": interviewer_avatar_url,
+            "interviewer_gender_hint": interviewer_gender_hint,
             "voice": voice,
             "persona": persona,
         }
@@ -539,26 +547,110 @@ class InterviewEngineAgent:
         session_id: str,
         turns: list[dict[str, Any]],
     ) -> None:
-        """Write the turn list to the separate 'transcripts' Firestore collection."""
+        """Write transcript turns to Firestore, merging with any existing turns.
+
+        Reconnect races can create overlapping saves from multiple websocket
+        lifecycles. We merge server-side so late saves never truncate prior
+        history.
+        """
+        incoming = self._normalize_turns(turns)
+
+        existing: list[dict[str, Any]] = []
+        existing_doc = await (
+            self._db
+            .collection(_TRANSCRIPT_COLLECTION)
+            .document(session_id)
+            .get()
+        )
+        if existing_doc.exists:
+            existing = self._normalize_turns(existing_doc.to_dict().get("turns", []))
+
+        merged = self._merge_turn_sequences(existing, incoming)
+
         await (
             self._db
             .collection(_TRANSCRIPT_COLLECTION)
             .document(session_id)
             .set({
                 "session_id": session_id,
-                "turns": turns,
+                "turns": merged,
                 "saved_at": datetime.now(timezone.utc).isoformat(),
             })
         )
         logger.info(
-            "Transcript saved — session_id=%s  turns=%d", session_id, len(turns)
+            "Transcript saved — session_id=%s  turns=%d", session_id, len(merged)
         )
+
+    def _normalize_turns(self, turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Normalize transcript payloads into canonical Firestore turn shape."""
+        normalized: list[dict[str, Any]] = []
+        for turn in turns or []:
+            if not isinstance(turn, dict):
+                continue
+            raw_speaker = str(turn.get("speaker", "")).strip().lower()
+            speaker = (
+                "user"
+                if raw_speaker in {"user", "candidate", "you"}
+                else "interviewer"
+                if raw_speaker in {"interviewer", "assistant", "ai"}
+                else None
+            )
+            if not speaker:
+                continue
+            text = str(turn.get("text", "")).strip()
+            if not text:
+                continue
+            ts = turn.get("ts")
+            ts_value = str(ts).strip() if ts else datetime.now(timezone.utc).isoformat()
+            normalized.append({
+                "speaker": speaker,
+                "text": text,
+                "ts": ts_value,
+            })
+        return normalized
+
+    def _merge_turn_sequences(
+        self,
+        existing: list[dict[str, Any]],
+        incoming: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge transcript lists while preserving full ordered conversation."""
+        if not existing:
+            return incoming
+        if not incoming:
+            return existing
+
+        def sig(turn: dict[str, Any]) -> tuple[str, str]:
+            return (str(turn.get("speaker", "")), str(turn.get("text", "")))
+
+        existing_sig = [sig(t) for t in existing]
+        incoming_sig = [sig(t) for t in incoming]
+
+        lcp = 0
+        for a, b in zip(existing_sig, incoming_sig):
+            if a != b:
+                break
+            lcp += 1
+
+        if lcp == len(existing):
+            return incoming
+        if lcp == len(incoming):
+            return existing
+
+        merged = existing[:]
+        for turn in incoming[lcp:]:
+            merged.append(turn)
+        return merged
 
     async def end_session(
         self,
         session_id: str,
         ended_by: str | None = None,
+        transcript: list[dict[str, Any]] | None = None,
     ) -> None:
+        if transcript:
+            await self._save_transcript(session_id, transcript)
+
         update_doc: dict[str, Any] = {
             "status": "ended",
             "ended_at": datetime.now(timezone.utc).isoformat(),

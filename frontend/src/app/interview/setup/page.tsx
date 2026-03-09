@@ -153,8 +153,8 @@ const PERSONAS: Persona[] = [
     icon: <Network size={20} className="text-orange" />,
   },
   {
-    id: "ai_engineer",
-    label: "AI Engineer",
+    id: "prompt_wizard",
+    label: "Prompt Wizard",
     tagline: "LLMs, ML systems & GenAI",
     description:
       "Focuses on AI/ML fundamentals, LLM application design, evaluation, safety, and production trade-offs.",

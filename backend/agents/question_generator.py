@@ -34,7 +34,13 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
+from vertexai.generative_models import (
+    GenerationConfig,
+    GenerativeModel,
+    Part,
+    Tool,
+    grounding,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +124,12 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
         "and trade-off reasoning. Expects candidates to clarify requirements, break problems into "
         "components, and address failure modes and capacity estimation."
     ),
+    "prompt_wizard": (
+        "An AI/ML interviewer focused on machine learning fundamentals, LLM application design, "
+        "prompting and evaluation strategy, model quality trade-offs, safety/guardrails, and "
+        "production AI system architecture. Expects concrete discussion of metrics, data quality, "
+        "and operational reliability for AI features."
+    ),
     "ai_engineer": (
         "An AI/ML interviewer focused on machine learning fundamentals, LLM application design, "
         "prompting and evaluation strategy, model quality trade-offs, safety/guardrails, and "
@@ -144,6 +156,35 @@ Persona description : {persona_desc}
 
 Target job role     : {job_role}
 Difficulty level    : {difficulty}  (easy | medium | hard)
+
+━━━ MANDATORY RESUME-FIRST ANALYSIS ━━━
+
+Before writing questions, you MUST internally process the résumé end-to-end and
+build a role-fit map:
+
+1) Read ALL relevant resume sections fully (summary, experience, projects,
+    skills, achievements, education/certs).
+2) Extract concrete evidence points (technologies, domains, responsibilities,
+    scale, metrics, outcomes, leadership scope, timelines).
+3) Correlate each evidence point with expected responsibilities of {job_role}:
+    - direct match,
+    - adjacent transfer,
+    - likely gap / risk area.
+4) Use this correlation to decide what to probe:
+    - verify strongest claims,
+    - test role-critical skills,
+    - pressure-test probable gaps.
+
+Do NOT ask generic résumé questions. Every question must be traceable to either:
+  (a) a specific résumé evidence point, or
+  (b) a role-critical competency for {job_role}.
+
+━━━ OPTIONAL EXTERNAL GROUNDING ━━━
+
+If needed, use grounded web knowledge to align question topics with current,
+real-world expectations for {job_role} (common responsibilities, tools,
+interview dimensions). Use grounding only to improve role relevance — never to
+invent facts about the candidate beyond the provided résumé.
 
 ━━━ CRITICAL: ROLE-SPECIFIC QUESTIONS ━━━
 
@@ -193,6 +234,9 @@ Rules (strictly enforced):
   appropriate for {job_role}.
 - Do NOT include generic filler questions. Every question should feel tailored
   to this specific candidate applying for this specific role.
+- At least 6 out of 8 questions must explicitly mention role-relevant concepts
+    for {job_role}, and at least 5 out of 8 must be tied to concrete résumé
+    evidence points.
 """
 
 # ---------------------------------------------------------------------------
@@ -212,6 +256,25 @@ class QuestionGeneratorAgent:
         vertexai.init(project=_PROJECT, location=_REGION)
         self._model = GenerativeModel(_MODEL)
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
+        self._grounding_tools: list[Tool] | None = None
+
+        try:
+            dynamic_cfg = grounding.DynamicRetrievalConfig(
+                mode=grounding.DynamicRetrievalConfig.Mode.MODE_DYNAMIC,
+                dynamic_threshold=0.3,
+            )
+            google_search = grounding.GoogleSearchRetrieval(
+                dynamic_retrieval_config=dynamic_cfg,
+            )
+            self._grounding_tools = [
+                Tool.from_google_search_retrieval(google_search)
+            ]
+            logger.info("Question generation grounding enabled (Google Search).")
+        except Exception as exc:
+            logger.warning(
+                "Question generation grounding unavailable; proceeding without it: %s",
+                exc,
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -352,14 +415,30 @@ class QuestionGeneratorAgent:
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
-        async def _generate_with_retry():
+        async def _generate_with_retry(tools: list[Tool] | None):
             return await self._model.generate_content_async(
                 [Part.from_text(prompt)],
                 generation_config=generation_config,
+                tools=tools,
             )
 
-        logger.debug("Sending question-generation prompt to Gemini (model=%s)", _MODEL)
-        response = await _generate_with_retry()
+        logger.debug(
+            "Sending question-generation prompt to Gemini (model=%s, grounding=%s)",
+            _MODEL,
+            bool(self._grounding_tools),
+        )
+
+        if self._grounding_tools:
+            try:
+                response = await _generate_with_retry(self._grounding_tools)
+            except Exception as exc:
+                logger.warning(
+                    "Grounded question generation failed; retrying without grounding: %s",
+                    exc,
+                )
+                response = await _generate_with_retry(None)
+        else:
+            response = await _generate_with_retry(None)
 
         raw_text = response.text.strip()
 

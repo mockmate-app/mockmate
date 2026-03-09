@@ -128,6 +128,7 @@ const PERSONA_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
   algorithm_guru: "Algorithm Guru",
   system_designer: "System Designer",
+  prompt_wizard: "Prompt Wizard",
   ai_engineer: "AI Engineer",
 };
 
@@ -144,6 +145,7 @@ const PERSONA_COLORS: Record<string, string> = {
   recruiter: "bg-lime-100 text-lime-700",
   algorithm_guru: "bg-cyan-100 text-cyan-700",
   system_designer: "bg-violet-100 text-violet-700",
+  prompt_wizard: "bg-fuchsia-100 text-fuchsia-700",
   ai_engineer: "bg-fuchsia-100 text-fuchsia-700",
 };
 
@@ -334,6 +336,41 @@ function DashboardContent() {
           </Button>
         </div>
 
+        {/* ── Mobile quick actions (shown only below lg) ── */}
+        <div className="mt-6 flex flex-col gap-2 lg:hidden">
+          <Button
+            asChild
+            className="w-full rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2"
+          >
+            <Link
+              href={
+                !loadingResume && !resume
+                  ? "/resume/upload?from=dashboard"
+                  : "/interview/setup?from=dashboard"
+              }
+            >
+              {!loadingResume && !resume ? (
+                <FileText size={15} />
+              ) : (
+                <Mic size={15} />
+              )}
+              {!loadingResume && !resume
+                ? "Upload résumé to start"
+                : "Start Interview"}
+            </Link>
+          </Button>
+          <QuickLink
+            href="/resume/upload?from=dashboard"
+            icon={<FileText size={15} className="text-orange" />}
+            label="Upload / update résumé"
+          />
+          <QuickLink
+            href="/sessions"
+            icon={<BarChart2 size={15} className="text-orange" />}
+            label="View all sessions"
+          />
+        </div>
+
         {/* ── Stats bar ── */}
         <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -408,41 +445,6 @@ function DashboardContent() {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        {/* ── Mobile quick actions (shown only below lg) ── */}
-        <div className="mt-6 flex flex-col gap-2 lg:hidden">
-          <Button
-            asChild
-            className="w-full rounded-xl bg-orange text-light hover:opacity-90 hover:bg-orange gap-2"
-          >
-            <Link
-              href={
-                !loadingResume && !resume
-                  ? "/resume/upload?from=dashboard"
-                  : "/interview/setup?from=dashboard"
-              }
-            >
-              {!loadingResume && !resume ? (
-                <FileText size={15} />
-              ) : (
-                <Mic size={15} />
-              )}
-              {!loadingResume && !resume
-                ? "Upload résumé to start"
-                : "Start interview"}
-            </Link>
-          </Button>
-          <QuickLink
-            href="/resume/upload?from=dashboard"
-            icon={<FileText size={15} className="text-orange" />}
-            label="Upload / update résumé"
-          />
-          <QuickLink
-            href="/sessions"
-            icon={<BarChart2 size={15} className="text-orange" />}
-            label="View all sessions"
-          />
         </div>
 
         {/* ── Main grid ── */}

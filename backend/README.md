@@ -211,6 +211,7 @@ gcloud run deploy mockmate-backend \
   --platform managed \
   --region us-central1 \
   --memory 2Gi \
+    --timeout 3600 \
   --allow-unauthenticated
 ```
 
