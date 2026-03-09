@@ -417,9 +417,9 @@ function FeedbackContent() {
       />
 
       {/* Desktop: side-by-side | Mobile: stacked with sheet */}
-      <div className="mx-auto max-w-7xl flex gap-6 px-4 sm:px-6 py-10">
+      <div className="flex justify-center gap-6 px-4 sm:px-6 py-10">
         {/* ── Feedback column ──────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 max-w-3xl flex flex-col gap-5">
+        <div className="flex-1 max-w-3xl min-w-0 flex flex-col gap-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
@@ -570,8 +570,8 @@ function FeedbackContent() {
 
           <div className="flex justify-center gap-2">
             <Button
-              onClick={() => router.back()}
-              className="hidden lg:flex z-40 rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
+              onClick={() => window.history.length > 1 ? router.back() : router.push('/dashboard')}
+              className="hidden lg:flex rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
             >
               Go back
             </Button>
@@ -603,7 +603,7 @@ function FeedbackContent() {
 
 
         {/* ── Desktop transcript sidebar (hidden on <lg) ───────────────── */}
-        <aside className="hidden lg:flex w-85 xl:w-95 shrink-0 flex-col sticky top-20 max-h-[calc(100vh-6rem)]">
+        <aside className="hidden lg:flex w-85 xl:w-95 shrink-0 flex-col sticky top-20 max-h-[calc(100vh-8rem)]">
           <div className="flex items-center gap-2 mb-3">
             <MessageSquareText className="h-4 w-4 text-white/40" />
             <h2 className="text-sm font-semibold text-white/50 uppercase tracking-widest">
@@ -639,17 +639,17 @@ function FeedbackContent() {
       </div>
 
       {/* ── Mobile transcript bottom button + sheet (visible on <lg) ───── */}
-      <div className="lg:hidden fixed bottom-6 left-0 right-0 flex gap-2 justify-center z-50 pointer-events-none">
+      <div className="lg:hidden fixed bottom-6 left-0 right-0 flex gap-2 justify-center z-50">
         <Button
-          onClick={() => router.back()}
-          className="z-40 rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
+          onClick={() => window.history.length > 1 ? router.back() : router.push('/dashboard')}
+          className="rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
         >
           Go back
         </Button>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button
-              className="pointer-events-auto rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white shadow-lg hover:bg-white/20 gap-2 px-5"
+              className="rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white shadow-lg hover:bg-white/20 gap-2 px-5"
             >
               <MessageSquareText className="h-4 w-4" />
               Transcript

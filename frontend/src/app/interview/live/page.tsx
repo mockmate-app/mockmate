@@ -145,10 +145,10 @@ function ProfileAvatar({
         <Image
           src={image}
           alt={fallback}
-          width={112}
-          height={112}
+          width={80}
+          height={80}
           unoptimized
-          className="w-28 h-28 rounded-full border border-white/15 object-cover"
+          className="w-20 h-20 rounded-full border border-white/15 object-cover"
         />
       );
     }
@@ -156,9 +156,9 @@ function ProfileAvatar({
       <Image
         src={image}
         alt={fallback}
-        width={112}
-        height={112}
-        className="rounded-full border border-white/15 object-cover"
+        width={80}
+        height={80}
+        className="w-20 h-20 rounded-full border border-white/15 object-cover"
       />
     );
   }
@@ -167,15 +167,15 @@ function ProfileAvatar({
 
   return (
     <div
-      className={`w-28 h-28 rounded-full border border-white/15 flex items-center justify-center ${ai ? "bg-orange/20" : "bg-white/10"
+      className={`w-20 h-20 rounded-full border border-white/15 flex items-center justify-center ${ai ? "bg-orange/20" : "bg-white/10"
         }`}
     >
       {ai ? (
-        <span className="text-orange text-4xl font-bold select-none">
+        <span className="text-orange text-2xl font-bold select-none">
           {initial}
         </span>
       ) : (
-        <User size={34} className="text-white/70" />
+        <User size={26} className="text-white/70" />
       )}
     </div>
   );
@@ -213,7 +213,7 @@ function ParticipantCard({
       .join("") || (ai ? "AI" : "U");
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col items-center gap-3 min-w-45">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col items-center gap-2 min-w-36">
       {showVideo ? (
         <div
           className={`rounded-xl overflow-hidden m-1 transition-all duration-200 p-1.5 ${speaking ? "ring-4 ring-orange/60" : "ring-4 ring-transparent"
@@ -224,7 +224,7 @@ function ParticipantCard({
             autoPlay
             muted
             playsInline
-            className="aspect-video h-28 object-cover rounded-lg bg-black"
+            className="aspect-video h-20 object-cover rounded-lg bg-black"
           />
         </div>
       ) : (
@@ -1475,8 +1475,8 @@ function LiveInterviewContent() {
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-        <aside className="lg:w-85 xl:w-95 border-b lg:border-b-0 lg:border-r border-white/10 p-4 shrink-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto">
-          <div className="flex lg:flex-col gap-3 min-w-max lg:min-w-0">
+        <aside className="lg:w-60 xl:w-68 border-b lg:border-b-0 lg:border-r border-white/10 p-3 shrink-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto">
+          <div className="flex lg:flex-col gap-2 min-w-max lg:min-w-0">
             <ParticipantCard
               title={interviewerName}
               subtitle={`${personaLabel} interviewer`}

@@ -92,7 +92,7 @@ function ResumeContent() {
 
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-12 flex flex-col gap-8">
         {/* Breadcrumb + actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8">
           <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
             <ArrowLeft size={14} /> {backLabel}
           </Link>
