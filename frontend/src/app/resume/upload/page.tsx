@@ -370,7 +370,7 @@ function ResumeContent({
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
                     <FileText size={28} className="text-muted opacity-40" />
-                    <p className="text-sm text-muted">No résumé uploaded yet.</p>
+                    <p className="text-sm text-muted">No résumé uploaded yet</p>
                   </div>
                 )}
               </CardContent>

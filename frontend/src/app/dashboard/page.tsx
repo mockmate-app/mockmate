@@ -462,7 +462,7 @@ function DashboardContent() {
               ) : sessions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center gap-3 px-6">
                   <Mic size={32} className="text-muted opacity-40" />
-                  <p className="text-sm text-muted">No sessions yet.</p>
+                  <p className="text-sm text-muted">No interviews yet. Start your first one!</p>
                 </div>
               ) : (
                 <Table>
@@ -655,7 +655,7 @@ function DashboardContent() {
                     <div className="flex flex-col items-center gap-3 py-6 text-center">
                       <FileText size={28} className="text-muted opacity-40" />
                       <p className="text-sm text-muted">
-                        No résumé uploaded yet.
+                        No résumé uploaded yet
                       </p>
                     </div>
                   )}
@@ -794,7 +794,7 @@ function ProgressionLineChart({ points }: { points: ProgressionPoint[] }) {
   if (!points.length) {
     return (
       <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted">
-        Complete interviews to see your trend.
+        Complete interviews to see your trend
       </div>
     );
   }
