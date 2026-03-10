@@ -1,6 +1,6 @@
 # MockMate — Frontend
 
-Next.js web application for MockMate — the real-time AI mock interview platform. Handles Google OAuth, résumé upload, live voice/video interview streaming, and post-session feedback display.
+Next.js web application for [MockMate](https://www.getmockmate.com) — the real-time AI mock interview platform built for the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/). Handles Google OAuth, résumé upload, live voice/video interview streaming, and post-session feedback display.
 
 ---
 
@@ -259,7 +259,7 @@ frontend/
 │   │   ├── auth-client.ts           # Better Auth client hooks
 │   │   ├── query-client.tsx         # React Query provider
 │   │   └── utils.ts                 # Tailwind cn() helper
-│   ├── constants/common.ts          # App name, description, URL
+│   ├── constants/common.ts          # Shared constants, persona maps, helpers
 │   └── middleware.ts                # Cookie-based route protection
 ├── public/
 │   └── audio-processor.worklet.js   # PCM audio capture worklet

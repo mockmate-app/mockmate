@@ -1,6 +1,6 @@
 # MockMate — Backend
 
-FastAPI backend for MockMate — an AI-powered mock interview platform. It exposes REST and WebSocket endpoints consumed by the Next.js frontend and orchestrates 6 Google Gemini-powered agents via the ADK.
+FastAPI backend for [MockMate](https://www.getmockmate.com) — an AI-powered mock interview platform built for the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/). It exposes REST and WebSocket endpoints consumed by the Next.js frontend and orchestrates **6 Google Gemini-powered agents** via the ADK.
 
 ---
 
@@ -46,9 +46,9 @@ graph TB
 |-------|-------|-------------|
 | **ResumeParserAgent** | Gemini 2.5 Flash | Extracts structured JSON from PDF/DOCX résumés, stores in GCS + Firestore |
 | **QuestionGeneratorAgent** | Gemini 2.5 Flash | Generates 8 personalized questions based on résumé, persona, and difficulty |
-| **InterviewEngineAgent** | Gemini Live API | Manages live bidirectional audio interviews with interruption support |
+| **InterviewEngineAgent** | Gemini Live API | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
 | **PostureAnalyzerAgent** | Gemini 2.5 Flash (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
-| **FeedbackCompilerAgent** | Gemini 2.5 Flash | Compiles post-interview feedback report with scores and decision letter |
+| **FeedbackCompilerAgent** | Gemini 2.5 Flash | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for interviewer personas |
 
 ### Google Cloud Services
@@ -185,9 +185,9 @@ sequenceDiagram
 
 ### Interviewer Personas
 
-12 distinct personas available: `neutral`, `startup_founder`, `investment_banker`, `tech_lead`, `hr_manager`, `product_manager`, `vp_engineering`, `management_consultant`, `cto`, `recruiter`, `algorithm_guru`, `system_designer`
+13 distinct personas available: `neutral`, `startup_founder`, `investment_banker`, `tech_lead`, `hr_manager`, `product_manager`, `vp_engineering`, `management_consultant`, `cto`, `recruiter`, `algorithm_guru`, `system_designer`, `prompt_wizard`
 
-Each has 4–6 named interviewers with unique voices and accents.
+Each persona has 4–6 named interviewers with unique voices, accents, and speech styles (tone, pace, warmth, filler words, etc.).
 
 ---
 
@@ -226,11 +226,12 @@ backend/
 ├── Dockerfile                 # Multi-stage production image
 ├── .env.example               # Environment variable template
 └── agents/
+    ├── config.py              # Shared configuration & env var loading
     ├── resume_parser.py       # Résumé extraction → GCS + Firestore
     ├── question_generator.py  # Personalized question generation
     ├── interview_engine.py    # Gemini Live API session management
     ├── posture_analyzer.py    # Real-time video posture scoring
     ├── feedback_compiler.py   # Post-session feedback & decision letter
     ├── interviewer_avatar.py  # AI avatar generation with Imagen
-    └── personas.json          # 10 interviewer persona definitions
+    └── personas.json          # 13 interviewer persona definitions
 ```
