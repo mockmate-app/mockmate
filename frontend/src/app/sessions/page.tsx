@@ -276,7 +276,7 @@ function SessionsContent() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-surface">
+                  <TableRow className="bg-surface/50">
                     <TableHead className="text-xs font-medium text-muted-foreground">Job role & Persona</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Interviewer</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Last active</TableHead>
@@ -357,7 +357,7 @@ function SessionsContent() {
         {/* Infinite-scroll sentinel */}
         <div ref={sentinelRef} className="h-1" />
         {isFetchingNextPage && (
-          <div className="flex justify-center py-4">
+          <div className="flex justify-center pb-4">
             <Loader2 size={20} className="animate-spin text-orange" />
           </div>
         )}

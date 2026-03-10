@@ -467,7 +467,7 @@ function DashboardContent() {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-surface">
+                    <TableRow className="bg-surface/50">
                       <TableHead className="text-xs font-medium text-muted-foreground">
                         Job role & Persona
                       </TableHead>
