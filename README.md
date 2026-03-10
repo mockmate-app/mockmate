@@ -95,7 +95,8 @@ graph TB
     subgraph "Google Cloud Platform"
         GLA[Gemini Live API<br/>Native Audio]
         GF[Gemini 2.5<br/>Flash]
-        IG[Imagen 3.0]
+        GFL[Gemini 2.5<br/>Flash Lite]
+        IG[Imagen 3.0 Fast]
         FS[(Cloud Firestore)]
         GCS[(Cloud Storage)]
     end
@@ -116,7 +117,7 @@ graph TB
     RP --> GF & GCS & FS
     QG --> GF
     IE --> GLA & FS
-    PA --> GF & FS
+    PA --> GFL & FS
     FC --> GF & FS
     IA --> IG & GCS
 
@@ -133,7 +134,7 @@ The backend is composed of **6 specialized AI agents**, each handling a distinct
 | **ResumeParserAgent** | Gemini 2.5 Flash | Extracts structured JSON from PDF/DOCX résumés, stores raw files in Cloud Storage, persists structured data in Firestore |
 | **QuestionGeneratorAgent** | Gemini 2.5 Flash | Generates 8 personalized interview questions based on the candidate's résumé, chosen persona, and difficulty level |
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages the live bidirectional voice interview session — handles real-time audio streaming, adaptive follow-ups, interruption support, and transcript persistence |
-| **PostureAnalyzerAgent** | Gemini 2.5 Flash (Vision) | Scores posture, eye contact, and facial confidence from webcam frames captured every 10 seconds |
+| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames captured every 10 seconds |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash | Aggregates transcript, posture data, and session metadata to produce a detailed feedback report with scores across 6 dimensions and a mock hiring decision letter |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for each interviewer persona |
 
@@ -183,7 +184,8 @@ sequenceDiagram
 | Technology | Usage in MockMate |
 |-----------|-------------------|
 | **Gemini Live API** (native audio) | Powers the real-time bidirectional voice interview — the core feature. Handles natural speech, interruptions, follow-ups, and persona-specific accents/intonation. |
-| **Gemini 2.5 Flash** | Used by 4 agents: résumé parsing (structured JSON extraction), question generation (personalized to résumé + persona), posture analysis (vision-based scoring from webcam), and feedback compilation (multi-source aggregation into scored report). |
+| **Gemini 2.5 Flash** | Used by 3 agents: résumé parsing (structured JSON extraction), question generation (personalized to résumé + persona), and feedback compilation (multi-source aggregation into scored report). |
+| **Gemini 2.5 Flash Lite** | Posture analysis — vision-based scoring of posture, eye contact, and facial confidence from webcam frames. Lighter model optimised for per-frame latency. |
 | **Imagen 3.0 Fast** | Generates unique AI profile pictures for each interviewer persona, cached in Cloud Storage. |
 | **Google ADK (Agent Development Kit)** | Orchestrates the InterviewEngineAgent — manages live sessions, request queues, and streaming to/from the Gemini Live API. |
 | **Vertex AI** | All Gemini and Imagen model calls are routed through Vertex AI endpoints. |

@@ -41,6 +41,9 @@ GEMINI_LIVE_MODEL = os.getenv("MOCKMATE_LIVE_MODEL", "gemini-live-2.5-flash-nati
 POSTURE_MODEL     = os.getenv("POSTURE_MODEL", "gemini-2.5-flash-lite")
 IMAGEN_MODEL      = os.getenv("IMAGEN_MODEL", "imagen-3.0-fast-generate-001")
 
+# ── Pub/Sub ────────────────────────────────────────────────────────────────
+PUBSUB_TOPIC_SESSION_END = os.getenv("PUBSUB_TOPIC_SESSION_END", "session-end")
+
 # ── Postgres (Better Auth) ─────────────────────────────────────────────────
 PGHOST     = os.getenv("PGHOST", "").strip()
 PGPORT     = int(os.getenv("PGPORT", "5432"))

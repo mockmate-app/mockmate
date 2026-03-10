@@ -23,6 +23,7 @@ graph TB
     subgraph "Google Cloud"
         LIVE[Gemini Live API<br/>Native Audio]
         FLASH[Gemini 2.5 Flash]
+        FLASH_LITE[Gemini 2.5 Flash Lite]
         IMAGEN[Imagen 3.0 Fast]
         FS[(Firestore)]
         GCS[(Cloud Storage)]
@@ -34,7 +35,7 @@ graph TB
     RP --> FLASH & GCS & FS
     QG --> FLASH
     IE --> LIVE & FS
-    PA --> FLASH & FS
+    PA --> FLASH_LITE & FS
     FC --> FLASH & FS
     IA --> IMAGEN & GCS
 ```
@@ -45,8 +46,8 @@ graph TB
 |-------|-------|-------------|
 | **ResumeParserAgent** | Gemini 2.5 Flash | Extracts structured JSON from PDF/DOCX résumés, stores in GCS + Firestore |
 | **QuestionGeneratorAgent** | Gemini 2.5 Flash | Generates 8 personalized questions based on résumé, persona, and difficulty |
-| **InterviewEngineAgent** | Gemini Live API | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
-| **PostureAnalyzerAgent** | Gemini 2.5 Flash (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
+| **InterviewEngineAgent** | Gemini Live API (native audio) | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
+| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for interviewer personas |
 
@@ -176,6 +177,12 @@ sequenceDiagram
         API-->>Client: Audio + transcript
     end
 
+    par Posture analysis (parallel)
+        Client->>API: JPEG frames (every 10s)
+        API->>AI: Posture analysis (Gemini Vision)
+    end
+
+    Client->>API: POST /session/{id}/end
     Client->>API: POST /feedback/generate
     API->>AI: Compile feedback
     API-->>Client: Scores + decision letter
@@ -209,8 +216,9 @@ gcloud run deploy mockmate-backend \
   --platform managed \
   --region us-central1 \
   --memory 2Gi \
-    --timeout 3600 \
-  --allow-unauthenticated
+  --timeout 3600 \
+  --allow-unauthenticated \
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=YOUR_PROJECT,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=YOUR_BUCKET,GOOGLE_GENAI_USE_VERTEXAI=TRUE"
 ```
 
 ---
