@@ -1441,10 +1441,9 @@ function LiveInterviewContent() {
   }, [closeAudioContextSafely, stopMicCapture]);
 
   return (
-    <div className="h-screen bg-dark text-white flex flex-col overflow-hidden">
+    <div className="dark h-screen bg-dark text-white flex flex-col overflow-hidden">
       <AppHeader
         homeHref="/dashboard"
-        variant="dark"
         name={session?.user?.name}
         email={session?.user?.email}
         image={session?.user?.image}

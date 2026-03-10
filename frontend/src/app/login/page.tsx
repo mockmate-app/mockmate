@@ -52,10 +52,10 @@ function LoginContent() {
       <main className="flex-1 flex items-center justify-center px-4">
         <Card className="w-full max-w-md rounded-2xl border border-border shadow-sm overflow-hidden">
           <CardHeader className="text-center py-4 bg-secondary">
-            <h1 className="text-2xl font-bold text-dark tracking-tight">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">
               Welcome back
             </h1>
-            <p className="text-sm text-muted text-center">
+            <p className="text-sm text-muted-foreground text-center">
               Sign in to continue your interview practice
             </p>
           </CardHeader>
@@ -96,13 +96,13 @@ function LoginContent() {
             </Button>
 
             {/* Terms */}
-            <p className="text-xs text-muted text-center leading-relaxed">
+            <p className="text-xs text-muted-foreground text-center leading-relaxed">
               By continuing, you agree to our{" "}
-              <Link href="/terms" className="underline underline-offset-2 hover:text-dark transition-colors">
+              <Link href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="underline underline-offset-2 hover:text-dark transition-colors">
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>
               .
@@ -112,7 +112,7 @@ function LoginContent() {
       </main>
 
       {/* Footer note */}
-      <footer className="py-6 text-center text-xs text-muted">
+      <footer className="py-6 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} MockMate. All rights reserved.
       </footer>
     </div>

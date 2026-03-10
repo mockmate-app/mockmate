@@ -6,7 +6,7 @@ interface LogoProps {
     className?: string;
 }
 
-export default function Logo({ color = '#252525', size = 24, className }: LogoProps) {
+export default function Logo({ color = 'currentColor', size = 24, className }: LogoProps) {
     return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 2048 2048" className={className}>
         <path
             fill="#FD721A"

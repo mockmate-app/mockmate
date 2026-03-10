@@ -18,16 +18,16 @@ const PERSONAS = [
 
 export default function Personas() {
   return (
-    <section id="personas" className="bg-light py-24">
+    <section id="personas" className="bg-background py-24">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-16 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-orange mb-3">
             Interviewer personas
           </p>
-          <h2 className="text-4xl font-bold tracking-tight text-dark sm:text-5xl">
+          <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             Choose your challenge
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
             Twelve distinct interviewers. Each one pushes differently — from an
             aggressive investment banker to a visionary CTO. The experience
             changes entirely depending on who you practise against.
@@ -38,13 +38,13 @@ export default function Personas() {
           {PERSONAS.map((p) => (
             <div
               key={p.name}
-              className="cursor-pointer rounded-2xl border border-border bg-light p-6 text-center transition-all hover:border-orange hover:shadow-lg hover:shadow-orange/10"
+              className="cursor-pointer rounded-2xl border border-border bg-card p-6 text-center transition-all hover:border-orange hover:shadow-lg hover:shadow-orange/10"
             >
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-dark text-2xl">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange/10 text-2xl">
                 {p.emoji}
               </div>
-              <h3 className="text-sm font-semibold text-dark">{p.name}</h3>
-              <p className="mt-1 text-xs text-muted">{p.tag}</p>
+              <h3 className="text-sm font-semibold text-foreground">{p.name}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{p.tag}</p>
             </div>
           ))}
         </div>

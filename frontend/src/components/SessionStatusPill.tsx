@@ -22,33 +22,33 @@ export function SessionStatusPill({ status, ended_by, feedback_ready, decision }
   if (!feedback_ready && status !== "active") {
     if (ended_by === "interviewer") {
       return (
-        <Badge variant="secondary" className="text-xs font-medium rounded-full bg-red-100 text-red-600">
+        <Badge variant="secondary" className="text-xs font-medium rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
           Ended by interviewer
         </Badge>
       );
     }
     return (
-      <Badge variant="secondary" className="text-xs font-medium rounded-full bg-amber-100 text-amber-600">
+      <Badge variant="secondary" className="text-xs font-medium rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
         Disconnected
       </Badge>
     );
   }
 
   if (status === "active") {
-    return <span className="text-xs text-muted italic">In progress</span>;
+    return <span className="text-xs text-muted-foreground italic">In progress</span>;
   }
 
   // Ended + feedback ready
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <Badge variant="secondary" className="text-xs font-medium rounded-full bg-green-100 text-green-700">
+      <Badge variant="secondary" className="text-xs font-medium rounded-full bg-green-500/15 text-green-600 dark:text-green-400">
         Completed
       </Badge>
       {decision && (
         <Badge
           variant="secondary"
           className={`text-xs font-medium rounded-full ${
-            decision === "offer" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
+            decision === "offer" ? "bg-green-500/15 text-green-600 dark:text-green-400" : "bg-red-500/15 text-red-600 dark:text-red-400"
           }`}
         >
           {decision === "offer" ? "🎉 Offer" : "❌ Rejected"}

@@ -29,14 +29,14 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-surface py-24">
+    <section id="how-it-works" className="bg-muted/50 py-24">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
         <div className="mb-16 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-orange mb-3">
             How it works
           </p>
-          <h2 className="text-4xl font-bold tracking-tight text-dark sm:text-5xl">
+          <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             From résumé to decision in one session
           </h2>
         </div>
@@ -44,16 +44,16 @@ export default function HowItWorks() {
         {/* Steps */}
         <div className="grid gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
-            <Card key={s.step} className="relative border-border bg-surface rounded-2xl">
+            <Card key={s.step} className="relative border-border bg-card rounded-2xl">
               <CardContent>
                 {/* Step number */}
-                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-dark text-light">
+                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-orange/10">
                   <span className="font-mono text-sm font-semibold text-orange">
                     {s.step}
                   </span>
                 </div>
-                <h3 className="mb-3 text-base font-semibold text-dark">{s.title}</h3>
-                <p className="text-sm leading-relaxed text-muted">{s.description}</p>
+                <h3 className="mb-3 text-base font-semibold text-foreground">{s.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{s.description}</p>
               </CardContent>
             </Card>
           ))}

@@ -93,7 +93,7 @@ function ResumeContent() {
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-12 flex flex-col gap-8">
         {/* Breadcrumb + actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8">
-          <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
+          <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
             <ArrowLeft size={14} /> {backLabel}
           </Link>
           {resume && (
@@ -103,7 +103,7 @@ function ResumeContent() {
                   <Mic size={14} /> Start interview
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="rounded-full border-border text-dark hover:border-orange/50 gap-2">
+              <Button asChild variant="outline" className="rounded-full border-border text-foreground hover:border-orange/50 gap-2">
                 <Link href="/resume/upload?from=resume">
                   <Upload size={14} /> Upload new version
                 </Link>
@@ -114,9 +114,9 @@ function ResumeContent() {
 
         {/* Title */}
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">My résumé</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">My résumé</h1>
           {resume?.filename && (
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-sm text-muted-foreground">
               {resume.filename}
               {resume.parsed_at && (
                 <> | Uploaded {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(resume.parsed_at))}</>
@@ -187,7 +187,7 @@ function ResumeContent() {
                   <Skeleton className="h-4 w-24 rounded" />
                 </div>
                 <div
-                  className="w-full flex flex-col gap-3 p-5 bg-zinc-50"
+                  className="w-full flex flex-col gap-3 p-5 bg-zinc-50 dark:bg-zinc-800/50"
                   style={{ height: "calc(100vh - 220px)", minHeight: 500 }}
                 >
                   <Skeleton className="h-6 w-48 rounded mb-2" />
@@ -213,10 +213,10 @@ function ResumeContent() {
         ) : !resume ? (
           /* No resume uploaded yet */
           <div className="flex flex-col items-center justify-center py-24 text-center gap-5">
-            <FileText size={48} className="text-muted opacity-30" />
+            <FileText size={48} className="text-muted-foreground opacity-30" />
             <div>
-              <p className="font-semibold text-dark">No résumé uploaded yet</p>
-              <p className="text-sm text-muted mt-1">Upload your résumé to get personalised interview questions.</p>
+              <p className="font-semibold text-foreground">No résumé uploaded yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Upload your résumé to get personalised interview questions.</p>
             </div>
             <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange">
               <Link href="/resume/upload?from=resume">Upload résumé</Link>
@@ -236,9 +236,9 @@ function ResumeContent() {
                     <User size={18} className="text-orange" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-dark text-base lg:text-lg">{resume.name}</p>
-                    {resume.email && <p className="text-sm text-muted mt-1">{resume.email}</p>}
-                    {resume.phone && <p className="text-sm text-muted mt-1">{resume.phone}</p>}
+                    <p className="font-bold text-foreground text-base lg:text-lg">{resume.name}</p>
+                    {resume.email && <p className="text-sm text-muted-foreground mt-1">{resume.email}</p>}
+                    {resume.phone && <p className="text-sm text-muted-foreground mt-1">{resume.phone}</p>}
                   </div>
                 </div>
                 {resume.summary && (
@@ -251,7 +251,7 @@ function ResumeContent() {
                 <Section title="Skills" icon={<Cpu size={16} className="text-orange" />}>
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {resume.skills.map(skill => (
-                      <Badge key={skill} variant="outline" className="rounded-md border-border text-dark text-sm px-2.5 py-1">
+                      <Badge key={skill} variant="outline" className="rounded-md border-border text-foreground text-sm px-2.5 py-1">
                         {skill}
                       </Badge>
                     ))}
@@ -264,7 +264,7 @@ function ResumeContent() {
                 <Section title="Key achievements" icon={<Star size={16} className="text-orange" />}>
                   <ul className="mt-3 flex flex-col gap-1.5">
                     {resume.bold_claims.map((claim, i) => (
-                      <li key={i} className="text-sm text-dark flex items-start gap-2">
+                      <li key={i} className="text-sm text-foreground flex items-start gap-2">
                         <span className="text-orange mt-0.5 shrink-0">•</span>
                         {claim}
                       </li>
@@ -279,8 +279,8 @@ function ResumeContent() {
                   <div className="mt-3 flex flex-col gap-4">
                     {resume.experience.map((exp, i) => (
                       <div key={i}>
-                        <p className="text-sm lg:text-base font-semibold text-dark">{exp.title}</p>
-                        <p className="text-xs lg:text-sm text-muted mt-0.5">{exp.company} | {exp.duration}</p>
+                        <p className="text-sm lg:text-base font-semibold text-foreground">{exp.title}</p>
+                        <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">{exp.company} | {exp.duration}</p>
                         {exp.highlights && exp.highlights.length > 0 && (
                           <ul className="mt-1.5 flex flex-col gap-1">
                             {exp.highlights.map((h, j) => (
@@ -303,8 +303,8 @@ function ResumeContent() {
                   <div className="mt-3 flex flex-col gap-3">
                     {resume.education.map((edu, i) => (
                       <div key={i}>
-                        <p className="text-sm lg:text-base font-semibold text-dark">{edu.degree}</p>
-                        <p className="text-xs lg:text-sm text-muted mt-0.5">{edu.institution} | {edu.year}</p>
+                        <p className="text-sm lg:text-base font-semibold text-foreground">{edu.degree}</p>
+                        <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">{edu.institution} | {edu.year}</p>
                       </div>
                     ))}
                   </div>
@@ -316,7 +316,7 @@ function ResumeContent() {
                 <Section title="Certifications" icon={<Star size={16} className="text-orange" />}>
                   <ul className="mt-3 flex flex-col gap-1.5">
                     {resume.certifications.map((cert, i) => (
-                      <li key={i} className="text-sm text-dark flex items-start gap-2">
+                      <li key={i} className="text-sm text-foreground flex items-start gap-2">
                         <span className="text-orange mt-0.5 shrink-0">•</span>
                         {cert}
                       </li>
@@ -330,7 +330,7 @@ function ResumeContent() {
             <div className="lg:col-span-3">
               <Card className="rounded-xl border border-border overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <p className="text-sm font-medium text-dark">Résumé preview</p>
+                  <p className="text-sm font-medium text-foreground">Résumé preview</p>
                   {pdfUrl && (
                     <a
                       href={pdfUrl}
@@ -343,9 +343,9 @@ function ResumeContent() {
                   )}
                 </div>
                 {pdfUrl ? (
-                  <div className="relative w-full" style={{ height: "calc(100vh - 220px)", minHeight: 500 }}>
+                  <div className="relative w-full" style={{ height: "calc(100vh - 72px)", minHeight: 512 }}>
                     {!pdfLoaded && (
-                      <div className="absolute inset-0 flex flex-col gap-3 p-5 bg-zinc-50 z-10">
+                      <div className="absolute inset-0 flex flex-col gap-3 p-5 bg-zinc-50 dark:bg-zinc-800/50 z-10">
                         <Skeleton className="h-6 w-48 rounded mb-2" />
                         {Array.from({ length: 18 }).map((_, i) => (
                           <Skeleton key={i} className="h-3 rounded" style={{ width: `${65 + ((i * 37) % 30)}%` }} />
@@ -364,7 +364,7 @@ function ResumeContent() {
                     />
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center py-24 text-muted text-sm">
+                  <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
                     Preview unavailable
                   </div>
                 )}
@@ -394,7 +394,7 @@ function Section({
         {title && (
           <div className="flex items-center gap-1.5 mb-1">
             {icon}
-            <p className="text-sm font-semibold text-dark uppercase tracking-wide">{title}</p>
+            <p className="text-sm font-semibold text-foreground uppercase tracking-wide">{title}</p>
           </div>
         )}
         {children}

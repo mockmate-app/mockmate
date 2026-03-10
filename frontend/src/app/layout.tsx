@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/query-client";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { APP_DESCRIPTION, APP_NAME } from "@/constants/common";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next"
@@ -21,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link href="https://api.fontshare.com/v2/css?f[]=supreme@200,201,300,301,400,401,500,501,700,701&display=swap" rel="stylesheet" />
         <link rel="icon" type="image/png" href="/favicons/favicon-96x96.png" sizes="96x96" />
@@ -33,11 +34,13 @@ export default function RootLayout({
       <body
         className="antialiased pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
       >
-        <ReactQueryProvider>
-          {children}
-          <Toaster />
-          <Analytics />
-        </ReactQueryProvider>
+        <ThemeProvider>
+          <ReactQueryProvider>
+            {children}
+            <Toaster />
+            <Analytics />
+          </ReactQueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

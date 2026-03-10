@@ -16,12 +16,12 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-light/90 backdrop-blur-md border-b border-border">
+    <header className="fixed top-0 inset-x-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
       <div className="mx-auto max-w-7xl px-6 flex items-center justify-between h-16">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <Logo />
-          <span className="text-dark font-semibold text-lg tracking-tight text-trim">
+          <span className="text-foreground font-semibold text-lg tracking-tight text-trim">
             Mock<span className="text-orange">Mate</span>
           </span>
         </Link>
@@ -32,7 +32,7 @@ export default function Navbar() {
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-muted hover:text-dark transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               {l.label}
             </Link>
@@ -41,7 +41,7 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" asChild className="text-dark hover:text-orange hover:bg-transparent">
+          <Button variant="ghost" asChild className="text-foreground hover:text-orange hover:bg-transparent">
             <Link href="/login">Sign in</Link>
           </Button>
           <Button asChild className="rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange transition-opacity">
@@ -53,7 +53,7 @@ export default function Navbar() {
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden text-dark hover:bg-transparent"
+          className="md:hidden text-foreground hover:bg-transparent"
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
         >
@@ -63,13 +63,13 @@ export default function Navbar() {
 
       {/* Mobile dropdown */}
       {open && (
-        <div className="md:hidden bg-light border-t border-border px-6 py-4 flex flex-col gap-4">
+        <div className="md:hidden bg-background border-t border-border px-6 py-4 flex flex-col gap-4">
           {NAV_LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="text-sm font-medium text-dark hover:text-orange transition-colors"
+              className="text-sm font-medium text-foreground hover:text-orange transition-colors"
             >
               {l.label}
             </Link>

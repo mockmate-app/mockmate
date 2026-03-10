@@ -49,17 +49,17 @@ const FEATURES = [
 
 export default function Features() {
   return (
-    <section id="features" className="bg-light py-24">
+    <section id="features" className="bg-background py-24">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
         <div className="mb-16 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-orange mb-3">
             Features
           </p>
-          <h2 className="text-4xl font-bold tracking-tight text-dark sm:text-5xl">
+          <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             Everything real interviews throw at you
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
             Most platforms evaluate what you say. MockMate evaluates who you
             are under pressure.
           </p>
@@ -70,16 +70,16 @@ export default function Features() {
           {FEATURES.map((f) => (
             <Card
               key={f.title}
-              className="group rounded-2xl border border-border bg-light transition-shadow hover:shadow-lg hover:shadow-dark/5 overflow-hidden"
+              className="group rounded-2xl border border-border bg-background transition-shadow hover:shadow-lg hover:shadow-dark/5 overflow-hidden"
             >
               <CardHeader className="pt-6 gap-4">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-orange/10 text-orange">
                   {f.icon}
                 </div>
-                <h3 className="text-base font-semibold text-dark">{f.title}</h3>
+                <h3 className="text-base font-semibold text-foreground">{f.title}</h3>
               </CardHeader>
               <CardContent className="px-6 pt-2 pb-6">
-                <p className="text-sm leading-relaxed text-muted">{f.description}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{f.description}</p>
               </CardContent>
             </Card>
           ))}

@@ -406,10 +406,9 @@ function FeedbackContent() {
     : queryError instanceof Error ? queryError.message : queryError ? "Failed to generate feedback." : null;
 
   return (
-    <div className="min-h-screen bg-dark text-white pb-12 lg:pb-0">
+    <div className="dark min-h-screen bg-dark text-white pb-12 lg:pb-0">
       <AppHeader
         homeHref="/dashboard"
-        variant="dark"
         name={session?.user?.name}
         email={session?.user?.email}
         image={session?.user?.image}

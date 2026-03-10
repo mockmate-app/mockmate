@@ -66,22 +66,30 @@ const PERSONA_LABELS: Record<string, string> = {
   algorithm_guru: "Algorithm Guru", system_designer: "System Designer", prompt_wizard: "Prompt Wizard" 
 };
 const PERSONA_COLORS: Record<string, string> = {
-  neutral: "bg-zinc-100 text-zinc-600", startup_founder: "bg-purple-100 text-purple-700",
-  investment_banker: "bg-blue-100 text-blue-700", tech_lead: "bg-green-100 text-green-700",
-  hr_manager: "bg-pink-100 text-pink-700", product_manager: "bg-amber-100 text-amber-700",
-  vp_engineering: "bg-indigo-100 text-indigo-700", management_consultant: "bg-teal-100 text-teal-700",
-  cto: "bg-red-100 text-red-700", recruiter: "bg-lime-100 text-lime-700",
-  algorithm_guru: "bg-cyan-100 text-cyan-700", system_designer: "bg-violet-100 text-violet-700", prompt_wizard: "bg-fuchsia-100 text-fuchsia-700", ai_engineer: "bg-fuchsia-100 text-fuchsia-700",
+  neutral: "bg-zinc-500/15 text-zinc-400 dark:text-zinc-300",
+  startup_founder: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+  investment_banker: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  tech_lead: "bg-green-500/15 text-green-600 dark:text-green-400",
+  hr_manager: "bg-pink-500/15 text-pink-600 dark:text-pink-400",
+  product_manager: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  vp_engineering: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400",
+  management_consultant: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+  cto: "bg-red-500/15 text-red-600 dark:text-red-400",
+  recruiter: "bg-lime-500/15 text-lime-600 dark:text-lime-400",
+  algorithm_guru: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
+  system_designer: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  prompt_wizard: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
+  ai_engineer: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
 };
 function personaLabel(p: string) { return PERSONA_LABELS[p] ?? p; }
-function personaColor(p: string) { return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600"; }
+function personaColor(p: string) { return PERSONA_COLORS[p] ?? "bg-zinc-500/15 text-zinc-400 dark:text-zinc-300"; }
 
 function scorePillClass(score: number | null) {
-  if (score === null) return "bg-zinc-100 text-zinc-400";
-  if (score >= 85) return "bg-green-100 text-green-700";
-  if (score >= 70) return "bg-yellow-100 text-yellow-700";
+  if (score === null) return "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400";
+  if (score >= 85) return "bg-green-500/15 text-green-600 dark:text-green-400";
+  if (score >= 70) return "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400";
   if (score >= 50) return "bg-orange/15 text-orange";
-  return "bg-red-100 text-red-600";
+  return "bg-red-500/15 text-red-600 dark:text-red-400";
 }
 
 function fmtDate(iso: string) {
@@ -200,15 +208,15 @@ function SessionsContent() {
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-10 flex flex-col gap-8">
         {/* Breadcrumb */}
-        <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
+        <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
 
         {/* Title + stats */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">All sessions</h1>
-            {!loading && <p className="mt-1 text-sm text-muted">{totalSessionCount} total interviews recorded</p>}
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">All sessions</h1>
+            {!loading && <p className="mt-1 text-sm text-muted-foreground">{totalSessionCount} total interviews recorded</p>}
           </div>
           <div className="flex gap-3">
             {totalSessionCount > 0 && (
@@ -216,8 +224,8 @@ function SessionsContent() {
                 <CardContent className="py-3 px-4 flex items-center gap-2.5">
                   <Award size={16} className="text-orange" />
                   <div>
-                    <p className="text-xs text-muted">Avg score</p>
-                    <p className="text-lg font-bold text-dark leading-tight">
+                    <p className="text-xs text-muted-foreground">Avg score</p>
+                    <p className="text-lg font-bold text-foreground leading-tight">
                       {avgScore !== null ? avgScore : "—"}
                     </p>
                   </div>
@@ -235,12 +243,12 @@ function SessionsContent() {
         {/* Search */}
         {sessions.length > 0 && (
           <div className="relative max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search by role, persona, interviewer…"
-              className="pl-9 rounded-xl border-border bg-light focus:ring-orange/40 focus:border-orange"
+              placeholder="Search by role, persona, interviewer"
+              className="pl-9 rounded-xl border-border bg-background focus:ring-orange/40 focus:border-orange"
             />
           </div>
         )}
@@ -257,11 +265,11 @@ function SessionsContent() {
             <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-6">
               {sessions.length === 0 ? (
                 <>
-                  <BarChart2 size={36} className="text-muted opacity-30" />
-                  <p className="text-sm text-muted">No interviews yet. Start your first one!</p>
+                  <BarChart2 size={36} className="text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No interviews yet. Start your first one!</p>
                 </>
               ) : (
-                <p className="text-sm text-muted">No sessions match your search.</p>
+                <p className="text-sm text-muted-foreground">No sessions match your search.</p>
               )}
             </div>
           ) : (
@@ -269,35 +277,35 @@ function SessionsContent() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface">
-                    <TableHead className="text-xs font-medium text-muted">Job role & Persona</TableHead>
-                    <TableHead className="text-xs font-medium text-muted hidden md:table-cell">Interviewer</TableHead>
-                    <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">Last active</TableHead>
-                    <TableHead className="text-xs font-medium text-muted hidden lg:table-cell">Duration</TableHead>
-                    {/* <TableHead className="text-xs font-medium text-muted text-center hidden sm:table-cell">Questions</TableHead> */}
-                    <TableHead className="text-xs font-medium text-muted text-center">Score</TableHead>
-                    <TableHead className="text-xs font-medium text-muted">Status</TableHead>
-                    <TableHead className="text-xs font-medium text-muted text-right"></TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Job role & Persona</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Interviewer</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Last active</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">Duration</TableHead>
+                    {/* <TableHead className="text-xs font-medium text-muted-foreground text-center hidden sm:table-cell">Questions</TableHead> */}
+                    <TableHead className="text-xs font-medium text-muted-foreground text-center">Score</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map(s => (
                     <TableRow key={s.session_id} className="hover:bg-surface/60">
                       <TableCell className="py-3.5 max-w-64">
-                        <p className="mx-0.5 text-xs text-muted truncate w-full">{s.job_role}</p>
+                        <p className="mx-0.5 text-xs text-muted-foreground truncate w-full">{s.job_role}</p>
                         <Badge variant="secondary" className={`mt-2 text-xs font-medium ${personaColor(s.persona)}`}>
                           {personaLabel(s.persona)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted hidden md:table-cell">
+                      <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                         {s.interviewer_name ?? "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-muted hidden sm:table-cell whitespace-nowrap">
+                      <TableCell className="text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
                         {fmtDate(s.last_retried_at ?? s.live_started_at ?? s.created_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted hidden lg:table-cell whitespace-nowrap">
+                      <TableCell className="text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
                         {fmtDuration(s.live_started_at ?? s.created_at, s.ended_at)}
                       </TableCell>
-                      {/* <TableCell className="text-xs text-center text-muted hidden sm:table-cell">
+                      {/* <TableCell className="text-xs text-center text-muted-foreground hidden sm:table-cell">
                         {s.question_count > 0 ? s.question_count : "—"}
                       </TableCell> */}
                       <TableCell className="text-center">
@@ -306,7 +314,7 @@ function SessionsContent() {
                             {s.overall_score}
                           </Badge>
                         ) : (
-                          <span className="text-xs text-muted/40">—</span>
+                          <span className="text-xs text-muted-foreground/40">—</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -326,7 +334,7 @@ function SessionsContent() {
                             Feedback <ChevronRight size={12} />
                           </Link>
                         ) : s.status === "active" ? (
-                          <span className="text-xs text-muted italic">In progress</span>
+                          <span className="text-xs text-muted-foreground italic">In progress</span>
                         ) : canRetry(s) ? (
                           <Link
                             href={`/interview/live?session_id=${s.session_id}&persona=${encodeURIComponent(s.persona)}&job_role=${encodeURIComponent(s.job_role)}&interviewer_name=${encodeURIComponent(s.interviewer_name)}${s.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(s.interviewer_avatar_url)}` : ""}`}
@@ -335,7 +343,7 @@ function SessionsContent() {
                             <RotateCcw size={12} /> Retry
                           </Link>
                         ) : (
-                          <span className="text-xs text-muted/40">—</span>
+                          <span className="text-xs text-muted-foreground/40">—</span>
                         )}
                       </TableCell>
                     </TableRow>

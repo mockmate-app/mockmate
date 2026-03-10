@@ -182,16 +182,16 @@ function ResumeContent({
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-4 sm:px-6 py-12 flex flex-col gap-8">
         {/* Breadcrumb */}
-        <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit">
+        <Link href={backHref} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
           ← {backLabel}
         </Link>
 
         {/* Title */}
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
             Upload your résumé
           </h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             MockMate uses your résumé to personalise every interview question to your
             experience and skills.
           </p>
@@ -209,8 +209,8 @@ function ResumeContent({
               stage === "idle"
                 ? dragging
                   ? "border-orange bg-orange/5 cursor-copy"
-                  : "border-border bg-light hover:border-orange/50 cursor-pointer"
-                : "border-border bg-light",
+                  : "border-border bg-background hover:border-orange/50 cursor-pointer"
+                : "border-border bg-background",
             ].join(" ")}
           >
             <Input
@@ -227,10 +227,10 @@ function ResumeContent({
                   <Upload size={26} className="text-orange" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-dark">
+                  <p className="text-sm font-semibold text-foreground">
                     Drag &amp; drop your résumé here
                   </p>
-                  <p className="text-xs text-muted mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     or click to browse — PDF, DOCX, DOC, TXT | max 10 MB
                   </p>
                 </div>
@@ -241,7 +241,7 @@ function ResumeContent({
               <div className="w-full flex flex-col items-center gap-4">
                 <div className="h-12 w-12 rounded-full border-4 border-orange border-t-transparent animate-spin" />
                 <div className="w-full max-w-xs">
-                  <div className="flex justify-between text-xs text-muted mb-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
                     <span>Parsing with Gemini…</span>
                     <span>{progress}%</span>
                   </div>
@@ -252,8 +252,8 @@ function ResumeContent({
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted">
-                  Uploading <span className="font-medium text-dark">{selectedFile?.name}</span>
+                <p className="text-xs text-muted-foreground">
+                  Uploading <span className="font-medium text-foreground">{selectedFile?.name}</span>
                 </p>
               </div>
             )}
@@ -261,13 +261,13 @@ function ResumeContent({
             {stage === "error" && (
               <div className="flex flex-col items-center gap-3 text-center">
                 <XCircle size={36} className="text-red-500" />
-                <p className="text-sm font-semibold text-dark">Upload failed</p>
-                <p className="text-xs text-muted max-w-xs">{errorMsg}</p>
+                <p className="text-sm font-semibold text-foreground">Upload failed</p>
+                <p className="text-xs text-muted-foreground max-w-xs">{errorMsg}</p>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={(e) => { e.stopPropagation(); reset(); }}
-                  className="mt-1 rounded-full border-border text-dark hover:border-orange hover:text-orange"
+                  className="mt-1 rounded-full border-border text-foreground hover:border-orange hover:text-orange"
                 >
                   Try again
                 </Button>
@@ -287,7 +287,7 @@ function ResumeContent({
         {/* Current résumé card — shown while idle or after error */}
         {(stage === "idle" || stage === "error") && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm font-semibold text-dark">Current résumé</p>
+            <p className="text-sm font-semibold text-foreground">Current résumé</p>
             <Card className="rounded-xl border border-border">
               <CardContent className="p-4">
                 {loadingExistingResume ? (
@@ -310,9 +310,9 @@ function ResumeContent({
                         <User size={16} className="text-orange" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-dark text-sm truncate">{existingResume.name}</p>
+                        <p className="font-semibold text-foreground text-sm truncate">{existingResume.name}</p>
                         {existingResume.experience?.[0] && (
-                          <p className="text-xs text-muted mt-0.5 truncate">
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {existingResume.experience[0].title} | {existingResume.experience[0].company}
                           </p>
                         )}
@@ -322,19 +322,19 @@ function ResumeContent({
                     {/* Skills */}
                     {existingResume.skills && existingResume.skills.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-muted mb-2">Top skills</p>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Top skills</p>
                         <div className="flex flex-wrap gap-1.5">
                           {existingResume.skills.slice(0, 8).map((skill: string) => (
                             <Badge
                               key={skill}
                               variant="outline"
-                              className="px-2 py-0.5 text-xs text-dark border-border bg-surface rounded-md"
+                              className="px-2 py-0.5 text-xs text-foreground border-border bg-surface rounded-md"
                             >
                               {skill}
                             </Badge>
                           ))}
                           {existingResume.skills.length > 8 && (
-                            <Badge variant="outline" className="px-2 py-0.5 text-xs text-muted border-border bg-surface rounded-md">
+                            <Badge variant="outline" className="px-2 py-0.5 text-xs text-muted-foreground border-border bg-surface rounded-md">
                               +{existingResume.skills.length - 8} more
                             </Badge>
                           )}
@@ -345,14 +345,14 @@ function ResumeContent({
                     {/* Experience */}
                     {existingResume.experience && existingResume.experience.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-muted mb-2">Experience</p>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Experience</p>
                         <div className="flex flex-col gap-3">
                           {existingResume.experience.slice(0, 2).map((exp: { title: string; company: string; duration: string }, i: number) => (
                             <div key={i} className="flex items-start gap-2.5">
-                              <Briefcase size={12} className="text-muted mt-0.5 shrink-0" />
+                              <Briefcase size={12} className="text-muted-foreground mt-0.5 shrink-0" />
                               <div className="min-w-0">
-                                <p className="text-xs font-medium text-dark truncate">{exp.title}</p>
-                                <p className="text-xs text-muted truncate">{exp.company} | {exp.duration}</p>
+                                <p className="text-xs font-medium text-foreground truncate">{exp.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">{exp.company} | {exp.duration}</p>
                               </div>
                             </div>
                           ))}
@@ -369,8 +369,8 @@ function ResumeContent({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
-                    <FileText size={28} className="text-muted opacity-40" />
-                    <p className="text-sm text-muted">No résumé uploaded yet</p>
+                    <FileText size={28} className="text-muted-foreground opacity-40" />
+                    <p className="text-sm text-muted-foreground">No résumé uploaded yet</p>
                   </div>
                 )}
               </CardContent>
@@ -401,8 +401,8 @@ function ParsedResumeCard({
       <Alert className="border-green-200 bg-green-50 rounded-xl">
         <CheckCircle size={16} className="text-green-600" />
         <AlertDescription>
-          <p className="text-sm font-semibold text-dark">Résumé parsed successfully</p>
-          <p className="text-xs text-muted mt-0.5">
+          <p className="text-sm font-semibold text-foreground">Résumé parsed successfully</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {resume.filename} | parsed {new Date(resume.parsed_at).toLocaleString()}
           </p>
         </AlertDescription>
@@ -412,12 +412,12 @@ function ParsedResumeCard({
       <Card className="rounded-xl border border-border">
         <CardContent className="p-5 flex flex-col gap-4">
         <div>
-          <h2 className="text-base font-bold text-dark">{resume.name || "—"}</h2>
-          <p className="text-xs text-muted mt-0.5">
+          <h2 className="text-base font-bold text-foreground">{resume.name || "—"}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {[resume.email, resume.phone].filter(Boolean).join(" | ")}
           </p>
           {resume.summary && (
-            <p className="mt-3 text-sm text-dark/80 leading-relaxed">{resume.summary}</p>
+            <p className="mt-3 text-sm text-foreground/80 leading-relaxed">{resume.summary}</p>
           )}
         </div>
 
@@ -429,7 +429,7 @@ function ParsedResumeCard({
                 <Badge
                   key={s}
                   variant="outline"
-                  className="rounded-full border-border text-dark text-xs px-3 py-1"
+                  className="rounded-full border-border text-foreground text-xs px-3 py-1"
                 >
                   {s}
                 </Badge>
@@ -444,17 +444,17 @@ function ParsedResumeCard({
             <ul className="mt-2 flex flex-col gap-3">
               {resume.experience.map((exp, i) => (
                 <li key={i} className="text-sm">
-                  <span className="font-medium text-dark">{exp.title}</span>
+                  <span className="font-medium text-foreground">{exp.title}</span>
                   {exp.company && (
-                    <span className="text-muted"> | {exp.company}</span>
+                    <span className="text-muted-foreground"> | {exp.company}</span>
                   )}
                   {exp.duration && (
-                    <span className="text-muted text-xs"> ({exp.duration})</span>
+                    <span className="text-muted-foreground text-xs"> ({exp.duration})</span>
                   )}
                   {exp.highlights?.length > 0 && (
                     <ul className="mt-1 ml-3 flex flex-col gap-0.5 list-disc list-inside">
                       {exp.highlights.map((h, j) => (
-                        <li key={j} className="text-xs text-muted leading-relaxed">
+                        <li key={j} className="text-xs text-muted-foreground leading-relaxed">
                           {h}
                         </li>
                       ))}
@@ -472,12 +472,12 @@ function ParsedResumeCard({
             <ul className="mt-2 flex flex-col gap-1.5">
               {resume.education.map((edu, i) => (
                 <li key={i} className="text-sm">
-                  <span className="font-medium text-dark">{edu.degree}</span>
+                  <span className="font-medium text-foreground">{edu.degree}</span>
                   {edu.institution && (
-                    <span className="text-muted"> | {edu.institution}</span>
+                    <span className="text-muted-foreground"> | {edu.institution}</span>
                   )}
                   {edu.year && (
-                    <span className="text-xs text-muted"> ({edu.year})</span>
+                    <span className="text-xs text-muted-foreground"> ({edu.year})</span>
                   )}
                 </li>
               ))}
@@ -490,7 +490,7 @@ function ParsedResumeCard({
           <Section icon={<Star size={14} className="text-orange" />} title="Notable claims">
             <ul className="mt-2 flex flex-col gap-1.5">
               {resume.bold_claims.map((c, i) => (
-                <li key={i} className="text-sm text-dark/80 flex gap-2">
+                <li key={i} className="text-sm text-foreground/80 flex gap-2">
                   <span className="text-orange shrink-0">✦</span>
                   {c}
                 </li>
@@ -506,7 +506,7 @@ function ParsedResumeCard({
         <Button
           variant="outline"
           onClick={onReplace}
-          className="rounded-full border-border text-dark hover:border-orange hover:text-orange gap-2"
+          className="rounded-full border-border text-foreground hover:border-orange hover:text-orange gap-2"
         >
           <FileText size={14} />
           Replace résumé
@@ -552,7 +552,7 @@ function Section({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted uppercase tracking-wider">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         {icon}
         {title}
       </div>

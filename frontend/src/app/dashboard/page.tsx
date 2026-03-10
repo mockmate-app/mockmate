@@ -132,33 +132,33 @@ const PERSONA_LABELS: Record<string, string> = {
 };
 
 const PERSONA_COLORS: Record<string, string> = {
-  neutral: "bg-zinc-100 text-zinc-600",
-  startup_founder: "bg-purple-100 text-purple-700",
-  investment_banker: "bg-blue-100 text-blue-700",
-  tech_lead: "bg-green-100 text-green-700",
-  hr_manager: "bg-pink-100 text-pink-700",
-  product_manager: "bg-amber-100 text-amber-700",
-  vp_engineering: "bg-indigo-100 text-indigo-700",
-  management_consultant: "bg-teal-100 text-teal-700",
-  cto: "bg-red-100 text-red-700",
-  recruiter: "bg-lime-100 text-lime-700",
-  algorithm_guru: "bg-cyan-100 text-cyan-700",
-  system_designer: "bg-violet-100 text-violet-700",
-  prompt_wizard: "bg-fuchsia-100 text-fuchsia-700",
-  ai_engineer: "bg-fuchsia-100 text-fuchsia-700",
+  neutral: "bg-zinc-500/15 text-zinc-400 dark:text-zinc-300",
+  startup_founder: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+  investment_banker: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  tech_lead: "bg-green-500/15 text-green-600 dark:text-green-400",
+  hr_manager: "bg-pink-500/15 text-pink-600 dark:text-pink-400",
+  product_manager: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  vp_engineering: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400",
+  management_consultant: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+  cto: "bg-red-500/15 text-red-600 dark:text-red-400",
+  recruiter: "bg-lime-500/15 text-lime-600 dark:text-lime-400",
+  algorithm_guru: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
+  system_designer: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  prompt_wizard: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
+  ai_engineer: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
 };
 
 function personaLabel(p: string) {
   return PERSONA_LABELS[p] ?? p;
 }
 function personaColor(p: string) {
-  return PERSONA_COLORS[p] ?? "bg-zinc-100 text-zinc-600";
+  return PERSONA_COLORS[p] ?? "bg-zinc-500/15 text-zinc-400 dark:text-zinc-300";
 }
 
 // ─── Score helpers ─────────────────────────────────────────────────────────────
 
 function scoreTextColor(score: number | null) {
-  if (score === null) return "text-muted";
+  if (score === null) return "text-muted-foreground";
   if (score >= 85) return "text-green-600";
   if (score >= 70) return "text-yellow-600";
   if (score >= 50) return "text-orange";
@@ -166,11 +166,11 @@ function scoreTextColor(score: number | null) {
 }
 
 function scorePillClass(score: number | null) {
-  if (score === null) return "bg-zinc-100 text-zinc-400";
-  if (score >= 85) return "bg-green-100 text-green-700";
-  if (score >= 70) return "bg-yellow-100 text-yellow-700";
+  if (score === null) return "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400";
+  if (score >= 85) return "bg-green-500/15 text-green-600 dark:text-green-400";
+  if (score >= 70) return "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400";
   if (score >= 50) return "bg-orange/15 text-orange";
-  return "bg-red-100 text-red-600";
+  return "bg-red-500/15 text-red-600 dark:text-red-400";
 }
 
 // ─── Date helpers ──────────────────────────────────────────────────────────────
@@ -283,10 +283,10 @@ function DashboardContent() {
           <Alert className="mb-6 border-orange/30 bg-orange/10 rounded-xl">
             <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="font-semibold text-dark">
+                <p className="font-semibold text-foreground">
                   Welcome to MockMate! 🎉
                 </p>
-                <p className="text-sm text-muted mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Get started by uploading your résumé and running your first
                   mock interview.
                 </p>
@@ -306,10 +306,10 @@ function DashboardContent() {
         {/* Greeting + primary CTA */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
               Hi, {firstName} 👋
             </h1>
-            <p className="mt-1.5 text-sm text-muted">
+            <p className="mt-1.5 text-sm text-muted-foreground">
               Get ready for your next interview
             </p>
           </div>
@@ -417,8 +417,8 @@ function DashboardContent() {
           <Card className="rounded-xl border border-border min-w-0 overflow-hidden">
             <CardContent className="p-4 min-w-0">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-dark">Score progression</p>
-                <p className="text-xs text-muted">Last 7 interviews</p>
+                <p className="text-sm font-semibold text-foreground">Score progression</p>
+                <p className="text-xs text-muted-foreground">Last 7 interviews</p>
               </div>
               {loadingAnalytics ? (
                 <Skeleton className="h-64 w-full rounded-lg" />
@@ -431,8 +431,8 @@ function DashboardContent() {
           <Card className="rounded-xl border border-border min-w-0 overflow-hidden">
             <CardContent className="p-4 min-w-0">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-dark">Skill Benchmark</p>
-                <p className="text-xs text-muted">You vs all users</p>
+                <p className="text-sm font-semibold text-foreground">Skill Benchmark</p>
+                <p className="text-xs text-muted-foreground">You vs all users</p>
               </div>
               {loadingAnalytics ? (
                 <Skeleton className="h-64 w-full rounded-lg" />
@@ -461,23 +461,23 @@ function DashboardContent() {
                 </div>
               ) : sessions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center gap-3 px-6">
-                  <Mic size={32} className="text-muted opacity-40" />
-                  <p className="text-sm text-muted">No interviews yet. Start your first one!</p>
+                  <Mic size={32} className="text-muted-foreground opacity-40" />
+                  <p className="text-sm text-muted-foreground">No interviews yet. Start your first one!</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-surface">
-                      <TableHead className="text-xs font-medium text-muted">
+                      <TableHead className="text-xs font-medium text-muted-foreground">
                         Job role & Persona
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-muted hidden sm:table-cell">
+                      <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">
                         Last active
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-muted text-center">
+                      <TableHead className="text-xs font-medium text-muted-foreground text-center">
                         Score
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-muted text-right"></TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -487,7 +487,7 @@ function DashboardContent() {
                         className="hover:bg-surface/60"
                       >
                         <TableCell className="py-3.5 max-w-64">
-                          <p className="mx-0.5 text-xs text-muted truncate w-full">
+                          <p className="mx-0.5 text-xs text-muted-foreground truncate w-full">
                             {s.job_role}
                           </p>
                           <Badge
@@ -497,7 +497,7 @@ function DashboardContent() {
                             {personaLabel(s.persona)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted hidden sm:table-cell whitespace-nowrap">
+                        <TableCell className="text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
                           {fmtDate(
                             s.last_retried_at ??
                               s.live_started_at ??
@@ -528,7 +528,7 @@ function DashboardContent() {
                               Feedback <ChevronRight size={12} />
                             </Link>
                           ) : s.status === "active" ? (
-                            <span className="text-xs text-muted italic">
+                            <span className="text-xs text-muted-foreground italic">
                               In progress
                             </span>
                           ) : canRetry(s) ? (
@@ -539,7 +539,7 @@ function DashboardContent() {
                               <RotateCcw size={12} /> Retry
                             </Link>
                           ) : (
-                            <span className="text-xs text-muted/40">—</span>
+                            <span className="text-xs text-muted-foreground/40">—</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -577,11 +577,11 @@ function DashboardContent() {
                           <User size={16} className="text-orange" />
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-dark text-sm truncate">
+                          <p className="font-semibold text-foreground text-sm truncate">
                             {resume.name}
                           </p>
                           {resume.experience?.[0] && (
-                            <p className="text-xs text-muted mt-0.5 truncate">
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
                               {resume.experience[0].title} |{" "}
                               {resume.experience[0].company}
                             </p>
@@ -592,7 +592,7 @@ function DashboardContent() {
                       {/* Skills */}
                       {resume.skills && resume.skills.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium text-muted mb-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
                             Top skills
                           </p>
                           <div className="flex flex-wrap gap-1.5">
@@ -600,7 +600,7 @@ function DashboardContent() {
                               <Badge
                                 key={skill}
                                 variant="outline"
-                                className="px-2 py-0.5 text-xs text-dark border-border bg-surface rounded-md"
+                                className="px-2 py-0.5 text-xs text-foreground border-border bg-surface rounded-md"
                               >
                                 {skill}
                               </Badge>
@@ -608,7 +608,7 @@ function DashboardContent() {
                             {resume.skills.length > 8 && (
                               <Badge
                                 variant="outline"
-                                className="px-2 py-0.5 text-xs text-muted border-border bg-surface rounded-md"
+                                className="px-2 py-0.5 text-xs text-muted-foreground border-border bg-surface rounded-md"
                               >
                                 +{resume.skills.length - 8} more
                               </Badge>
@@ -620,7 +620,7 @@ function DashboardContent() {
                       {/* Experience */}
                       {resume.experience && resume.experience.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium text-muted mb-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
                             Experience
                           </p>
                           <div className="flex flex-col gap-3">
@@ -628,13 +628,13 @@ function DashboardContent() {
                               <div key={i} className="flex items-start gap-2.5">
                                 <Briefcase
                                   size={12}
-                                  className="text-muted mt-0.5 shrink-0"
+                                  className="text-muted-foreground mt-0.5 shrink-0"
                                 />
                                 <div className="min-w-0">
-                                  <p className="text-xs font-medium text-dark truncate">
+                                  <p className="text-xs font-medium text-foreground truncate">
                                     {exp.title}
                                   </p>
-                                  <p className="text-xs text-muted truncate">
+                                  <p className="text-xs text-muted-foreground truncate">
                                     {exp.company} | {exp.duration}
                                   </p>
                                 </div>
@@ -653,8 +653,8 @@ function DashboardContent() {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-3 py-6 text-center">
-                      <FileText size={28} className="text-muted opacity-40" />
-                      <p className="text-sm text-muted">
+                      <FileText size={28} className="text-muted-foreground opacity-40" />
+                      <p className="text-sm text-muted-foreground">
                         No résumé uploaded yet
                       </p>
                     </div>
@@ -665,7 +665,7 @@ function DashboardContent() {
 
             {/* Quick actions — desktop only */}
             <div className="hidden lg:flex flex-col gap-3">
-              <p className="text-sm font-semibold text-dark">Quick actions</p>
+              <p className="text-sm font-semibold text-foreground">Quick actions</p>
               <div className="flex flex-col gap-2">
                 <QuickLink
                   href="/resume/upload?from=dashboard"
@@ -704,17 +704,17 @@ function StatCard({
   return (
     <Card className="rounded-xl border border-border">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted mb-2">
+        <div className="flex items-center gap-2 text-muted-foreground mb-2">
           {icon}
           <span className="text-xs font-medium">{label}</span>
         </div>
         <div className="flex items-baseline gap-1.5 flex-wrap">
           <span
-            className={`text-xl sm:text-2xl font-bold tracking-tight ${valueClass ?? "text-dark"}`}
+            className={`text-xl sm:text-2xl font-bold tracking-tight ${valueClass ?? "text-foreground"}`}
           >
             {value}
           </span>
-          {unit && <span className="text-xs text-muted">{unit}</span>}
+          {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
         </div>
       </CardContent>
     </Card>
@@ -724,7 +724,7 @@ function StatCard({
 function SectionHeader({ title, href }: { title: string; href?: string }) {
   return (
     <div className="flex items-center justify-between">
-      <p className="text-sm font-semibold text-dark">{title}</p>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
       {href && (
         <Link
           href={href}
@@ -760,8 +760,8 @@ function QuickLink({
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange/10 shrink-0">
             {icon}
           </span>
-          <span className="text-sm text-muted">{label}</span>
-          <span className="ml-auto text-xs text-muted">
+          <span className="text-sm text-muted-foreground">{label}</span>
+          <span className="ml-auto text-xs text-muted-foreground">
             Upload résumé first
           </span>
         </Link>
@@ -778,12 +778,12 @@ function QuickLink({
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange/10 shrink-0">
           {icon}
         </span>
-        <span className="text-sm text-dark group-hover:text-orange transition-colors">
+        <span className="text-sm text-foreground group-hover:text-orange transition-colors">
           {label}
         </span>
         <ChevronRight
           size={14}
-          className="ml-auto text-muted group-hover:text-orange transition-colors"
+          className="ml-auto text-muted-foreground group-hover:text-orange transition-colors"
         />
       </Link>
     </Button>
@@ -793,7 +793,7 @@ function QuickLink({
 function ProgressionLineChart({ points }: { points: ProgressionPoint[] }) {
   if (!points.length) {
     return (
-      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted">
+      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted-foreground">
         Complete interviews to see your trend
       </div>
     );
@@ -846,7 +846,7 @@ function RadarComparisonChart({
 }) {
   if (!userAvg || !globalAvg) {
     return (
-      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted">
+      <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted-foreground">
         Not enough feedback data for benchmark yet.
       </div>
     );

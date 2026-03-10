@@ -297,7 +297,7 @@ function SetupContent({
         {/* Breadcrumb */}
         <Link
           href={backHref}
-          className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors w-fit"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
         >
           <ArrowLeft size={14} />
           {backLabel}
@@ -308,11 +308,11 @@ function SetupContent({
           <Alert className="border-orange/30 bg-orange/5 rounded-xl">
             <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="font-semibold text-dark flex items-center gap-2">
+                <p className="font-semibold text-foreground flex items-center gap-2">
                   <FileText size={16} className="text-orange" />
                   Résumé required
                 </p>
-                <p className="text-sm text-muted mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   You need to upload your résumé before starting an interview so MockMate can personalise the questions.
                 </p>
               </div>
@@ -325,10 +325,10 @@ function SetupContent({
 
         {/* Title */}
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-dark tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
             Configure your interview
           </h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             Choose a target role, pick an interviewer, and set the pressure level.
           </p>
         </div>
@@ -341,11 +341,11 @@ function SetupContent({
             placeholder="e.g. Senior Software Engineer at a Series B startup"
             value={jobRole}
             onChange={(e) => setJobRole(e.target.value)}
-            className="rounded-xl border-border bg-light focus:ring-orange/40 focus:border-orange"
+            className="rounded-xl border-border bg-background focus:ring-orange/40 focus:border-orange"
           />
           {suggestedTitles.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted">Suggestions</span>
+              <span className="text-xs text-muted-foreground">Suggestions</span>
               {suggestedTitles.map((title) => (
                 <Button
                   key={title}
@@ -426,7 +426,7 @@ function SetupContent({
         {/* Blocking modal — prevents navigation while questions are being generated */}
         <Dialog open={startSessionMutation.isPending}>
           <DialogContent
-            className="sm:max-w-md rounded-2xl border-border bg-light [&>button]:hidden"
+            className="sm:max-w-md rounded-2xl border-border bg-background [&>button]:hidden"
             onInteractOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
@@ -435,10 +435,10 @@ function SetupContent({
                 <div className="h-14 w-14 rounded-full border-[3px] border-orange/20 border-t-orange animate-spin" />
               </div>
               <div className="text-center space-y-1.5">
-                <DialogTitle className="text-lg font-bold text-dark">
+                <DialogTitle className="text-lg font-bold text-foreground">
                   Setting up your interview
                 </DialogTitle>
-                <DialogDescription className="text-sm text-muted">
+                <DialogDescription className="text-sm text-muted-foreground">
                   Generating tailored questions based on your résumé and selected role.
                   This usually takes a few seconds — please don&apos;t close this page.
                 </DialogDescription>
@@ -461,7 +461,7 @@ function SectionLabel({ step, label }: { step: number; label: string }) {
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange text-xs font-bold text-light">
         {step}
       </span>
-      <span className="text-sm font-semibold text-dark">{label}</span>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
     </div>
   );
 }
@@ -482,7 +482,7 @@ function PersonaCard({
         "cursor-pointer rounded-xl border transition-all",
         selected
           ? "border-orange bg-orange/5 ring-1 ring-orange/30"
-          : "border-border bg-light hover:border-orange/40",
+          : "border-border bg-background hover:border-orange/40",
       ].join(" ")}
     >
       <CardContent className="p-4 flex flex-col gap-2.5">
@@ -491,11 +491,11 @@ function PersonaCard({
             {persona.icon}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-dark truncate">{persona.label}</p>
-            <p className="text-xs text-muted truncate">{persona.tagline}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{persona.label}</p>
+            <p className="text-xs text-muted-foreground truncate">{persona.tagline}</p>
           </div>
         </div>
-        <p className="text-xs text-muted leading-relaxed">{persona.description}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{persona.description}</p>
       </CardContent>
     </Card>
   );
@@ -524,12 +524,12 @@ function DifficultyCard({
         "flex-1 cursor-pointer rounded-xl border transition-all",
         selected
           ? "border-orange bg-orange/5 ring-1 ring-orange/30"
-          : "border-border bg-light hover:border-orange/40",
+          : "border-border bg-background hover:border-orange/40",
       ].join(" ")}
     >
       <CardContent className="p-4 flex flex-col gap-1.5">
         <p className={`text-sm font-bold ${accent}`}>{difficulty.label}</p>
-        <p className="text-xs text-muted leading-relaxed">{difficulty.description}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{difficulty.description}</p>
       </CardContent>
     </Card>
   );
