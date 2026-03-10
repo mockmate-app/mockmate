@@ -26,7 +26,6 @@ graph TB
         IMAGEN[Imagen 3.0 Fast]
         FS[(Firestore)]
         GCS[(Cloud Storage)]
-        PS[Pub/Sub]
     end
 
     FE -- "REST + WebSocket" --> MAIN
@@ -34,7 +33,7 @@ graph TB
 
     RP --> FLASH & GCS & FS
     QG --> FLASH
-    IE --> LIVE & FS & PS
+    IE --> LIVE & FS
     PA --> FLASH & FS
     FC --> FLASH & FS
     IA --> IMAGEN & GCS
@@ -59,7 +58,6 @@ graph TB
 | **Gemini Live API** | Real-time audio interview streaming |
 | **Cloud Firestore** | Sessions, transcripts, résumés, feedback, posture scores |
 | **Cloud Storage** | Raw résumé files + generated avatars |
-| **Cloud Pub/Sub** | Async `session-end` events |
 | **Cloud Run** | Serverless container hosting |
 
 ---
@@ -114,7 +112,7 @@ Or use a service account key:
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/key.json"
 ```
 
-Required IAM roles: `roles/aiplatform.user`, `roles/storage.objectAdmin`, `roles/datastore.user`, `roles/pubsub.publisher`
+Required IAM roles: `roles/aiplatform.user`, `roles/storage.objectAdmin`, `roles/datastore.user`
 
 ### 5. Run the server
 

@@ -6,7 +6,6 @@ Handles:
   - Session creation & Firestore persistence
   - Real-time bidirectional audio streaming over WebSocket
   - Adaptive follow-ups and probing via prompting
-  - Publishing session-end events to Pub/Sub
 """
 
 from __future__ import annotations

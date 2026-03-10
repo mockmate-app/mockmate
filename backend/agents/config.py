@@ -47,6 +47,3 @@ PGPORT     = int(os.getenv("PGPORT", "5432"))
 PGUSER     = os.getenv("PGUSER", "").strip()
 PGPASSWORD = os.getenv("PGPASSWORD", "").strip()
 PGDATABASE = os.getenv("PGDATABASE", "").strip()
-
-# ── Pub/Sub ────────────────────────────────────────────────────────────────
-PUBSUB_TOPIC_SESSION_END = os.getenv("PUBSUB_TOPIC_SESSION_END", "session-end")

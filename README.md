@@ -98,7 +98,6 @@ graph TB
         IG[Imagen 3.0]
         FS[(Cloud Firestore)]
         GCS[(Cloud Storage)]
-        PS[Cloud Pub/Sub]
     end
 
     subgraph "Auth & Data"
@@ -116,7 +115,7 @@ graph TB
 
     RP --> GF & GCS & FS
     QG --> GF
-    IE --> GLA & FS & PS
+    IE --> GLA & FS
     PA --> GF & FS
     FC --> GF & FS
     IA --> IG & GCS
@@ -196,7 +195,6 @@ sequenceDiagram
 | **Cloud Run** | Hosts the FastAPI backend as a serverless container. Handles auto-scaling, HTTPS termination, and WebSocket upgrades for live interviews. |
 | **Cloud Firestore** | Primary database for all application data — sessions, transcripts, parsed résumés, feedback reports, and posture scores. |
 | **Cloud Storage (GCS)** | Stores raw résumé files (PDF/DOCX) and generated interviewer avatar images. |
-| **Cloud Pub/Sub** | Publishes async `session-end` events when an interview concludes, enabling decoupled post-processing. |
 
 ### Application Stack
 
@@ -226,7 +224,6 @@ You also need a **Google Cloud project** with the following APIs enabled:
 - Vertex AI API
 - Cloud Firestore API
 - Cloud Storage API
-- Cloud Pub/Sub API
 
 And a **Google OAuth 2.0 Client ID** (for user login).
 
@@ -408,7 +405,6 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 | Vertex AI + Gemini Flash | [`backend/agents/feedback_compiler.py`](./backend/agents/feedback_compiler.py) | Uses `GenerativeModel("gemini-2.5-flash")` via Vertex AI to compile feedback reports |
 | Cloud Firestore | [`backend/agents/config.py`](./backend/agents/config.py) | Centralised Firestore collection names; used in every agent via `firestore.AsyncClient()` |
 | Cloud Storage | [`backend/agents/resume_parser.py`](./backend/agents/resume_parser.py) | Uploads raw résumé files to GCS via `storage.Client()` |
-| Cloud Pub/Sub | [`backend/agents/interview_engine.py`](./backend/agents/interview_engine.py) | Publishes `session-end` events via `pubsub_v1.PublisherClient()` |
 | Imagen 3.0 (Vertex AI) | [`backend/agents/interviewer_avatar.py`](./backend/agents/interviewer_avatar.py) | Generates interviewer avatars via `ImageGenerationModel` |
 | Cloud Run | [`backend/Dockerfile`](./backend/Dockerfile) | Multi-stage container deployed to Cloud Run |
 
