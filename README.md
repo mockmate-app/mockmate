@@ -4,7 +4,7 @@
 
 MockMate is an AI-powered mock interview platform that conducts real, adaptive interview sessions using **voice**, **vision**, and **résumé-personalized** question generation. It analyzes not just _what_ you say but _how_ you say it — scoring your tone, posture, vocabulary, and confidence in real time. At the end of every session, you receive a detailed feedback report and a mock hiring decision letter, so you walk into every real interview already knowing how it ends.
 
-**Live demo:** [getmockmate.com](https://www.getmockmate.com)
+**Live Link:** [getmockmate.com](https://www.getmockmate.com)
 
 > This project was built for the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/) hackathon — category: **Live Agents 🗣️**
 
