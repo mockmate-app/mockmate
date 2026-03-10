@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import traceback
 from datetime import datetime, timezone
 from typing import Any
@@ -31,34 +30,24 @@ from tenacity import (
 )
 from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
+from agents.config import (
+    PROJECT as _PROJECT,
+    REGION as _REGION,
+    FIRESTORE_DATABASE as _DATABASE,
+    FIRESTORE_SESSION_COLLECTION as _COL_SESSIONS,
+    FIRESTORE_RESUME_COLLECTION as _COL_RESUMES,
+    FIRESTORE_TRANSCRIPT_COLLECTION as _COL_TRANSCRIPTS,
+    FIRESTORE_FEEDBACK_COLLECTION as _COL_FEEDBACK,
+    FIRESTORE_POSTURE_COLLECTION as _COL_POSTURE,
+    GEMINI_MODEL as _MODEL,
+    PGHOST as _PGHOST,
+    PGPORT as _PGPORT,
+    PGUSER as _PGUSER,
+    PGPASSWORD as _PGPASSWORD,
+    PGDATABASE as _PGDATABASE,
+)
+
 logger = logging.getLogger(__name__)
-
-
-def _require(var: str) -> str:
-    """Return env var value or raise a clear error if it is missing/empty."""
-    val = os.getenv(var, "").strip()
-    if not val:
-        raise EnvironmentError(
-            f"Required environment variable '{var}' is not set. "
-            f"Add it to your .env file and restart the server."
-        )
-    return val
-
-
-_PROJECT      = _require("GOOGLE_CLOUD_PROJECT")
-_REGION       = _require("GOOGLE_CLOUD_LOCATION")
-_DATABASE     = os.getenv("FIRESTORE_DATABASE", "(default)")               # optional
-_MODEL        = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")           # optional
-_COL_SESSIONS     = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")       # optional
-_COL_TRANSCRIPTS  = os.getenv("FIRESTORE_TRANSCRIPT_COLLECTION", "transcripts") # optional
-_COL_POSTURE      = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores") # optional
-_COL_FEEDBACK     = os.getenv("FIRESTORE_FEEDBACK_COLLECTION", "feedback")      # optional
-_COL_RESUMES      = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")         # optional
-_PGHOST = os.getenv("PGHOST", "").strip()
-_PGPORT = int(os.getenv("PGPORT", "5432"))
-_PGUSER = os.getenv("PGUSER", "").strip()
-_PGPASSWORD = os.getenv("PGPASSWORD", "").strip()
-_PGDATABASE = os.getenv("PGDATABASE", "").strip()
 
 FEEDBACK_PROMPT = """
 You are a rigorous, unbiased interview coach and senior hiring manager.

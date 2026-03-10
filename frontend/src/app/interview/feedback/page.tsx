@@ -21,8 +21,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { API_BASE, PERSONA_LABELS } from "@/constants/common";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const FEEDBACK_RETRY_COOLDOWN_MS = 8000;
 const FEEDBACK_RETRY_MAX_ATTEMPTS = 3;
 
@@ -131,22 +131,6 @@ interface SessionMeta {
   overall_score: number | null;
   feedback_ready: boolean;
 }
-
-const PERSONA_LABELS: Record<string, string> = {
-  neutral: "Professional",
-  startup_founder: "Startup Founder",
-  investment_banker: "Investment Banker",
-  tech_lead: "Tech Lead",
-  hr_manager: "HR Manager",
-  product_manager: "Product Manager",
-  vp_engineering: "VP of Engineering",
-  management_consultant: "Consultant",
-  cto: "CTO",
-  recruiter: "Recruiter",
-  algorithm_guru: "Algorithm Guru",
-  system_designer: "System Designer",
-  prompt_wizard: "Prompt Wizard"
-};
 
 /* ── Small components ──────────────────────────────────────────────────── */
 

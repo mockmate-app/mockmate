@@ -3,7 +3,7 @@
  * Thin wrapper around fetch for all backend endpoints.
  */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API_BASE as BASE_URL } from "@/constants/common";
 
 // ---------------------------------------------------------------------------
 // Types

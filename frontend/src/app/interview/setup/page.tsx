@@ -7,6 +7,7 @@ import { useSession } from "@/lib/auth-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { startSession } from "@/lib/api";
+import { API_BASE } from "@/constants/common";
 import {
   ArrowLeft,
   ArrowRight,
@@ -210,8 +211,6 @@ function SetupPageInner() {
 // ---------------------------------------------------------------------------
 // Main content
 // ---------------------------------------------------------------------------
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function SetupContent({
   userId,

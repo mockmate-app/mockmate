@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from typing import Any
 
@@ -45,27 +44,17 @@ from vertexai.generative_models import (
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Configuration (override via environment variables)
+# Configuration (from shared config)
 # ---------------------------------------------------------------------------
 
-
-def _require(var: str) -> str:
-    """Return env var value or raise a clear error if it is missing/empty."""
-    val = os.getenv(var, "").strip()
-    if not val:
-        raise EnvironmentError(
-            f"Required environment variable '{var}' is not set. "
-            f"Add it to your .env file and restart the server."
-        )
-    return val
-
-
-_PROJECT              = _require("GOOGLE_CLOUD_PROJECT")
-_REGION               = _require("GOOGLE_CLOUD_LOCATION")
-_COLLECTION_RESUMES   = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")    # optional
-_COLLECTION_SESSIONS  = os.getenv("FIRESTORE_SESSION_COLLECTION", "sessions")  # optional
-_DATABASE             = os.getenv("FIRESTORE_DATABASE", "(default)")            # optional
-_MODEL                = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")       # optional
+from agents.config import (
+    PROJECT as _PROJECT,
+    REGION as _REGION,
+    FIRESTORE_RESUME_COLLECTION as _COLLECTION_RESUMES,
+    FIRESTORE_SESSION_COLLECTION as _COLLECTION_SESSIONS,
+    FIRESTORE_DATABASE as _DATABASE,
+    GEMINI_MODEL as _MODEL,
+)
 
 # ---------------------------------------------------------------------------
 # Persona registry

@@ -44,25 +44,22 @@ from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Configuration (override via environment variables)
+# Configuration (from shared config)
 # ---------------------------------------------------------------------------
 
-def _require(var: str) -> str:
-    """Return env var value or raise a clear error if it is missing/empty."""
-    val = os.getenv(var, "").strip()
-    if not val:
-        raise EnvironmentError(
-            f"Required environment variable '{var}' is not set. "
-            f"Add it to your .env file and restart the server."
-        )
-    return val
+from agents.config import (
+    PROJECT as _PROJECT,
+    REGION as _REGION,
+    GCS_BUCKET as _BUCKET,
+    FIRESTORE_RESUME_COLLECTION as _COLLECTION,
+    FIRESTORE_DATABASE as _DATABASE,
+    GEMINI_MODEL as _MODEL,
+    require_env,
+)
 
-_PROJECT    = _require("GOOGLE_CLOUD_PROJECT")
-_REGION     = _require("GOOGLE_CLOUD_LOCATION")
-_BUCKET     = _require("GCS_BUCKET")
-_COLLECTION = os.getenv("FIRESTORE_RESUME_COLLECTION", "resumes")  # optional, sensible default
-_DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")          # optional, sensible default
-_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")     # optional, sensible default
+# GCS_BUCKET is required for this agent
+if not _BUCKET:
+    _BUCKET = require_env("GCS_BUCKET")
 
 # ---------------------------------------------------------------------------
 # Prompt

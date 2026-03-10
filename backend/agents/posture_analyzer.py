@@ -21,7 +21,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 import traceback
 from datetime import datetime, timezone
 from typing import Any
@@ -41,23 +40,13 @@ from vertexai.generative_models import GenerationConfig, GenerativeModel, Image,
 
 logger = logging.getLogger(__name__)
 
-
-def _require(var: str) -> str:
-    """Return env var value or raise a clear error if it is missing/empty."""
-    val = os.getenv(var, "").strip()
-    if not val:
-        raise EnvironmentError(
-            f"Required environment variable '{var}' is not set. "
-            f"Add it to your .env file and restart the server."
-        )
-    return val
-
-
-_PROJECT    = _require("GOOGLE_CLOUD_PROJECT")
-_REGION     = _require("GOOGLE_CLOUD_LOCATION")
-_COLLECTION = os.getenv("FIRESTORE_POSTURE_COLLECTION", "posture_scores")  # optional
-_DATABASE   = os.getenv("FIRESTORE_DATABASE", "(default)")                  # optional
-_MODEL      = os.getenv("POSTURE_MODEL", "gemini-2.5-flash-lite")           # optional
+from agents.config import (
+    PROJECT as _PROJECT,
+    REGION as _REGION,
+    FIRESTORE_POSTURE_COLLECTION as _COLLECTION,
+    FIRESTORE_DATABASE as _DATABASE,
+    POSTURE_MODEL as _MODEL,
+)
 
 ANALYSIS_PROMPT = """
 You are a professional interview coach analysing a single video frame from a

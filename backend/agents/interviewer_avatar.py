@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 from typing import Optional
 
@@ -39,20 +38,19 @@ logger = logging.getLogger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 
-def _require(var: str) -> str:
-    val = os.getenv(var, "").strip()
-    if not val:
-        raise EnvironmentError(
-            f"Required environment variable '{var}' is not set."
-        )
-    return val
+from agents.config import (
+    PROJECT as _PROJECT,
+    REGION as _REGION,
+    GCS_BUCKET as _BUCKET,
+    IMAGEN_MODEL as _IMAGEN_MODEL,
+    require_env,
+)
 
+# GCS_BUCKET is required for this agent
+if not _BUCKET:
+    _BUCKET = require_env("GCS_BUCKET")
 
-_PROJECT       = _require("GOOGLE_CLOUD_PROJECT")
-_REGION        = _require("GOOGLE_CLOUD_LOCATION")
-_BUCKET        = _require("GCS_BUCKET")
 _AVATAR_PREFIX = "interviewer-avatars"
-_IMAGEN_MODEL  = os.getenv("IMAGEN_MODEL", "imagen-3.0-fast-generate-001")
 _AVATAR_CACHE_VERSION = "v2"
 
 

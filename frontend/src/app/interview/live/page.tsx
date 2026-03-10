@@ -67,7 +67,7 @@ interface AdkEvent {
   transcript?: Array<{ speaker: string; text: string; ts?: string }>;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API_BASE, PERSONA_LABELS } from "@/constants/common";
 
 // Derive WebSocket base from the API URL so the protocol matches automatically:
 //   http://  → ws://   (local dev)
@@ -84,22 +84,6 @@ const TRANSCRIPT_SYNC_POLL_MS = 800;
 const POSTURE_FRAME_INTERVAL_MS = 30_000; // capture a frame every 30 seconds
 const POSTURE_FRAME_QUALITY = 0.5;        // JPEG quality (0-1)
 const POSTURE_FRAME_SIZE = 512;           // resize to 512x512 for the model
-
-const PERSONA_LABELS: Record<string, string> = {
-  neutral: "Professional",
-  startup_founder: "Startup Founder",
-  investment_banker: "Investment Banker",
-  tech_lead: "Tech Lead",
-  hr_manager: "HR Manager",
-  product_manager: "Product Manager",
-  vp_engineering: "VP of Engineering",
-  management_consultant: "Consultant",
-  cto: "CTO",
-  recruiter: "Recruiter",
-  algorithm_guru: "Algorithm Guru",
-  system_designer: "System Designer",
-  prompt_wizard: "Prompt Wizard"
-};
 
 function int16ToFloat32(buffer: ArrayBuffer): Float32Array<ArrayBuffer> {
   const view = new Int16Array(buffer);
