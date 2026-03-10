@@ -582,7 +582,7 @@ function DashboardContent() {
                           </p>
                           {resume.experience?.[0] && (
                             <p className="text-xs text-muted mt-0.5 truncate">
-                              {resume.experience[0].title} ·{" "}
+                              {resume.experience[0].title} |{" "}
                               {resume.experience[0].company}
                             </p>
                           )}
@@ -635,7 +635,7 @@ function DashboardContent() {
                                     {exp.title}
                                   </p>
                                   <p className="text-xs text-muted truncate">
-                                    {exp.company} · {exp.duration}
+                                    {exp.company} | {exp.duration}
                                   </p>
                                 </div>
                               </div>

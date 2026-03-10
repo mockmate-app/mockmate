@@ -425,9 +425,9 @@ function FeedbackContent() {
               <div className="flex flex-wrap items-center gap-2 mt-2 text-white/40 text-sm">
                 {/* <p className="text-white/40 text-xs md:text-sm"> */}
                 <span className="text-primary">Job role </span>{sessionMeta.job_role}
-                {" · "}
+                {" | "}
                 <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
-                {" · "}
+                {" | "}
                 <span className="text-primary">Interviewer </span>{sessionMeta.interviewer_name}
                 {/* </p> */}
                 {interviewerAvatarUrl && (

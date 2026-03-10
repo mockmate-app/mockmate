@@ -1454,7 +1454,7 @@ function LiveInterviewContent() {
       <div className="shrink-0 bg-dark border-b border-white/10 px-5 sm:px-6 py-2.5 flex items-center justify-between gap-4">
         <p className="text-xs sm:text-sm text-white/45 truncate">
           <span className="text-primary">Job role </span>{jobRole}
-          {" · "}
+          {" | "}
           <span className="text-primary">Persona </span>{personaLabel}
         </p>
         <span

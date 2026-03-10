@@ -231,7 +231,7 @@ function ResumeContent({
                     Drag &amp; drop your résumé here
                   </p>
                   <p className="text-xs text-muted mt-1">
-                    or click to browse — PDF, DOCX, DOC, TXT · max 10 MB
+                    or click to browse — PDF, DOCX, DOC, TXT | max 10 MB
                   </p>
                 </div>
               </>
@@ -313,7 +313,7 @@ function ResumeContent({
                         <p className="font-semibold text-dark text-sm truncate">{existingResume.name}</p>
                         {existingResume.experience?.[0] && (
                           <p className="text-xs text-muted mt-0.5 truncate">
-                            {existingResume.experience[0].title} · {existingResume.experience[0].company}
+                            {existingResume.experience[0].title} | {existingResume.experience[0].company}
                           </p>
                         )}
                       </div>
@@ -352,7 +352,7 @@ function ResumeContent({
                               <Briefcase size={12} className="text-muted mt-0.5 shrink-0" />
                               <div className="min-w-0">
                                 <p className="text-xs font-medium text-dark truncate">{exp.title}</p>
-                                <p className="text-xs text-muted truncate">{exp.company} · {exp.duration}</p>
+                                <p className="text-xs text-muted truncate">{exp.company} | {exp.duration}</p>
                               </div>
                             </div>
                           ))}
@@ -403,7 +403,7 @@ function ParsedResumeCard({
         <AlertDescription>
           <p className="text-sm font-semibold text-dark">Résumé parsed successfully</p>
           <p className="text-xs text-muted mt-0.5">
-            {resume.filename} · parsed {new Date(resume.parsed_at).toLocaleString()}
+            {resume.filename} | parsed {new Date(resume.parsed_at).toLocaleString()}
           </p>
         </AlertDescription>
       </Alert>
@@ -414,7 +414,7 @@ function ParsedResumeCard({
         <div>
           <h2 className="text-base font-bold text-dark">{resume.name || "—"}</h2>
           <p className="text-xs text-muted mt-0.5">
-            {[resume.email, resume.phone].filter(Boolean).join(" · ")}
+            {[resume.email, resume.phone].filter(Boolean).join(" | ")}
           </p>
           {resume.summary && (
             <p className="mt-3 text-sm text-dark/80 leading-relaxed">{resume.summary}</p>
@@ -446,7 +446,7 @@ function ParsedResumeCard({
                 <li key={i} className="text-sm">
                   <span className="font-medium text-dark">{exp.title}</span>
                   {exp.company && (
-                    <span className="text-muted"> · {exp.company}</span>
+                    <span className="text-muted"> | {exp.company}</span>
                   )}
                   {exp.duration && (
                     <span className="text-muted text-xs"> ({exp.duration})</span>
@@ -474,7 +474,7 @@ function ParsedResumeCard({
                 <li key={i} className="text-sm">
                   <span className="font-medium text-dark">{edu.degree}</span>
                   {edu.institution && (
-                    <span className="text-muted"> · {edu.institution}</span>
+                    <span className="text-muted"> | {edu.institution}</span>
                   )}
                   {edu.year && (
                     <span className="text-xs text-muted"> ({edu.year})</span>

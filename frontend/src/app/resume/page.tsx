@@ -119,7 +119,7 @@ function ResumeContent() {
             <p className="mt-1 text-sm text-muted">
               {resume.filename}
               {resume.parsed_at && (
-                <> · Uploaded {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(resume.parsed_at))}</>
+                <> | Uploaded {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(resume.parsed_at))}</>
               )}
             </p>
           )}
@@ -280,7 +280,7 @@ function ResumeContent() {
                     {resume.experience.map((exp, i) => (
                       <div key={i}>
                         <p className="text-sm lg:text-base font-semibold text-dark">{exp.title}</p>
-                        <p className="text-xs lg:text-sm text-muted mt-0.5">{exp.company} · {exp.duration}</p>
+                        <p className="text-xs lg:text-sm text-muted mt-0.5">{exp.company} | {exp.duration}</p>
                         {exp.highlights && exp.highlights.length > 0 && (
                           <ul className="mt-1.5 flex flex-col gap-1">
                             {exp.highlights.map((h, j) => (
@@ -304,7 +304,7 @@ function ResumeContent() {
                     {resume.education.map((edu, i) => (
                       <div key={i}>
                         <p className="text-sm lg:text-base font-semibold text-dark">{edu.degree}</p>
-                        <p className="text-xs lg:text-sm text-muted mt-0.5">{edu.institution} · {edu.year}</p>
+                        <p className="text-xs lg:text-sm text-muted mt-0.5">{edu.institution} | {edu.year}</p>
                       </div>
                     ))}
                   </div>
