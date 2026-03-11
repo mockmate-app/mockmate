@@ -78,14 +78,30 @@ _PERSONA_VISUAL: dict[str, str] = {
 # Score → mood mapping for the image
 # ---------------------------------------------------------------------------
 
-def _score_mood(score: int) -> str:
+def _score_mood(score: int) -> dict[str, str]:
     if score >= 85:
-        return "triumphant, golden sunlight, celebration energy, warm tones"
+        return {
+            "mood": "triumphant, golden sunlight, celebration energy, warm tones",
+            "scene_extra": "radiant sunrise over a mountain summit, gold and amber light flooding the scene, a sense of reaching the peak",
+            "palette": "warm gold, amber, soft white, champagne highlights",
+        }
     if score >= 70:
-        return "confident, bright daylight, optimistic, cool blue and green tones"
+        return {
+            "mood": "confident, bright daylight, optimistic, cool blue and green tones",
+            "scene_extra": "clear open sky at golden hour, a path stretching forward into bright light, sense of momentum",
+            "palette": "teal, sky blue, soft green, silver accents",
+        }
     if score >= 50:
-        return "determined, dawn breaking, hopeful amber tones"
-    return "dramatic, stormy but clearing, intense purple and deep blue tones"
+        return {
+            "mood": "determined, dawn breaking, hopeful amber tones",
+            "scene_extra": "dawn breaking over a horizon, first light cutting through clouds, a new day beginning",
+            "palette": "warm amber, deep orange, muted navy, hints of gold",
+        }
+    return {
+        "mood": "dramatic, stormy but clearing, intense purple and deep blue tones",
+        "scene_extra": "dramatic storm clouds parting to reveal distant light, rain clearing, resilience",
+        "palette": "deep purple, midnight blue, silver edges, faint warm glow on the horizon",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -119,14 +135,28 @@ def _build_card_prompt(
     job_role: str,
     score: int,
     decision: str,
+    motivational_line: str = "",
 ) -> str:
     visual = _PERSONA_VISUAL.get(persona, "professional modern workspace")
-    mood = _score_mood(score)
+    score_info = _score_mood(score)
+    mood = score_info["mood"]
+    scene_extra = score_info["scene_extra"]
+    palette = score_info["palette"]
     trophy = "with a subtle golden trophy silhouette" if score >= 85 else ""
+
+    # Distill the motivational line into visual imagery keywords
+    quote_hint = ""
+    if motivational_line:
+        quote_hint = (
+            f"The artwork should visually evoke the feeling of: \"{motivational_line}\". "
+            f"Translate this sentiment into abstract visual metaphors — do NOT render any text. "
+        )
 
     return (
         f"Abstract, cinematic wide-format background artwork for a premium achievement card. "
-        f"Scene: {visual}. Mood: {mood}. {trophy} "
+        f"Scene: {visual}, blended with {scene_extra}. "
+        f"Mood: {mood}. Color palette: {palette}. {trophy} "
+        f"{quote_hint}"
         f"Style: ultra-wide 16:9 aspect ratio, soft bokeh, rich depth of field, "
         f"subtle lens flare, premium gradient overlay transitioning from deep navy/charcoal "
         f"on the left third to the scene on the right. The left side MUST be dark and clean "
@@ -234,6 +264,7 @@ class PerformanceCardAgent:
         job_role: str,
         score: int,
         decision: str,
+        motivational_line: str = "",
     ) -> Optional[bytes]:
         """Synchronous background generation (run in executor)."""
         try:
@@ -241,7 +272,7 @@ class PerformanceCardAgent:
                 logger.debug("Performance card cache hit — session=%s", session_id)
                 return self._download_from_gcs(session_id)
 
-            prompt = _build_card_prompt(persona, job_role, score, decision)
+            prompt = _build_card_prompt(persona, job_role, score, decision, motivational_line)
 
             @retry(
                 retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
@@ -341,11 +372,12 @@ class PerformanceCardAgent:
         )
 
         # Generate background image (Imagen 3 — slower, run in executor)
+        # Pass the motivational line so the image visually reflects the quote's sentiment.
         loop = asyncio.get_event_loop()
         image_bytes = await loop.run_in_executor(
             None,
             self._sync_generate_background,
-            session_id, persona, job_role, score, decision,
+            session_id, persona, job_role, score, decision, motivational_line,
         )
 
         if image_bytes is None:

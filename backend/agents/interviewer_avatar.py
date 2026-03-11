@@ -60,18 +60,119 @@ _AVATAR_CACHE_VERSION = "v2"
 # These give Imagen richer context so the portrait fits the interviewer's role.
 # ---------------------------------------------------------------------------
 
-_PERSONA_DESCRIPTOR: dict[str, str] = {
-    "neutral":               "professional corporate interviewer",
-    "startup_founder":       "tech startup founder wearing smart casual attire",
-    "investment_banker":     "senior investment banker in a sharp tailored suit",
-    "tech_lead":             "senior software engineer in business casual",
-    "hr_manager":            "friendly HR professional with an approachable look",
-    "product_manager":       "product manager in business casual attire",
-    "vp_engineering":        "VP of Engineering with a confident look",
-    "management_consultant": "management consultant in formal business wear",
-    "cto":                   "Chief Technology Officer with an authoritative presence",
-    "recruiter":             "corporate talent recruiter with a welcoming expression",
-    "prompt_wizard":         "AI engineer and machine learning specialist in modern tech attire"
+_PERSONA_STYLE: dict[str, dict[str, str]] = {
+    "neutral": {
+        "descriptor": "professional corporate interviewer",
+        "setting": "clean neutral studio background",
+        "attire": "business attire",
+        "lighting": "soft professional studio lighting",
+        "expression": "confident and approachable expression",
+        "vibe": "LinkedIn-style headshot portrait photograph",
+    },
+    "startup_founder": {
+        "descriptor": "tech startup founder",
+        "setting": "modern coworking space or trendy café background, slightly blurred",
+        "attire": "smart casual — hoodie and blazer, or t-shirt under a jacket",
+        "lighting": "warm natural window light",
+        "expression": "energetic grin, slightly leaning forward",
+        "vibe": "candid portrait photograph with startup energy",
+    },
+    "investment_banker": {
+        "descriptor": "senior investment banker",
+        "setting": "sleek corporate office with city skyline visible through glass",
+        "attire": "sharp tailored dark suit, crisp white shirt, silk tie",
+        "lighting": "dramatic side lighting, high contrast",
+        "expression": "composed, measured, subtly intimidating",
+        "vibe": "formal corporate portrait photograph",
+    },
+    "tech_lead": {
+        "descriptor": "senior software engineer and tech lead",
+        "setting": "home office or engineering workspace with monitors in background, blurred",
+        "attire": "casual — plain t-shirt or flannel, comfortable",
+        "lighting": "soft ambient indoor lighting",
+        "expression": "thoughtful, slightly focused, relaxed half-smile",
+        "vibe": "relaxed candid portrait, developer aesthetic",
+    },
+    "hr_manager": {
+        "descriptor": "friendly HR professional",
+        "setting": "bright open-plan modern office background, slightly blurred",
+        "attire": "smart business casual — colorful blouse or neat polo",
+        "lighting": "bright even lighting, warm tones",
+        "expression": "warm genuine smile, welcoming and approachable",
+        "vibe": "friendly corporate portrait photograph",
+    },
+    "product_manager": {
+        "descriptor": "product manager",
+        "setting": "whiteboard or sticky-note wall background, slightly blurred",
+        "attire": "business casual — button-up shirt, no tie, sleeves rolled",
+        "lighting": "natural office lighting",
+        "expression": "engaged and curious, slight smile",
+        "vibe": "editorial-style workplace portrait",
+    },
+    "vp_engineering": {
+        "descriptor": "VP of Engineering",
+        "setting": "executive office or conference room background",
+        "attire": "polished business casual — blazer over a dark crewneck",
+        "lighting": "balanced professional studio lighting",
+        "expression": "confident, calm authority, slight smile",
+        "vibe": "executive leadership portrait photograph",
+    },
+    "management_consultant": {
+        "descriptor": "management consultant",
+        "setting": "premium hotel lobby or sleek conference room background",
+        "attire": "formal business wear — dark suit, polished shoes visible",
+        "lighting": "crisp professional lighting, neutral tones",
+        "expression": "poised, analytical, composed",
+        "vibe": "formal professional headshot photograph",
+    },
+    "cto": {
+        "descriptor": "Chief Technology Officer",
+        "setting": "modern tech office with subtle tech artwork or server racks in background, blurred",
+        "attire": "smart-casual to polished — dark henley or turtleneck, or blazer with no tie",
+        "lighting": "cool-toned modern lighting",
+        "expression": "authoritative yet approachable, direct gaze",
+        "vibe": "tech executive editorial portrait",
+    },
+    "recruiter": {
+        "descriptor": "corporate talent recruiter",
+        "setting": "cozy office corner or café background, warm tones",
+        "attire": "smart casual — neat sweater or blouse, approachable",
+        "lighting": "warm soft lighting",
+        "expression": "bright welcoming smile, open body language",
+        "vibe": "warm friendly portrait photograph",
+    },
+    "algorithm_guru": {
+        "descriptor": "algorithms and data structures specialist",
+        "setting": "university office or library with books and whiteboards in background",
+        "attire": "academic casual — plain shirt, cardigan, or hoodie",
+        "lighting": "soft indoor lighting",
+        "expression": "intense focus, knowing half-smile",
+        "vibe": "academic portrait photograph",
+    },
+    "system_designer": {
+        "descriptor": "system design and architecture expert",
+        "setting": "whiteboard with architecture diagrams in background, blurred",
+        "attire": "casual — t-shirt or polo, relaxed",
+        "lighting": "natural office lighting",
+        "expression": "thoughtful, analytical gaze",
+        "vibe": "candid workplace portrait",
+    },
+    "prompt_wizard": {
+        "descriptor": "AI engineer and machine learning specialist",
+        "setting": "modern AI lab or tech workspace with screens in background",
+        "attire": "modern tech casual — graphic tee or smart hoodie",
+        "lighting": "cool-toned ambient lighting",
+        "expression": "curious, slightly playful smile",
+        "vibe": "modern tech portrait photograph",
+    },
+    "ai_engineer": {
+        "descriptor": "AI/ML engineer",
+        "setting": "tech workspace with multiple monitors, blurred background",
+        "attire": "casual — t-shirt, hoodie, developer aesthetic",
+        "lighting": "soft screen-lit ambiance mixed with natural light",
+        "expression": "focused, relaxed confidence",
+        "vibe": "candid developer portrait",
+    },
 }
 
 
@@ -85,7 +186,7 @@ def _name_to_slug(name: str) -> str:
 
 
 def _build_prompt(name: str, persona: str, gender_hint: str | None = None) -> str:
-    descriptor = _PERSONA_DESCRIPTOR.get(persona, "professional interviewer")
+    style = _PERSONA_STYLE.get(persona, _PERSONA_STYLE["neutral"])
     gender_clause = ""
     if gender_hint:
         normalized = gender_hint.strip().lower()
@@ -96,11 +197,11 @@ def _build_prompt(name: str, persona: str, gender_hint: str | None = None) -> st
         elif normalized in {"nonbinary", "non-binary"}:
             gender_clause = " presenting as non-binary."
     return (
-        f"Professional LinkedIn-style headshot portrait photograph of {name}, "
-        f"a {descriptor}.{gender_clause} "
-        "Clean neutral studio background, business attire, "
-        "soft professional studio lighting, looking directly at camera with a "
-        "confident and approachable expression, photorealistic, high quality, "
+        f"{style['vibe']} of {name}, "
+        f"a {style['descriptor']}.{gender_clause} "
+        f"{style['setting']}, {style['attire']}, "
+        f"{style['lighting']}, looking directly at camera with a "
+        f"{style['expression']}, photorealistic, high quality, "
         "shoulders and face clearly visible, no text, no watermarks."
     )
 

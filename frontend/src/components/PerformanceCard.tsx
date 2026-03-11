@@ -304,16 +304,16 @@ export default function PerformanceCard({
   /* ── Share ───────────────────────────────────────────── */
   const handleShare = useCallback(async () => {
     const shareText = buildShareText();
-    const linkedInText = `${shareText}\n\nhttps://getmockmate.com`;
+    const linkedInText = `${shareText}`;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     // Mobile: use native share sheet
     if (isMobile && navigator.share) {
       try {
         await navigator.share({
-          title: "My MockMate Performance Card",
+          title: "Mock interview performance stats - MockMate",
           text: linkedInText,
-          url: "https://getmockmate.com",
+          // url: "https://getmockmate.com",
         });
         return;
       } catch {

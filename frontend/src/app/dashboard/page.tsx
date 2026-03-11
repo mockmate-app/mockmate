@@ -411,7 +411,7 @@ function DashboardContent() {
                   </Link>
                 </Button>
                 <p className="self-end text-xs text-muted-foreground">
-                  AI-generated based on last {nextRecommendation.sessions_analyzed} sessions
+                  AI generated, based on your last {nextRecommendation.sessions_analyzed} sessions
                 </p>
                 </div>
             </CardContent>
