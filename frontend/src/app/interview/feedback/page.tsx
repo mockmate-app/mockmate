@@ -559,7 +559,7 @@ function FeedbackContent() {
               )}
 
               {/* Decision letter */}
-              <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"} className="border-orange">
+              <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"} className="border-orange bg-orange-500/20">
                 <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">
                   {report.decision_letter}
                 </p>

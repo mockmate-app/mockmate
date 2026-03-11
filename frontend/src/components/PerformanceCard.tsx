@@ -307,12 +307,23 @@ export default function PerformanceCard({
     const linkedInText = `${shareText}\n\nhttps://getmockmate.com`;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    const linkedInUrl = isMobile
-      ? `https://www.linkedin.com/post/new?text=${encodeURIComponent(linkedInText)}`
-      : `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(linkedInText)}`;
+    // Mobile: use native share sheet
+    if (isMobile && navigator.share) {
+      try {
+        await navigator.share({
+          title: "My MockMate Performance Card",
+          text: linkedInText,
+          url: "https://getmockmate.com",
+        });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to LinkedIn
+      }
+    }
 
-    // On some mobile LinkedIn deep links, prefilled text can be dropped.
-    // Prefill clipboard so user can paste instantly if needed.
+    // Desktop / fallback: open LinkedIn directly
+    const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(linkedInText)}`;
+
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         await navigator.clipboard.writeText(linkedInText);
