@@ -404,7 +404,7 @@ function DashboardContent() {
                   </Link>
                 </Button>
                 <p className="self-end text-xs text-muted-foreground">
-                  Based on your last {nextRecommendation.sessions_analyzed} sessions
+                  AI-generated based on last {nextRecommendation.sessions_analyzed} sessions
                 </p>
                 </div>
             </CardContent>
@@ -592,7 +592,7 @@ function DashboardContent() {
           </div>
 
           {/* Right sidebar */}
-          <div className="flex flex-col gap-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
             {/* Performance card */}
             {latestFeedbackSession && performanceCard && (
               <div className="flex flex-col gap-3">
@@ -908,7 +908,7 @@ function RadarComparisonChart({
   if (!userAvg || !globalAvg) {
     return (
       <div className="h-64 rounded-lg border border-border bg-surface/40 flex items-center justify-center text-sm text-muted-foreground">
-        Not enough feedback data for benchmark yet.
+        Not enough data for benchmark yet
       </div>
     );
   }

@@ -12,7 +12,9 @@ import json
 import logging
 from typing import Any
 
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
 from tenacity import (
@@ -22,7 +24,6 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 from agents.config import (
     PROJECT as _PROJECT,
@@ -83,9 +84,12 @@ class NextInterviewRecommenderAgent:
     """Generates recommendation strip content from recent sessions."""
 
     def __init__(self) -> None:
-        vertexai.init(project=_PROJECT, location=_REGION)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
-        self._model = GenerativeModel(_MODEL)
 
     async def recommend(self, user_id: str, lookback: int = 5) -> dict[str, Any] | None:
         """Return recommendation payload or None when data is insufficient."""
@@ -209,7 +213,7 @@ class NextInterviewRecommenderAgent:
         }
 
     @retry(
-        retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+        retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
         wait=wait_random_exponential(multiplier=1, max=30),
         stop=stop_after_attempt(4),
         before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -217,9 +221,10 @@ class NextInterviewRecommenderAgent:
     )
     async def _call_gemini(self, summary: dict[str, Any]) -> dict[str, Any]:
         prompt = _PROMPT.format(input_json=json.dumps(summary, indent=2))
-        resp = await self._model.generate_content_async(
-            [Part.from_text(prompt)],
-            generation_config=GenerationConfig(
+        resp = await self._client.aio.models.generate_content(
+            model=_MODEL,
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.4,
                 max_output_tokens=800,

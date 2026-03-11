@@ -20,7 +20,9 @@ import asyncio
 import logging
 from typing import Any, Optional
 
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore, storage
 from tenacity import (
@@ -30,8 +32,6 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
-from vertexai.preview.vision_models import ImageGenerationModel
 
 from agents.config import (
     PROJECT as _PROJECT,
@@ -144,18 +144,15 @@ class PerformanceCardAgent:
     """Generate and cache AI performance card backgrounds with metadata."""
 
     def __init__(self) -> None:
-        vertexai.init(project=_PROJECT, location=_REGION)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._storage_client = storage.Client(project=_PROJECT)
         self._bucket = self._storage_client.bucket(_BUCKET)
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
-        self._gemini = GenerativeModel(_GEMINI_MODEL)
-        self._imagen: Optional[ImageGenerationModel] = None
         logger.info("PerformanceCardAgent initialised (bucket=%s)", _BUCKET)
-
-    def _get_imagen(self) -> ImageGenerationModel:
-        if self._imagen is None:
-            self._imagen = ImageGenerationModel.from_pretrained(_IMAGEN_MODEL)
-        return self._imagen
 
     # ------------------------------------------------------------------
     # GCS helpers
@@ -197,16 +194,17 @@ class PerformanceCardAgent:
         )
 
         @retry(
-            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
             wait=wait_random_exponential(multiplier=1, max=30),
             stop=stop_after_attempt(3),
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
         async def _call():
-            return await self._gemini.generate_content_async(
-                [Part.from_text(prompt)],
-                generation_config=GenerationConfig(
+            return await self._client.aio.models.generate_content(
+                model=_GEMINI_MODEL,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
                     temperature=0.9,
                     max_output_tokens=64,
                 ),
@@ -244,31 +242,36 @@ class PerformanceCardAgent:
                 return self._download_from_gcs(session_id)
 
             prompt = _build_card_prompt(persona, job_role, score, decision)
-            model = self._get_imagen()
 
             @retry(
-                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
                 wait=wait_random_exponential(multiplier=1, max=60),
                 stop=stop_after_attempt(5),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
                 reraise=True,
             )
             def _gen():
-                return model.generate_images(
+                return self._client.models.generate_images(
+                    model=_IMAGEN_MODEL,
                     prompt=prompt,
-                    number_of_images=1,
-                    aspect_ratio="16:9",
-                    person_generation="dont_allow",
-                    language="en",
-                    safety_filter_level="block_few",
+                    config=genai_types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="16:9",
+                        output_mime_type="image/jpeg",
+                    ),
                 )
 
             response = _gen()
-            if not response.images:
+            generated = getattr(response, "generated_images", None) or []
+            if not generated:
                 logger.warning("Imagen returned no images for performance card (session=%s)", session_id)
                 return None
 
-            image_bytes: bytes = response.images[0]._image_bytes
+            image_obj = getattr(generated[0], "image", None)
+            image_bytes: bytes | None = getattr(image_obj, "image_bytes", None)
+            if not image_bytes:
+                logger.warning("Imagen response missing image bytes (session=%s)", session_id)
+                return None
             self._upload_to_gcs(session_id, image_bytes)
             return image_bytes
 

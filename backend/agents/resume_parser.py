@@ -28,7 +28,9 @@ from typing import Any
 
 import PyPDF2
 import docx
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore, storage
 from google.cloud.exceptions import GoogleCloudError
@@ -39,7 +41,6 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,11 @@ class ResumeParserAgent:
             "firestore_db=%s  collection=%s  model=%s",
             _PROJECT, _REGION, _BUCKET, _DATABASE, _COLLECTION, _MODEL,
         )
-        vertexai.init(project=_PROJECT, location=_REGION)
-        self._model = GenerativeModel(_MODEL)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
         self._storage = storage.Client(project=_PROJECT)
 
@@ -296,23 +300,24 @@ class ResumeParserAgent:
         """Send *resume_text* to Gemini and return the parsed JSON dict."""
         prompt = PARSE_PROMPT.format(resume_text=resume_text)
 
-        generation_config = GenerationConfig(
+        generation_config = genai_types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.1,          # low temperature for deterministic extraction
             max_output_tokens=4096,
         )
 
         @retry(
-            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
             wait=wait_random_exponential(multiplier=1, max=60),
             stop=stop_after_attempt(5),
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
         async def _generate_with_retry():
-            return await self._model.generate_content_async(
-                [Part.from_text(prompt)],
-                generation_config=generation_config,
+            return await self._client.aio.models.generate_content(
+                model=_MODEL,
+                contents=prompt,
+                config=generation_config,
             )
 
         response = await _generate_with_retry()

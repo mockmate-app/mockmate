@@ -23,7 +23,9 @@ import logging
 import re
 from typing import Any
 
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
 from tenacity import (
@@ -33,13 +35,7 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import (
-    GenerationConfig,
-    GenerativeModel,
-    Part,
-    Tool,
-    grounding,
-)
+
 
 logger = logging.getLogger(__name__)
 
@@ -242,21 +238,17 @@ class QuestionGeneratorAgent:
             "firestore_db=%s  resume_col=%s  session_col=%s  model=%s",
             _PROJECT, _REGION, _DATABASE, _COLLECTION_RESUMES, _COLLECTION_SESSIONS, _MODEL,
         )
-        vertexai.init(project=_PROJECT, location=_REGION)
-        self._model = GenerativeModel(_MODEL)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
-        self._grounding_tools: list[Tool] | None = None
+        self._grounding_tools: list[genai_types.Tool] | None = None
 
         try:
-            dynamic_cfg = grounding.DynamicRetrievalConfig(
-                mode=grounding.DynamicRetrievalConfig.Mode.MODE_DYNAMIC,
-                dynamic_threshold=0.3,
-            )
-            google_search = grounding.GoogleSearchRetrieval(
-                dynamic_retrieval_config=dynamic_cfg,
-            )
             self._grounding_tools = [
-                Tool.from_google_search_retrieval(google_search)
+                genai_types.Tool(google_search=genai_types.GoogleSearch())
             ]
             logger.info("Question generation grounding enabled (Google Search).")
         except Exception as exc:
@@ -391,24 +383,32 @@ class QuestionGeneratorAgent:
             difficulty=difficulty,
         )
 
-        generation_config = GenerationConfig(
+        generation_config = genai_types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.7,        # some creativity, but stays structured
             max_output_tokens=4096,
         )
 
         @retry(
-            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
             wait=wait_random_exponential(multiplier=1, max=60),
             stop=stop_after_attempt(5),
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
-        async def _generate_with_retry(tools: list[Tool] | None):
-            return await self._model.generate_content_async(
-                [Part.from_text(prompt)],
-                generation_config=generation_config,
-                tools=tools,
+        async def _generate_with_retry(tools: list[genai_types.Tool] | None):
+            cfg = generation_config
+            if tools:
+                cfg = genai_types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.7,
+                    max_output_tokens=4096,
+                    tools=tools,
+                )
+            return await self._client.aio.models.generate_content(
+                model=_MODEL,
+                contents=prompt,
+                config=cfg,
             )
 
         logger.debug(

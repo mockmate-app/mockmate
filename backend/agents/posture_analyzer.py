@@ -25,8 +25,10 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any
 
-import vertexai
 from fastapi import WebSocket
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
 from tenacity import (
@@ -36,7 +38,6 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Image, Part
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +81,11 @@ class PostureAnalyzerAgent:
             "firestore_db=%s  collection=%s  model=%s",
             _PROJECT, _REGION, _DATABASE, _COLLECTION, _MODEL,
         )
-        vertexai.init(project=_PROJECT, location=_REGION)
-        self._model = GenerativeModel(_MODEL)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
 
     # ------------------------------------------------------------------
@@ -94,20 +98,23 @@ class PostureAnalyzerAgent:
         Returns an empty dict on failure so as not to crash the caller.
         """
         try:
-            image_part = Part.from_image(Image.from_bytes(frame_bytes))
-            text_part = Part.from_text(ANALYSIS_PROMPT)
+            image_part = genai_types.Part.from_bytes(
+                data=frame_bytes,
+                mime_type="image/jpeg",
+            )
 
             @retry(
-                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
                 wait=wait_random_exponential(multiplier=1, max=30),
                 stop=stop_after_attempt(3),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
                 reraise=True,
             )
             async def _generate_with_retry():
-                return await self._model.generate_content_async(
-                    [image_part, text_part],
-                    generation_config=GenerationConfig(
+                return await self._client.aio.models.generate_content(
+                    model=_MODEL,
+                    contents=[ANALYSIS_PROMPT, image_part],
+                    config=genai_types.GenerateContentConfig(
                         response_mime_type="application/json",
                         temperature=0.1,
                         max_output_tokens=512,

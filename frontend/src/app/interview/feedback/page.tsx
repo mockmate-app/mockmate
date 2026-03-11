@@ -588,10 +588,10 @@ function FeedbackContent() {
 
           <div className="flex justify-center gap-2">
             <Button
-              onClick={() => window.history.length > 1 ? router.back() : router.push('/dashboard')}
+              onClick={() => router.push('/dashboard')}
               className="hidden lg:flex rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
             >
-              Go back
+              Go home
             </Button>
 
             {!loading && !!sessionId && (
@@ -659,10 +659,10 @@ function FeedbackContent() {
       {/* ── Mobile transcript bottom button + sheet (visible on <lg) ───── */}
       <div className="lg:hidden fixed bottom-6 left-0 right-0 flex gap-2 justify-center z-50">
         <Button
-          onClick={() => window.history.length > 1 ? router.back() : router.push('/dashboard')}
+          onClick={() => router.push('/dashboard')}
           className="rounded-full bg-orange text-white hover:opacity-90 hover:bg-orange px-5"
         >
-          Go back
+          Go home
         </Button>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>

@@ -19,7 +19,9 @@ import logging
 import re
 from typing import Optional
 
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import storage
 from tenacity import (
@@ -29,7 +31,6 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.preview.vision_models import ImageGenerationModel
 
 logger = logging.getLogger(__name__)
 
@@ -112,21 +113,17 @@ class InterviewerAvatarAgent:
     """Generate (once) and cache AI profile pictures for interviewers."""
 
     def __init__(self) -> None:
-        vertexai.init(project=_PROJECT, location=_REGION)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._storage_client = storage.Client(project=_PROJECT)
         self._bucket = self._storage_client.bucket(_BUCKET)
-        # Model loaded lazily to avoid startup latency
-        self._model: Optional[ImageGenerationModel] = None
 
     # ------------------------------------------------------------------
     # Internal (synchronous — called via run_in_executor)
     # ------------------------------------------------------------------
-
-    def _get_model(self) -> ImageGenerationModel:
-        if self._model is None:
-            logger.info("Loading Imagen model: %s", _IMAGEN_MODEL)
-            self._model = ImageGenerationModel.from_pretrained(_IMAGEN_MODEL)
-        return self._model
 
     def _blob_name(self, name: str, persona: str, gender_hint: str | None = None) -> str:
         gender_slug = (gender_hint or "unspecified").strip().lower().replace("-", "_")
@@ -165,34 +162,39 @@ class InterviewerAvatarAgent:
                 name, persona,
             )
             prompt = _build_prompt(name, persona, gender_hint)
-            model = self._get_model()
 
             @retry(
-                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+                retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
                 wait=wait_random_exponential(multiplier=1, max=60),
                 stop=stop_after_attempt(5),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
                 reraise=True,
             )
             def _generate_with_retry():
-                return model.generate_images(
+                return self._client.models.generate_images(
+                    model=_IMAGEN_MODEL,
                     prompt=prompt,
-                    number_of_images=1,
-                    aspect_ratio="1:1",
-                    person_generation="allow_adult",
-                    language="en",
-                    safety_filter_level="block_few",
+                    config=genai_types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="1:1",
+                        output_mime_type="image/jpeg",
+                    ),
                 )
 
             response = _generate_with_retry()
 
-            if not response.images:
+            generated = getattr(response, "generated_images", None) or []
+            if not generated:
                 logger.warning(
                     "Imagen returned no images for '%s' (likely safety filter)", name
                 )
                 return None
 
-            image_bytes: bytes = response.images[0]._image_bytes
+            image_obj = getattr(generated[0], "image", None)
+            image_bytes: bytes | None = getattr(image_obj, "image_bytes", None)
+            if not image_bytes:
+                logger.warning("Imagen response missing image bytes for '%s'", name)
+                return None
             self._upload_to_gcs(name, persona, gender_hint, image_bytes)
             return image_bytes
 

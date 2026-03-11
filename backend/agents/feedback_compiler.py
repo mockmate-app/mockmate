@@ -18,7 +18,9 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any
 
-import vertexai
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from google.cloud import firestore
 from tenacity import (
@@ -28,7 +30,6 @@ from tenacity import (
     wait_random_exponential,
     before_sleep_log,
 )
-from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 from agents.config import (
     PROJECT as _PROJECT,
@@ -172,8 +173,11 @@ class FeedbackCompilerAgent:
             "firestore_db=%s  model=%s",
             _PROJECT, _REGION, _DATABASE, _MODEL,
         )
-        vertexai.init(project=_PROJECT, location=_REGION)
-        self._model = GenerativeModel(_MODEL)
+        self._client = genai.Client(
+            vertexai=True,
+            project=_PROJECT,
+            location=_REGION,
+        )
         self._db = firestore.AsyncClient(project=_PROJECT, database=_DATABASE)
         self._pg_pool = None
         self._pg_ready = False
@@ -358,16 +362,17 @@ class FeedbackCompilerAgent:
 
         # Inner call wrapped with tenacity for 429 / 503 resilience.
         @retry(
-            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable)),
+            retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, genai_errors.APIError)),
             wait=wait_random_exponential(multiplier=1, max=60),
             stop=stop_after_attempt(5),
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
         async def _generate_with_retry():
-            return await self._model.generate_content_async(
-                [Part.from_text(prompt)],
-                generation_config=GenerationConfig(
+            return await self._client.aio.models.generate_content(
+                model=_MODEL,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.3,
                     max_output_tokens=8192,

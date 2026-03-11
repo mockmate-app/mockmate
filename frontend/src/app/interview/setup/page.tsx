@@ -354,7 +354,7 @@ function SetupContent({
                   className={[
                     "text-xs px-3 py-1.5 rounded-full border transition-all hover:bg-inherit hover:text-inherit",
                     jobRole === title
-                      && "border-orange text-orange"
+                      && "border-orange text-orange dark:border-orange dark:text-orange"
                   ].join(" ")}
                 >
                   {title}
