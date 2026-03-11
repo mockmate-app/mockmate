@@ -54,6 +54,44 @@ _PERSONA_BY_FOCUS = {
     "posture_presence": "recruiter",
 }
 
+_TECH_PERSONA_BY_FOCUS = {
+    "technical_depth": "tech_lead",
+    "domain_vocabulary": "tech_lead",
+    "structure": "system_designer",
+    "communication": "tech_lead",
+    "confidence": "tech_lead",
+    "posture_presence": "tech_lead",
+}
+
+_VALID_PERSONAS = {
+    "neutral",
+    "startup_founder",
+    "investment_banker",
+    "tech_lead",
+    "hr_manager",
+    "product_manager",
+    "vp_engineering",
+    "management_consultant",
+    "cto",
+    "recruiter",
+    "algorithm_guru",
+    "system_designer",
+    "prompt_wizard",
+    "ai_engineer",
+}
+
+_TECHNICAL_PERSONAS = {
+    "tech_lead",
+    "cto",
+    "algorithm_guru",
+    "system_designer",
+    "prompt_wizard",
+    "ai_engineer",
+    "vp_engineering",
+    "startup_founder",
+    "neutral",
+}
+
 _PROMPT = """\
 You are MockMate's recommendation engine.
 Given the user's recent mock interview performance summary, return a concise and
@@ -64,6 +102,13 @@ Rules:
 - Be specific and data-grounded.
 - Mention trend direction where relevant (e.g., dropped 8 points across 3 sessions).
 - Keep each field short and UI-ready.
+- Persona-role fit is mandatory:
+    - For technical software roles (e.g. Software Engineer, SDE, Backend, Frontend,
+        Full Stack, DevOps, Data Engineer, ML/AI Engineer), choose a technical
+        interviewer persona such as tech_lead/cto/system_designer/algorithm_guru/
+        prompt_wizard/ai_engineer.
+    - Avoid non-technical personas like management_consultant or investment_banker
+        for technical software roles.
 
 Input data:
 {input_json}
@@ -161,6 +206,51 @@ class NextInterviewRecommenderAgent:
         rows.sort(key=lambda s: s.get("created_at") or "", reverse=True)
         return rows[:lookback]
 
+    @staticmethod
+    def _is_technical_role(job_role: str | None) -> bool:
+        role = (job_role or "").strip().lower()
+        if not role:
+            return False
+        keywords = (
+            "software engineer",
+            "sde",
+            "developer",
+            "backend",
+            "front",
+            "full stack",
+            "devops",
+            "platform engineer",
+            "site reliability",
+            "sre",
+            "data engineer",
+            "machine learning",
+            "ml engineer",
+            "ai engineer",
+            "system design",
+            "architect",
+            "qa engineer",
+            "security engineer",
+        )
+        return any(k in role for k in keywords)
+
+    def _allowed_personas_for_role(self, job_role: str | None) -> set[str]:
+        if self._is_technical_role(job_role):
+            return _TECHNICAL_PERSONAS
+        return _VALID_PERSONAS
+
+    def _rule_persona_for(self, weakest_dimension: str | None, job_role: str | None) -> str:
+        if self._is_technical_role(job_role):
+            return _TECH_PERSONA_BY_FOCUS.get(weakest_dimension or "", "tech_lead")
+        return _PERSONA_BY_FOCUS.get(weakest_dimension or "", "neutral")
+
+    def _normalize_persona(self, persona: str | None, job_role: str | None, fallback: str) -> str:
+        candidate = (persona or "").strip()
+        if candidate not in _VALID_PERSONAS:
+            return fallback
+        if candidate not in self._allowed_personas_for_role(job_role):
+            return fallback
+        return candidate
+
     def _build_summary(self, sessions: list[dict[str, Any]]) -> dict[str, Any]:
         ordered = list(reversed(sessions))
         overall_series = [s.get("overall_score") for s in ordered if isinstance(s.get("overall_score"), (int, float))]
@@ -190,6 +280,9 @@ class NextInterviewRecommenderAgent:
                 weakest_avg = avg
                 weakest_key = key
 
+            suggested_job_role = ordered[-1].get("job_role") if ordered else "Software Engineer"
+            suggested_persona = self._rule_persona_for(weakest_key, suggested_job_role)
+
         return {
             "recent_sessions": [
                 {
@@ -208,8 +301,8 @@ class NextInterviewRecommenderAgent:
             },
             "dimension_trends": trends,
             "weakest_dimension": weakest_key,
-            "suggested_persona_from_rule": _PERSONA_BY_FOCUS.get(weakest_key, "neutral"),
-            "suggested_job_role_from_rule": ordered[-1].get("job_role") if ordered else "Software Engineer",
+            "suggested_persona_from_rule": suggested_persona,
+            "suggested_job_role_from_rule": suggested_job_role,
         }
 
     @retry(
@@ -231,12 +324,20 @@ class NextInterviewRecommenderAgent:
             ),
         )
         payload = json.loads((resp.text or "{}").strip())
+        recommended_job_role = str(payload.get("recommended_job_role") or summary.get("suggested_job_role_from_rule") or "Software Engineer")
+        fallback_persona = str(summary.get("suggested_persona_from_rule") or "neutral")
+        normalized_persona = self._normalize_persona(
+            str(payload.get("recommended_persona") or ""),
+            recommended_job_role,
+            fallback_persona,
+        )
+
         return {
             "headline": str(payload.get("headline") or "Your Next Interview"),
             "insight": str(payload.get("insight") or "Let's keep improving your consistency."),
             "practice_focus": str(payload.get("practice_focus") or "Practice role-specific weak areas."),
-            "recommended_persona": str(payload.get("recommended_persona") or summary.get("suggested_persona_from_rule") or "neutral"),
-            "recommended_job_role": str(payload.get("recommended_job_role") or summary.get("suggested_job_role_from_rule") or "Software Engineer"),
+            "recommended_persona": normalized_persona,
+            "recommended_job_role": recommended_job_role,
             "cta": str(payload.get("cta") or "Run a focused practice session now."),
         }
 

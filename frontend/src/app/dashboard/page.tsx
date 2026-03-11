@@ -264,7 +264,14 @@ function DashboardContent() {
   const avgScore: number | null = sessionsData?.avg_score ?? null;
   const lastSession = sessions[0] ?? null;
   const thisMonth: number = sessionsData?.this_month ?? 0;
-  const recommendationCta = nextRecommendation?.cta?.replace(/\.+\s*$/, "") ?? "";
+  const recommendedPersonaId = nextRecommendation?.recommended_persona ?? "";
+  const recommendedPersonaLabel = recommendedPersonaId
+    ? personaLabel(recommendedPersonaId)
+    : "";
+  const recommendationCtaRaw = nextRecommendation?.cta?.replace(/\.+\s*$/, "") ?? "";
+  const recommendationCta = recommendedPersonaId
+    ? recommendationCtaRaw.split(recommendedPersonaId).join(recommendedPersonaLabel)
+    : recommendationCtaRaw;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col overflow-x-clip">
