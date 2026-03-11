@@ -721,7 +721,7 @@ class InterviewEngineAgent:
         """Write transcript turns to Firestore, merging with any existing turns.
 
         Reconnect races can create overlapping saves from multiple websocket
-        lifecycles. We merge server-side so late saves never truncate prior
+        lifecycles. Merge server-side so late saves never truncate prior
         history.
         """
         incoming = self._normalize_turns(turns)

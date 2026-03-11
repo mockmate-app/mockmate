@@ -302,10 +302,24 @@ export default function PerformanceCard({
   }, [card.session_id, renderCardBlob]);
 
   /* ── Share ───────────────────────────────────────────── */
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const shareText = buildShareText();
-    const linkedInText = `${shareText}`;
-    const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(linkedInText)}`;
+    const linkedInText = `${shareText}\n\nhttps://getmockmate.com`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    const linkedInUrl = isMobile
+      ? `https://www.linkedin.com/post/new?text=${encodeURIComponent(linkedInText)}`
+      : `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(linkedInText)}`;
+
+    // On some mobile LinkedIn deep links, prefilled text can be dropped.
+    // Prefill clipboard so user can paste instantly if needed.
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(linkedInText);
+      }
+    } catch {
+      // Ignore clipboard permission issues.
+    }
 
     const anchor = document.createElement("a");
     anchor.href = linkedInUrl;

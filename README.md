@@ -480,7 +480,7 @@ Building MockMate taught us several things about working with Gemini and Google 
 
 1. **Gemini Live API is remarkably natural** — The native audio mode produces speech that feels genuinely human. Personas with different accents and speech patterns (fast-talking startup founders vs. measured consultants) emerge naturally from the system prompt without any special TTS configuration.
 
-2. **Prompt engineering is the real product work** — Getting each of the 13 personas to feel distinct required extensive prompt iteration. We added structured SPEECH STYLE blocks (tone, pace, warmth, filler words, energy) and ACCENT GUIDANCE (22 accent types) to make each interviewer feel like a real person.
+2. **Prompt engineering is the real product work** — Getting each of the 13 personas to feel distinct required extensive prompt iteration. I added structured SPEECH STYLE blocks (tone, pace, warmth, filler words, energy) and ACCENT GUIDANCE (22 accent types) to make each interviewer feel like a real person.
 
 3. **AudioWorklet is essential for real-time audio** — The Web Audio API's AudioWorklet runs on a separate thread, which is critical for capturing PCM audio at 16 kHz without drops while the main thread handles UI updates and transcript rendering.
 
