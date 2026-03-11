@@ -365,7 +365,7 @@ export default function PerformanceCard({
           </div>
 
           {/* Center: score + details */}
-          <div className={`flex flex-col ${compact ? "gap-0.5" : "gap-1 sm:gap-3"}`}>
+          <div className={`flex flex-col ${compact ? "gap-2" : "gap-2 sm:gap-3"}`}>
             <div className={`flex items-end ${compact ? "gap-1" : "gap-1.5 sm:gap-3"}`}>
               {/* <div className="self-center -mt-0.5">{scoreIcon(card.score)}</div> */}
               <span
@@ -373,14 +373,14 @@ export default function PerformanceCard({
               >
                 {card.score}
               </span>
-              <span className={`${compact ? "text-4xl" : "text-3xl mb-1 sm:mb-2"} font-light text-white/30 self-end`}>
+              <span className={`${compact ? "text-4xl" : "text-3xl"} font-light text-white/30 self-end`}>
                 /100
               </span>
             </div>
-            <p className={`${compact ? "text-sm" : "text-lg xs:text-xl"} font-semibold text-white/95 truncate`}>
+            <p className={`${compact ? "text-base" : "text-lg xs:text-xl"} font-semibold text-white/95 truncate`}>
               {card.job_role}
             </p>
-            <p className={`${compact ? "text-xs" : "text-sm"} text-white/50 truncate`}>
+            <p className={`${compact ? "text-sm" : "text-base"} text-white/50 truncate`}>
               Interviewed by {card.interviewer_name} &bull;{" "}
               {personaLabel(card.persona)}
             </p>
