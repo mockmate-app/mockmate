@@ -496,8 +496,8 @@ Building MockMate taught us several things about working with Gemini and Google 
 
 <!-- PLACEHOLDER: Add links to any blog posts, videos, or podcasts you publish about building MockMate -->
 
-- **Blog post:** [YOUR_BLOG_POST_LINK_HERE]
-- **Google Developer Group Profile:** [Link](https://gdg.community.dev/u/mzf4ez/#/about)
+- **Blog post:** [Medium blog post](https://medium.com/@blogsbyindrajit/introducing-mockmate-the-ai-mock-interview-platform-that-prepares-you-for-the-real-thing-81c14cf1db59)
+- **Google Developer Group Profile:** [GDG profile](https://gdg.community.dev/u/mzf4ez/#/about)
 
 > All content was created for the purposes of entering the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/) hackathon. #GeminiLiveAgentChallenge
 
