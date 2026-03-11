@@ -17,6 +17,7 @@ import {
   User,
   Briefcase,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,13 +53,16 @@ import {
 } from "@/components/ui/table";
 import {
   API_BASE,
-  PERSONA_LABELS,
-  PERSONA_COLORS,
   personaLabel,
   personaColor,
   scorePillClass,
   fmtDate,
 } from "@/constants/common";
+import PerformanceCard, {
+  PerformanceCardSkeleton,
+  type PerformanceCardData,
+} from "@/components/PerformanceCard";
+import { Separator } from "@/components/ui/separator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +123,17 @@ interface DashboardAnalytics {
     user_sessions: number;
     global_feedback_reports: number;
   };
+}
+
+interface NextInterviewRecommendation {
+  user_id: string;
+  sessions_analyzed: number;
+  headline: string;
+  insight: string;
+  practice_focus: string;
+  recommended_persona: string;
+  recommended_job_role: string;
+  cta: string;
 }
 
 // ─── Score helpers ─────────────────────────────────────────────────────────────
@@ -187,8 +202,41 @@ function DashboardContent() {
     enabled: !!uid,
   });
 
+  const { data: nextRecommendation } = useQuery<NextInterviewRecommendation | null>({
+    queryKey: ["next-interview-recommendation", uid],
+    queryFn: () =>
+      fetch(`${API_BASE}/analytics/next-interview/${uid}?lookback=5`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+    enabled: !!uid,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+
   const sessions: SessionSummary[] = sessionsData?.sessions ?? [];
   const resume: ResumeData | null = resumeData?.resume_data ?? null;
+
+  // Find the latest session that has feedback for the performance card
+  const latestFeedbackSession = sessions.find(
+    (s) => s.feedback_ready && s.overall_score !== null,
+  );
+
+  const { data: performanceCard, isLoading: loadingCard } =
+    useQuery<PerformanceCardData | null>({
+      queryKey: ["performance-card", latestFeedbackSession?.session_id],
+      queryFn: () =>
+        fetch(
+          `${API_BASE}/performance-card/${latestFeedbackSession!.session_id}`,
+        ).then((r) => (r.ok ? r.json() : null)),
+      enabled: !!latestFeedbackSession,
+      retry: 2,
+      retryDelay: 3000,
+      // Poll every 6s until the card arrives (covers background generation)
+      refetchInterval: (query) => (query.state.data ? false : 6000),
+    });
 
   // Use useEffect to avoid calling router.replace() during render
   useEffect(() => {
@@ -216,6 +264,7 @@ function DashboardContent() {
   const avgScore: number | null = sessionsData?.avg_score ?? null;
   const lastSession = sessions[0] ?? null;
   const thisMonth: number = sessionsData?.this_month ?? 0;
+  const recommendationCta = nextRecommendation?.cta?.replace(/\.+\s*$/, "") ?? "";
 
   return (
     <div className="min-h-screen bg-surface flex flex-col overflow-x-clip">
@@ -320,8 +369,50 @@ function DashboardContent() {
           />
         </div>
 
+        {/* ── AI recommendation strip ── */}
+        {nextRecommendation && (
+          <Card className="mt-8 rounded-xl border border-orange/30 bg-orange/5">
+            <CardContent className="p-4">
+                <div className="min-w-0 flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-orange uppercase tracking-wide inline-flex items-center gap-1.5">
+                    <Sparkles size={13} /> Your Next Interview
+                  </p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {nextRecommendation.headline}
+                  </p>
+                  <p className="text-sm/relaxed text-muted-foreground">
+                    {nextRecommendation.insight}
+                  </p>
+                  <p className="text-sm/relaxed text-foreground italic">
+                    <span className="font-medium">Practice focus:</span>{" "}
+                    {nextRecommendation.practice_focus}
+                  </p>
+                  <Separator className="my-1" />
+                  <p className="text-sm/relaxed text-foreground">
+                    <span className="font-medium">Next step:</span>{" "}
+                    <span className="text-muted-foreground">{recommendationCta}</span>
+                  </p>
+                  <Button
+                  asChild
+                  size="sm"
+                  className="my-1 w-fit rounded-full bg-orange text-light hover:opacity-90 hover:bg-orange gap-1.5"
+                >
+                  <Link
+                    href={`/interview/setup?from=dashboard&persona=${encodeURIComponent(nextRecommendation.recommended_persona)}&job_role=${encodeURIComponent(nextRecommendation.recommended_job_role)}`}
+                  >
+                    Let&apos;s Go <ChevronRight size={14} />
+                  </Link>
+                </Button>
+                <p className="self-end text-xs text-muted-foreground">
+                  Based on your last {nextRecommendation.sessions_analyzed} sessions
+                </p>
+                </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* ── Stats bar ── */}
-        <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={<BarChart2 size={18} className="text-orange" />}
             label="Total sessions"
@@ -502,6 +593,26 @@ function DashboardContent() {
 
           {/* Right sidebar */}
           <div className="flex flex-col gap-6">
+            {/* Performance card */}
+            {latestFeedbackSession && performanceCard && (
+              <div className="flex flex-col gap-3">
+                <SectionHeader title="Latest performance card" />
+                {loadingCard ? (
+                  <PerformanceCardSkeleton />
+                ) : (
+                  <PerformanceCard
+                    card={performanceCard}
+                    compact
+                    onCardClick={() =>
+                      router.push(
+                        `/interview/feedback?session_id=${performanceCard.session_id}`,
+                      )
+                    }
+                  />
+                )}
+              </div>
+            )}
+
             {/* Résumé card */}
             <div className="flex flex-col gap-3">
               <SectionHeader title="Your résumé" />

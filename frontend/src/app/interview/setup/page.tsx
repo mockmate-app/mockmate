@@ -227,8 +227,8 @@ function SetupContent({
   const searchParams = useSearchParams();
   const from = searchParams.get("from"); // "dashboard" | "resume" | "sessions" | "resumes"
 
-  const [persona, setPersona]       = useState("neutral");
-  const [jobRole, setJobRole]       = useState("");
+  const [persona, setPersona]       = useState(() => searchParams.get("persona") ?? "neutral");
+  const [jobRole, setJobRole]       = useState(() => searchParams.get("job_role") ?? "");
   const [difficulty, setDifficulty] = useState("medium");
   const [error, setError]           = useState("");
 

@@ -69,12 +69,12 @@ graph LR
 |-------|-------------|
 | `/` | Landing page — hero, features, personas, how-it-works |
 | `/login` | Google OAuth sign-in |
-| `/dashboard` | Session history, stats, résumé preview, quick actions |
+| `/dashboard` | Session history, stats, résumé preview, performance card, next-interview recommendation |
 | `/resume/upload` | Drag-and-drop résumé upload (PDF/DOCX/TXT) |
 | `/resume` | View parsed résumé data |
 | `/interview/setup` | Pick job role → persona → difficulty level |
 | `/interview/live` | **Core** — real-time voice interview with webcam posture capture |
-| `/interview/feedback` | Feedback report with scores, strengths, decision letter |
+| `/interview/feedback` | Feedback report with scores, strengths, decision letter, performance card |
 | `/sessions` | Full session history |
 
 ---
@@ -188,12 +188,15 @@ Displays the AI-generated feedback with:
 - Tone analysis and vocabulary calibration
 - Filler word detection
 - Mock offer or rejection letter
+- **AI Performance Card** — Imagen 3.0 artistic background with score, decision badge, and Gemini-generated motivational quote. Downloadable as image or shareable to LinkedIn.
 - Full interview transcript sidebar
 
 ### Dashboard
 
+- **"Your Next Interview" recommendation strip** — AI-powered suggestion (persona, role, practice focus) based on recent feedback, with a one-click CTA to start the recommended session
 - Session history table with persona badges and scores
 - Stats cards (total sessions, average score, monthly count)
+- **Compact performance card** in sidebar (click to navigate to full feedback)
 - Résumé preview with top skills
 - Quick actions to start new interviews
 
@@ -250,6 +253,7 @@ frontend/
 │   │   ├── Features.tsx             # Feature cards grid
 │   │   ├── HowItWorks.tsx           # How it works section
 │   │   ├── Personas.tsx             # Persona showcase
+│   │   ├── PerformanceCard.tsx      # AI performance card (compact + full)
 │   │   ├── SessionStatusPill.tsx    # Status badge component
 │   │   ├── UserMenu.tsx             # User dropdown menu
 │   │   └── ui/                      # shadcn/ui components

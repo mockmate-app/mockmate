@@ -36,6 +36,8 @@ from agents.interview_engine import InterviewEngineAgent
 from agents.posture_analyzer import PostureAnalyzerAgent
 from agents.feedback_compiler import FeedbackCompilerAgent
 from agents.interviewer_avatar import InterviewerAvatarAgent
+from agents.performance_card import PerformanceCardAgent
+from agents.next_interview_recommender import NextInterviewRecommenderAgent
 
 # ---------------------------------------------------------------------------
 # Lifespan — initialise/teardown shared resources
@@ -50,6 +52,8 @@ async def lifespan(app: FastAPI):
     app.state.posture_analyzer = PostureAnalyzerAgent()
     app.state.feedback_compiler = FeedbackCompilerAgent()
     app.state.avatar_agent = InterviewerAvatarAgent()
+    app.state.performance_card = PerformanceCardAgent()
+    app.state.next_interview_recommender = NextInterviewRecommenderAgent()
     yield
     # Teardown (if needed) goes here
 
@@ -364,6 +368,21 @@ async def get_dashboard_analytics(user_id: str, limit: int = 7):
     return data
 
 
+@app.get("/analytics/next-interview/{user_id}", tags=["session"])
+async def get_next_interview_recommendation(user_id: str, lookback: int = 5):
+    """Return AI recommendation for what the user should practice next."""
+    data = await app.state.next_interview_recommender.recommend(
+        user_id=user_id,
+        lookback=max(3, min(lookback, 5)),
+    )
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Not enough completed sessions to generate recommendation yet.",
+        )
+    return data
+
+
 @app.get("/transcript/{session_id}", tags=["session"])
 async def get_transcript(session_id: str):
     """Return the full transcript (list of turns) for a session."""
@@ -389,10 +408,15 @@ async def read_feedback(session_id: str):
     return report
 
 @app.post("/feedback/generate", tags=["feedback"])
-async def generate_feedback(req: FeedbackRequest):
+async def generate_feedback(req: FeedbackRequest, background_tasks: BackgroundTasks):
     """Compile full multimodal feedback and mock hiring decision letter."""
     try:
         report = await app.state.feedback_compiler.compile(req.session_id)
+        # Kick off performance-card generation in the background so
+        # it's ready by the time the user visits the dashboard.
+        background_tasks.add_task(
+            app.state.performance_card.generate, req.session_id,
+        )
         return report
     except ValueError as exc:
         # Session not found
@@ -413,6 +437,45 @@ async def generate_feedback(req: FeedbackRequest):
             status_code=500,
             detail=f"Internal error generating feedback: {type(exc).__name__}",
         )
+
+
+# ---------------------------------------------------------------------------
+# Performance cards (AI-generated session achievement images)
+# ---------------------------------------------------------------------------
+
+@app.get("/performance-card/{session_id}", tags=["performance-card"])
+async def get_performance_card(session_id: str):
+    """
+    Return card metadata (score, motivational line, persona, job role, …).
+    Generates the card on-the-fly if feedback exists but the card hasn't been
+    created yet (idempotent).
+    """
+    card = await app.state.performance_card.generate(session_id)
+    if card is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Performance card not available for session '{session_id}'. "
+                   "Feedback may not have been generated yet.",
+        )
+    return card
+
+
+@app.get("/performance-card/{session_id}/image", tags=["performance-card"])
+async def get_performance_card_image(session_id: str):
+    """Stream the AI-generated card background JPEG."""
+    img_bytes = await app.state.performance_card.get_card_image(session_id)
+    if not img_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Performance card image not available for session '{session_id}'.",
+        )
+    return Response(
+        content=img_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "public, max-age=604800, immutable",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

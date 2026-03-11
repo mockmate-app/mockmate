@@ -22,6 +22,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { API_BASE, PERSONA_LABELS } from "@/constants/common";
+import PerformanceCard, {
+  PerformanceCardSkeleton,
+  type PerformanceCardData,
+} from "@/components/PerformanceCard";
 
 const FEEDBACK_RETRY_COOLDOWN_MS = 8000;
 const FEEDBACK_RETRY_MAX_ATTEMPTS = 3;
@@ -385,6 +389,19 @@ function FeedbackContent() {
     ? `${API_BASE}${sessionMeta.interviewer_avatar_url}`
     : undefined;
 
+  // Fetch performance card data (available after feedback is compiled)
+  const { data: performanceCard, isLoading: loadingCard } =
+    useQuery<PerformanceCardData | null>({
+      queryKey: ["performance-card", sessionId],
+      queryFn: () =>
+        fetch(`${API_BASE}/performance-card/${sessionId}`).then((r) =>
+          r.ok ? r.json() : null,
+        ),
+      enabled: !!sessionId && !!report,
+      // Poll every 5s until the card arrives (background generation)
+      refetchInterval: (query) => (query.state.data ? false : 5000),
+    });
+
   const error = !sessionId
     ? "Missing session_id. Please start a new interview."
     : queryError instanceof Error ? queryError.message : queryError ? "Failed to generate feedback." : null;
@@ -547,6 +564,25 @@ function FeedbackContent() {
                   {report.decision_letter}
                 </p>
               </Section>
+
+              {/* AI Performance Card — download / share to LinkedIn */}
+              <div className="mt-2">
+                <h2 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-4">
+                  Your Performance Card
+                </h2>
+                {loadingCard ? (
+                  <PerformanceCardSkeleton />
+                ) : performanceCard ? (
+                  <PerformanceCard
+                    card={performanceCard}
+                    userName={session?.user?.name ?? undefined}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/40">
+                    Generating your performance card…
+                  </div>
+                )}
+              </div>
             </>
           )}
 
