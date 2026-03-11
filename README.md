@@ -55,7 +55,9 @@ Upload Résumé  →  Pick Persona & Difficulty  →  Live Voice Interview  → 
 | 🎙️ **Live Native Audio** | Real-time bidirectional voice interview through the Gemini Live API — not text-to-speech, but native audio generation with natural intonation, interruption support, and persona-specific accents. |
 | 📬 **Mock Hiring Decision** | A simulated offer or rejection letter with personalized reasoning — making feedback feel consequential. |
 | 📈 **Skill Progression Dashboard** | Tracks improvement across communication, confidence, structure, technical depth, and domain vocabulary over time. |
-| 🌗 **Dark Mode** | Full dark/light/system theme support across the entire application. |
+| 🪧 **AI Performance Card** | After every session, Imagen 3.0 generates a unique artistic background themed to your persona, role, and score. The card displays your result, a motivational quote from Gemini, and can be downloaded or shared to LinkedIn. |
+| 🧭 **Next Interview Recommender** | Gemini Flash analyzes your recent sessions to surface your weakest dimension, then recommends a specific persona, job role, and practice focus for your next session — with a one-click CTA to start. |
+| �🌗 **Dark Mode** | Full dark/light/system theme support across the entire application. |
 
 ---
 
@@ -89,6 +91,8 @@ graph TB
         IE[Interview Engine<br/>Agent]
         PA[Posture Analyzer<br/>Agent]
         FC[Feedback Compiler<br/>Agent]
+        PC[Performance Card<br/>Agent]
+        NR[Next Interview<br/>Recommender Agent]
         IA[Avatar Generator<br/>Agent]
     end
 
@@ -110,7 +114,7 @@ graph TB
     AW -- PCM audio --> WSA
     WC -- JPEG frames --> WSV
 
-    API --> RP & QG & FC & IA
+    API --> RP & QG & FC & PC & NR & IA
     WSA --> IE
     WSV --> PA
 
@@ -119,6 +123,8 @@ graph TB
     IE --> GLA & FS
     PA --> GFL & FS
     FC --> GF & FS
+    PC --> GF & IG & GCS & FS
+    NR --> GF & FS
     IA --> IG & GCS
 
     UI --> GA
@@ -127,7 +133,7 @@ graph TB
 
 ### Agent Pipeline
 
-The backend is composed of **6 specialized AI agents**, each handling a distinct part of the interview workflow:
+The backend is composed of **8 specialized AI agents**, each handling a distinct part of the interview workflow:
 
 | Agent | Model Used | What It Does |
 |-------|-----------|-------------|
@@ -136,6 +142,8 @@ The backend is composed of **6 specialized AI agents**, each handling a distinct
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages the live bidirectional voice interview session — handles real-time audio streaming, adaptive follow-ups, interruption support, and transcript persistence |
 | **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames captured every 10 seconds |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash | Aggregates transcript, posture data, and session metadata to produce a detailed feedback report with scores across 6 dimensions and a mock hiring decision letter |
+| **PerformanceCardAgent** | Gemini 2.5 Flash + Imagen 3.0 Fast | Generates a unique AI performance card per session — Imagen creates a themed artistic background, Gemini writes a motivational quote. Cards are cached in GCS + Firestore. |
+| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash | Analyzes recent feedback sessions to identify the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the user's next interview |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for each interviewer persona |
 
 ```mermaid
@@ -173,6 +181,13 @@ sequenceDiagram
     FE->>BE: POST /feedback/generate
     BE->>Gemini: Compile feedback (Gemini 2.5 Flash)
     BE-->>FE: Scores + decision letter
+
+    BE->>Gemini: Generate performance card (Imagen 3.0 + Gemini Flash)
+    BE-->>FE: Performance card metadata + image
+
+    FE->>BE: GET /analytics/next-interview/{user_id}
+    BE->>Gemini: Recommend next interview (Gemini Flash)
+    BE-->>FE: Recommendation (persona, role, focus)
 ```
 
 ---
@@ -186,7 +201,7 @@ sequenceDiagram
 | **Gemini Live API** (native audio) | Powers the real-time bidirectional voice interview — the core feature. Handles natural speech, interruptions, follow-ups, and persona-specific accents/intonation. |
 | **Gemini 2.5 Flash** | Used by 3 agents: résumé parsing (structured JSON extraction), question generation (personalized to résumé + persona), and feedback compilation (multi-source aggregation into scored report). |
 | **Gemini 2.5 Flash Lite** | Posture analysis — vision-based scoring of posture, eye contact, and facial confidence from webcam frames. Lighter model optimised for per-frame latency. |
-| **Imagen 3.0 Fast** | Generates unique AI profile pictures for each interviewer persona, cached in Cloud Storage. |
+| **Imagen 3.0 Fast** | Generates unique AI profile pictures for interviewer personas and artistic performance card backgrounds — each themed to the persona, job role, and score. |
 | **Google ADK (Agent Development Kit)** | Orchestrates the InterviewEngineAgent — manages live sessions, request queues, and streaming to/from the Gemini Live API. |
 | **Vertex AI** | All Gemini and Imagen model calls are routed through Vertex AI endpoints. |
 
@@ -319,21 +334,23 @@ mockmate/
 │       ├── interview_engine.py         # Live audio interview via Gemini Live API
 │       ├── posture_analyzer.py         # Webcam posture scoring via Gemini Vision
 │       ├── feedback_compiler.py        # Post-session feedback & decision letter
+│       ├── performance_card.py         # AI performance card (Imagen 3.0 + Gemini)
+│       ├── next_interview_recommender.py # Next interview recommendation engine
 │       ├── interviewer_avatar.py       # AI avatar generation with Imagen 3.0
 │       └── personas.json              # 13 interviewer persona definitions
 │
 ├── frontend/                           # Next.js web app (TypeScript)
 │   ├── src/
 │   │   ├── app/                        # Pages (App Router)
-│   │   │   ├── dashboard/              # Session history, stats, quick actions
+│   │   │   ├── dashboard/              # Session history, stats, performance card, next-interview recommendation
 │   │   │   ├── interview/
 │   │   │   │   ├── setup/              # Persona & difficulty selection
 │   │   │   │   ├── live/               # Real-time voice interview engine
-│   │   │   │   └── feedback/           # Post-interview feedback report
+│   │   │   │   └── feedback/           # Feedback report + full-size performance card
 │   │   │   ├── resume/                 # Résumé upload & preview
 │   │   │   ├── sessions/               # Full session history
 │   │   │   └── login/                  # Google OAuth login
-│   │   ├── components/                 # Reusable UI components (shadcn/ui)
+│   │   ├── components/                 # Reusable UI components (shadcn/ui, PerformanceCard)
 │   │   ├── constants/common.ts         # Shared constants & helpers
 │   │   └── lib/                        # API client, auth, utilities
 │   ├── public/
@@ -420,7 +437,8 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 4. **Live interview** — A real-time voice conversation begins. The AI interviewer asks personalized questions, follows up on your answers, challenges weak points, and adapts its questioning style based on your responses. Your webcam captures posture data in the background.
 5. **Get feedback** — After the interview ends, Gemini Flash compiles all data (transcript, posture scores, résumé context) into a detailed feedback report scoring you across 6 dimensions: communication, confidence, structure, technical depth, domain vocabulary, and posture.
 6. **Hiring decision** — You receive a mock offer or rejection letter with specific reasoning, making the feedback feel real and consequential.
-7. **Track progress** — Your dashboard shows session history, score trends, and skill progression over time.
+7. **Performance card** — An AI-generated card with a unique Imagen 3.0 artistic background, your score, and a motivational quote from Gemini. Download it or share it to LinkedIn.
+8. **Track progress** — Your dashboard shows session history, score trends, skill progression, and a personalized "Your Next Interview" recommendation strip powered by Gemini.
 
 ```mermaid
 graph TD
@@ -434,7 +452,8 @@ graph TD
     E --> H[Interview Ends]
     H --> I[📊 Feedback Report]
     I --> J[✅ Offer or ❌ Rejection Letter]
-    I --> K[📈 Dashboard Updated]
+    I --> K[🎨 Performance Card]
+    K --> L[📈 Dashboard Updated + Next Interview Recommendation]
 ```
 
 ---

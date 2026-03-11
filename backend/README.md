@@ -1,6 +1,6 @@
 # MockMate — Backend
 
-FastAPI backend for [MockMate](https://www.getmockmate.com) — an AI-powered mock interview platform built for the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/). It exposes REST and WebSocket endpoints consumed by the Next.js frontend and orchestrates **6 Google Gemini-powered agents** via the ADK.
+FastAPI backend for [MockMate](https://www.getmockmate.com) — an AI-powered mock interview platform built for the [Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/). It exposes REST and WebSocket endpoints consumed by the Next.js frontend and orchestrates **8 Google Gemini-powered agents** via the ADK.
 
 ---
 
@@ -17,6 +17,8 @@ graph TB
         IE[InterviewEngineAgent]
         PA[PostureAnalyzerAgent]
         FC[FeedbackCompilerAgent]
+        PC[PerformanceCardAgent]
+        NR[NextInterviewRecommenderAgent]
         IA[InterviewerAvatarAgent]
     end
 
@@ -30,13 +32,15 @@ graph TB
     end
 
     FE -- "REST + WebSocket" --> MAIN
-    MAIN --> RP & QG & IE & PA & FC & IA
+    MAIN --> RP & QG & IE & PA & FC & PC & NR & IA
 
     RP --> FLASH & GCS & FS
     QG --> FLASH
     IE --> LIVE & FS
     PA --> FLASH_LITE & FS
     FC --> FLASH & FS
+    PC --> FLASH & IMAGEN & GCS & FS
+    NR --> FLASH & FS
     IA --> IMAGEN & GCS
 ```
 
@@ -49,6 +53,8 @@ graph TB
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
 | **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
+| **PerformanceCardAgent** | Gemini 2.5 Flash + Imagen 3.0 Fast | Generates an AI performance card per session — Imagen creates a unique artistic background themed to the persona, role, and score; Gemini writes a motivational quote. Cached in GCS + Firestore |
+| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash | Analyzes recent feedback sessions to find the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the next interview |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for interviewer personas |
 
 ### Google Cloud Services
@@ -144,6 +150,9 @@ API available at **http://localhost:8080** | Interactive docs at **http://localh
 | `GET` | `/transcript/{session_id}` | Get full transcript |
 | `POST` | `/feedback/generate` | Generate feedback report |
 | `GET` | `/feedback/{session_id}` | Get existing feedback |
+| `GET` | `/performance-card/{session_id}` | Get performance card metadata (score, decision, motivational line) |
+| `GET` | `/performance-card/{session_id}/image` | Stream the AI-generated performance card background image from GCS |
+| `GET` | `/analytics/next-interview/{user_id}` | Get AI-powered next interview recommendation (persona, role, focus) |
 | `GET` | `/interviewer-avatar/{name}` | Get/generate interviewer avatar |
 
 ### WebSocket Endpoints
@@ -238,6 +247,8 @@ backend/
     ├── interview_engine.py    # Gemini Live API session management
     ├── posture_analyzer.py    # Real-time video posture scoring
     ├── feedback_compiler.py   # Post-session feedback & decision letter
+    ├── performance_card.py    # AI performance card (Imagen 3.0 background + Gemini quote)
+    ├── next_interview_recommender.py  # Next interview recommendation engine
     ├── interviewer_avatar.py  # AI avatar generation with Imagen
     └── personas.json          # 13 interviewer persona definitions
 ```
