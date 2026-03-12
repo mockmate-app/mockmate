@@ -50,7 +50,7 @@ function LoginContent() {
 
       {/* Centered card */}
       <main className="flex-1 flex items-center justify-center px-4">
-        <Card className="w-full max-w-md rounded-2xl border border-border shadow-sm overflow-hidden">
+        <Card className="w-full max-w-md rounded-2xl border border-border shadow-sm overflow-hidden my-16">
           <CardHeader className="text-center py-4 bg-neutral-600/10 dark:bg-secondary/60">
             <h1 className="text-2xl font-bold text-foreground tracking-tight">
               Welcome back

@@ -510,7 +510,7 @@ All in a single, seamless session.
 
 ## 📝 Findings & Learnings
 
-Building MockMate taught us several things about working with Gemini and Google Cloud:
+Building MockMate taught me several things about working with Gemini and Google Cloud:
 
 1. **Gemini Live API is remarkably natural** — The native audio mode produces speech that feels genuinely human. Personas with different accents and speech patterns (fast-talking startup founders vs. measured consultants) emerge naturally from the system prompt without any special TTS configuration.
 
@@ -520,9 +520,9 @@ Building MockMate taught us several things about working with Gemini and Google 
 
 4. **Vision analysis adds genuine value** — Even simple posture/eye-contact scoring from webcam frames makes feedback significantly more actionable. Candidates often don't realize they're looking away from the camera or slouching until they see the data.
 
-5. **The ADK simplifies agent orchestration** — Google's Agent Development Kit handled session management, request queuing, and streaming to/from the Gemini Live API, letting us focus on the product logic rather than infrastructure plumbing.
+5. **The ADK simplifies agent orchestration** — Google's Agent Development Kit handled session management, request queuing, and streaming to/from the Gemini Live API, letting me focus on the product logic rather than infrastructure plumbing.
 
-6. **Firestore's flexibility accelerated development** — The schemaless nature of Firestore let us iterate on data structures (sessions, transcripts, feedback reports) without migration overhead. Each agent writes to its own collection, keeping concerns cleanly separated.
+6. **Firestore's flexibility accelerated development** — The schemaless nature of Firestore let me iterate on data structures (sessions, transcripts, feedback reports) without migration overhead. Each agent writes to its own collection, keeping concerns cleanly separated.
 
 ---
 

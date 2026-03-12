@@ -237,9 +237,9 @@ function SessionsContent() {
                 <TableHeader>
                   <TableRow className="bg-surface/50">
                     <TableHead className="text-xs font-medium text-muted-foreground">Job role & Persona</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Interviewer</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Last active</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">Duration</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Interviewer</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Last active</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Duration</TableHead>
                     {/* <TableHead className="text-xs font-medium text-muted-foreground text-center hidden sm:table-cell">Questions</TableHead> */}
                     <TableHead className="text-xs font-medium text-muted-foreground text-center">Score</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
@@ -255,13 +255,13 @@ function SessionsContent() {
                           {personaLabel(s.persona)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
+                      <TableCell className="text-xs text-muted-foreground">
                         {s.interviewer_name ?? "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {fmtDate(s.last_retried_at ?? s.live_started_at ?? s.created_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {fmtDuration(s.live_started_at ?? s.created_at, s.ended_at)}
                       </TableCell>
                       {/* <TableCell className="text-xs text-center text-muted-foreground hidden sm:table-cell">

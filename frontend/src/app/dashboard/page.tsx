@@ -410,7 +410,7 @@ function DashboardContent() {
                     Let&apos;s Go <ChevronRight size={14} />
                   </Link>
                 </Button>
-                <p className="self-end text-xs text-muted-foreground">
+                <p className="self-end text-xs text-muted-foreground mt-2">
                   AI generated, based on your last {nextRecommendation.sessions_analyzed} sessions
                 </p>
                 </div>

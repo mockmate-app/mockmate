@@ -32,7 +32,7 @@ export default function RootLayout({
         <link rel="manifest" href="/favicons/site.webmanifest" />
       </head>
       <body
-        className="antialiased pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+        className="antialiased pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
       >
         <ThemeProvider>
           <ReactQueryProvider>

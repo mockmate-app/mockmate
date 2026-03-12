@@ -715,7 +715,7 @@ class FeedbackCompilerAgent:
             return
 
         dim = report.get("dimension_scores", {})
-        created_at_raw = report.get("compiled_at") or session.get("ended_at") or session.get("created_at")
+        created_at_raw = session.get("created_at") or session.get("ended_at")
         try:
             created_at = datetime.fromisoformat(str(created_at_raw)) if created_at_raw else datetime.now(timezone.utc)
         except Exception:  # noqa: BLE001
@@ -732,7 +732,6 @@ class FeedbackCompilerAgent:
                 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
                 ON CONFLICT (session_id) DO UPDATE SET
                   user_id = EXCLUDED.user_id,
-                  created_at = EXCLUDED.created_at,
                   overall_score = EXCLUDED.overall_score,
                   communication = EXCLUDED.communication,
                   confidence = EXCLUDED.confidence,
