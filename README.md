@@ -414,6 +414,10 @@ Both the backend and frontend have **fully automated continuous deployments** li
 
 Every push to `main` automatically builds and deploys the affected service — no manual steps required.
 
+Google Cloud and Vercel integration in Github:
+
+<img width="1504" height="432" alt="image" src="https://github.com/user-attachments/assets/1ef10fde-fcb0-4468-b604-31374c6b1d4b" />
+
 ### Deployment Scripts
 
 For local or manual deployments, each service also has its own deployment script:
