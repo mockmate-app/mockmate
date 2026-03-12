@@ -315,10 +315,10 @@ export default function PerformanceCard({
           text: linkedInText,
           // url: "https://getmockmate.com",
         });
-        return;
       } catch {
-        // User cancelled or share failed — fall through to LinkedIn
+        // User cancelled or share failed — do nothing.
       }
+      return;
     }
 
     // Desktop / fallback: open LinkedIn directly
