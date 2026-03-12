@@ -235,7 +235,7 @@ sequenceDiagram
 | **Python** | 3.13 | Backend runtime. Pre-built wheels for all deps. | [python.org/downloads](https://www.python.org/downloads/) |
 | **Node.js** | 18+ | Frontend runtime | [nodejs.org](https://nodejs.org/) |
 | **Google Cloud SDK** | latest | Auth + deploy | [cloud.google.com/sdk](https://cloud.google.com/sdk/docs/install) |
-| **PostgreSQL** | 14+ | Better Auth session storage | [postgresql.org](https://www.postgresql.org/download/) |
+| **PostgreSQL** | 14+ | Better Auth session storage | [pgadmin.org](https://www.pgadmin.org/download/) |
 
 You also need a **Google Cloud project** with the following APIs enabled:
 - Vertex AI API
@@ -247,7 +247,7 @@ And a **Google OAuth 2.0 Client ID** (for user login).
 ### Step 1 — Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mockmate.git
+git clone https://github.com/mockmate-app/mockmate.git
 cd mockmate
 ```
 
@@ -373,7 +373,7 @@ The backend is containerized with a multi-stage Dockerfile and deployed on Cloud
 # Build container image using Cloud Build
 gcloud builds submit --tag gcr.io/YOUR_PROJECT/mockmate-backend ./backend
 
-# Deploy to Cloud Run
+# Deploy to Cloud Run (reads env vars from backend/cloudrun-env.yaml)
 gcloud run deploy mockmate-backend \
   --image gcr.io/YOUR_PROJECT/mockmate-backend \
   --platform managed \
@@ -381,15 +381,17 @@ gcloud run deploy mockmate-backend \
   --memory 2Gi \
   --timeout 3600 \
   --allow-unauthenticated \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=YOUR_PROJECT,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=YOUR_BUCKET,GOOGLE_GENAI_USE_VERTEXAI=TRUE"
+  --env-vars-file backend/cloudrun-env.yaml
 ```
 
-Or use the deployment script:
+Or use the deployment script, which automatically reads all variables from `backend/.env`:
 
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
 ```
+
+> **Note:** The `deploy.sh` script parses `backend/.env` and passes every key-value pair to Cloud Run via `--set-env-vars`. Make sure your `.env` file is populated before deploying.
 
 ### Frontend → Vercel
 

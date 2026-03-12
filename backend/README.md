@@ -218,8 +218,10 @@ docker run -p 8080:8080 --env-file .env mockmate-backend
 ## Deploy to Cloud Run
 
 ```bash
+# Build container image using Cloud Build
 gcloud builds submit --tag gcr.io/YOUR_PROJECT/mockmate-backend
 
+# Deploy to Cloud Run (reads env vars from cloudrun-env.yaml)
 gcloud run deploy mockmate-backend \
   --image gcr.io/YOUR_PROJECT/mockmate-backend \
   --platform managed \
@@ -227,7 +229,14 @@ gcloud run deploy mockmate-backend \
   --memory 2Gi \
   --timeout 3600 \
   --allow-unauthenticated \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=YOUR_PROJECT,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=YOUR_BUCKET,GOOGLE_GENAI_USE_VERTEXAI=TRUE"
+  --env-vars-file cloudrun-env.yaml
+```
+
+Or use the deployment script from the repo root, which reads all variables from `backend/.env` automatically:
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ---

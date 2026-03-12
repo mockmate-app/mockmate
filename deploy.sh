@@ -25,10 +25,39 @@ if [[ -z "$PROJECT_ID" ]]; then
   exit 1
 fi
 
+# ── Load environment variables from backend/.env ──────────────────────────────
+ENV_FILE="./backend/.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Error: $ENV_FILE not found. Copy backend/.env.example to backend/.env and fill in your values."
+  exit 1
+fi
+
+# Parse .env into a comma-separated KEY=VALUE string for Cloud Run.
+# Skips comments, blank lines, and strips surrounding whitespace/quotes.
+ENV_VARS=""
+while IFS= read -r line || [[ -n "$line" ]]; do
+  # Skip empty lines and comments
+  [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+  # Extract key and value
+  key="${line%%=*}"
+  value="${line#*=}"
+  # Trim whitespace from key
+  key="$(echo "$key" | xargs)"
+  # Trim whitespace and surrounding quotes from value
+  value="$(echo "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']*$//')"
+  [[ -z "$key" ]] && continue
+  if [[ -n "$ENV_VARS" ]]; then
+    ENV_VARS="${ENV_VARS},${key}=${value}"
+  else
+    ENV_VARS="${key}=${value}"
+  fi
+done < "$ENV_FILE"
+
 echo "Deploying MockMate backend to Cloud Run"
 echo "  Project:  $PROJECT_ID"
 echo "  Region:   $REGION"
 echo "  Service:  $SERVICE_NAME"
+echo "  Env file: $ENV_FILE"
 echo ""
 
 # ── Build ─────────────────────────────────────────────────────────────────────
@@ -44,7 +73,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --memory "$MEMORY" \
   --timeout "$TIMEOUT" \
   --allow-unauthenticated \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},GOOGLE_GENAI_USE_VERTEXAI=TRUE"
+  --set-env-vars "$ENV_VARS"
 
 # ── Print URL ─────────────────────────────────────────────────────────────────
 URL=$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format 'value(status.url)' 2>/dev/null)
@@ -53,5 +82,4 @@ echo "Deployment complete!"
 echo "Backend URL: $URL"
 echo ""
 echo "Next steps:"
-echo "  1. Set environment variables in Cloud Run (GCS_BUCKET, Firestore, Postgres, etc.)"
-echo "  2. Update your frontend's NEXT_PUBLIC_API_URL to: $URL"
+echo "  1. Update your frontend's NEXT_PUBLIC_API_URL to: $URL"
