@@ -138,13 +138,13 @@ The backend is composed of **8 specialized AI agents**, each handling a distinct
 
 | Agent | Model Used | What It Does |
 |-------|-----------|-------------|
-| **ResumeParserAgent** | Gemini 2.5 Flash | Extracts structured JSON from PDF/DOCX résumés, stores raw files in Cloud Storage, persists structured data in Firestore |
-| **QuestionGeneratorAgent** | Gemini 2.5 Flash | Generates 8 personalized interview questions based on the candidate's résumé, chosen persona, and difficulty level |
+| **ResumeParserAgent** | Gemini 2.5 Flash Lite | Extracts structured JSON from PDF/DOCX résumés, stores raw files in Cloud Storage, persists structured data in Firestore |
+| **QuestionGeneratorAgent** | Gemini 2.5 Flash Lite | Generates 8 personalized interview questions based on the candidate's résumé, chosen persona, and difficulty level |
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages the live bidirectional voice interview session — handles real-time audio streaming, adaptive follow-ups, interruption support, and transcript persistence |
-| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames captured every 10 seconds |
-| **FeedbackCompilerAgent** | Gemini 2.5 Flash | Aggregates transcript, posture data, and session metadata to produce a detailed feedback report with scores across 6 dimensions and a mock hiring decision letter |
-| **PerformanceCardAgent** | Gemini 2.5 Flash + Imagen 3.0 Fast | Generates a unique AI performance card per session — Imagen creates a themed artistic background, Gemini writes a motivational quote. Cards are cached in GCS + Firestore. |
-| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash | Analyzes recent feedback sessions to identify the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the user's next interview |
+| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite | Scores posture, eye contact, and facial confidence from webcam frames captured every 10 seconds |
+| **FeedbackCompilerAgent** | Gemini 2.5 Flash Lite | Aggregates transcript, posture data, and session metadata to produce a detailed feedback report with scores across 6 dimensions and a mock hiring decision letter |
+| **PerformanceCardAgent** | Gemini 2.5 Flash Lite + Imagen 3.0 Fast | Generates a unique AI performance card per session — Imagen creates a themed artistic background, Gemini writes a motivational quote. Cards are cached in GCS + Firestore. |
+| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash Lite | Analyzes recent feedback sessions to identify the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the user's next interview |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for each interviewer persona |
 
 ```mermaid
@@ -156,12 +156,12 @@ sequenceDiagram
 
     User->>FE: Upload résumé
     FE->>BE: POST /resume/upload
-    BE->>Gemini: Parse résumé (Gemini 2.5 Flash)
+    BE->>Gemini: Parse résumé (Gemini 2.5 Flash Lite)
     BE-->>FE: Structured résumé data
 
     User->>FE: Pick persona + difficulty
     FE->>BE: POST /session/start
-    BE->>Gemini: Generate questions (Gemini 2.5 Flash)
+    BE->>Gemini: Generate questions (Gemini 2.5 Flash Lite)
     BE-->>FE: Session ID + questions
 
     User->>FE: Start interview
@@ -180,7 +180,7 @@ sequenceDiagram
 
     User->>FE: End interview
     FE->>BE: POST /feedback/generate
-    BE->>Gemini: Compile feedback (Gemini 2.5 Flash)
+    BE->>Gemini: Compile feedback (Gemini 2.5 Flash Lite)
     BE-->>FE: Scores + decision letter
 
     BE->>Gemini: Generate performance card (Imagen 3.0 + Gemini Flash)
@@ -199,9 +199,8 @@ sequenceDiagram
 
 | Technology | Usage in MockMate |
 |-----------|-------------------|
-| **Gemini Live API** (native audio) | Powers the real-time bidirectional voice interview — the core feature. Handles natural speech, interruptions, follow-ups, and persona-specific accents/intonation. |
-| **Gemini 2.5 Flash** | Used by 3 agents: résumé parsing (structured JSON extraction), question generation (personalized to résumé + persona), and feedback compilation (multi-source aggregation into scored report). |
-| **Gemini 2.5 Flash Lite** | Posture analysis — vision-based scoring of posture, eye contact, and facial confidence from webcam frames. Lighter model optimised for per-frame latency. |
+| **Gemini Live API (native audio)** | Powers the real-time bidirectional voice interview — the core feature. Handles natural speech, interruptions, follow-ups, and persona-specific accents/intonation. |
+| **Gemini 2.5 Flash Lite** | Used by 4 agents: résumé parsing (structured JSON extraction), question generation (personalized to résumé + persona), feedback compilation (multi-source aggregation into scored report) and posture analysis (vision-based scoring of posture, eye contact, and facial confidence from webcam frames). |
 | **Imagen 3.0 Fast** | Generates unique AI profile pictures for interviewer personas and artistic performance card backgrounds — each themed to the persona, job role, and score. |
 | **Google ADK (Agent Development Kit)** | Orchestrates the InterviewEngineAgent — manages live sessions, request queues, and streaming to/from the Gemini Live API. |
 | **Vertex AI** | All Gemini and Imagen model calls are routed through Vertex AI endpoints. |
@@ -456,7 +455,7 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 | GCP Service | Code File | What It Does |
 |-------------|-----------|-------------|
 | Vertex AI + Gemini Live API | [`backend/agents/interview_engine.py`](./backend/agents/interview_engine.py) | Lines using `vertexai.init()`, `Agent()`, `Runner()`, and `LiveRequestQueue` for real-time audio streaming via the Gemini Live API |
-| Vertex AI + Gemini Flash | [`backend/agents/feedback_compiler.py`](./backend/agents/feedback_compiler.py) | Uses `GenerativeModel("gemini-2.5-flash")` via Vertex AI to compile feedback reports |
+| Vertex AI + Gemini Flash Lite | [`backend/agents/feedback_compiler.py`](./backend/agents/feedback_compiler.py) | Uses `GenerativeModel("gemini-2.5-flash-lite")` via Vertex AI to compile feedback reports |
 | Cloud Firestore | [`backend/agents/config.py`](./backend/agents/config.py) | Centralised Firestore collection names; used in every agent via `firestore.AsyncClient()` |
 | Cloud Storage | [`backend/agents/resume_parser.py`](./backend/agents/resume_parser.py) | Uploads raw résumé files to GCS via `storage.Client()` |
 | Imagen 3.0 (Vertex AI) | [`backend/agents/interviewer_avatar.py`](./backend/agents/interviewer_avatar.py) | Generates interviewer avatars via `ImageGenerationModel` |

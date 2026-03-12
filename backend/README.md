@@ -24,7 +24,7 @@ graph TB
 
     subgraph "Google Cloud"
         LIVE[Gemini Live API<br/>Native Audio]
-        FLASH[Gemini 2.5 Flash]
+        FLASH[Gemini 2.5 Flash Lite]
         FLASH_LITE[Gemini 2.5 Flash Lite]
         IMAGEN[Imagen 3.0 Fast]
         FS[(Firestore)]
@@ -48,13 +48,13 @@ graph TB
 
 | Agent | Model | What It Does |
 |-------|-------|-------------|
-| **ResumeParserAgent** | Gemini 2.5 Flash | Extracts structured JSON from PDF/DOCX résumés, stores in GCS + Firestore |
-| **QuestionGeneratorAgent** | Gemini 2.5 Flash | Generates 8 personalized questions based on résumé, persona, and difficulty |
+| **ResumeParserAgent** | Gemini 2.5 Flash Lite | Extracts structured JSON from PDF/DOCX résumés, stores in GCS + Firestore |
+| **QuestionGeneratorAgent** | Gemini 2.5 Flash Lite | Generates 8 personalized questions based on résumé, persona, and difficulty |
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
 | **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
-| **FeedbackCompilerAgent** | Gemini 2.5 Flash | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
-| **PerformanceCardAgent** | Gemini 2.5 Flash + Imagen 3.0 Fast | Generates an AI performance card per session — Imagen creates a unique artistic background themed to the persona, role, and score; Gemini writes a motivational quote. Cached in GCS + Firestore |
-| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash | Analyzes recent feedback sessions to find the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the next interview |
+| **FeedbackCompilerAgent** | Gemini 2.5 Flash Lite | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
+| **PerformanceCardAgent** | Gemini 2.5 Flash Lite + Imagen 3.0 Fast | Generates an AI performance card per session — Imagen creates a unique artistic background themed to the persona, role, and score; Gemini writes a motivational quote. Cached in GCS + Firestore |
+| **NextInterviewRecommenderAgent** | Gemini 2.5 Flash Lite | Analyzes recent feedback sessions to find the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the next interview |
 | **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for interviewer personas |
 
 ### Google Cloud Services

@@ -486,7 +486,7 @@ Silently classify the candidate's answer BEFORE replying:
 
 3. ADAPTIVE CONVERSATION — not a questionnaire
   • NEVER start with question id=1 every time. Pick your FIRST question randomly
-    from the bank — any of the 8 questions can be your starting point.
+        from the bank — any of the 6 questions can be your starting point.
   • After the first question, pick the next topic based on conversation gaps and
     what feels natural given the candidate's previous answers — not list order.
   • If a topic was naturally well-covered, skip it.
@@ -499,7 +499,7 @@ Silently classify the candidate's answer BEFORE replying:
   • React authentically: if something surprises you, say so briefly before continuing.
 
 3B. QUESTION COVERAGE CONTRACT — use the generated bank properly
-    • The internal bank has 8 generated questions. During PHASE 3, you MUST ask
+    • The internal bank has 6 generated questions. During PHASE 3, you MUST ask
         at least 4 and at most 6 DISTINCT questions from that bank before moving to
         candidate-questions and closing.
     • Start with a RANDOM question from the bank — do NOT default to id=1.
@@ -510,6 +510,10 @@ Silently classify the candidate's answer BEFORE replying:
         move to the next distinct bank question.
     • Do not end early after only 1-3 bank questions unless the candidate explicitly
         requests to stop or repeated gibberish requires ending per GUARDRAILS.
+    • NON-NEGOTIABLE COVERAGE FLOOR: before entering PHASE 4, you MUST have asked
+        at least 10 TOTAL interview questions (primary + follow-ups combined), with
+        at least 1 follow-up overall and at most 2 follow-ups per primary question.
+        If total asked is below 10, continue interviewing and probing until you hit 10.
 
 4. NATURAL HUMAN SPEECH
   • Short sentences. Speak like a real person on a call, not a form or chatbot.
@@ -574,7 +578,9 @@ Silently classify the candidate's answer BEFORE replying:
 
 3. PACING GUARDRAILS:
   • Keep the TOTAL interview to within 10 minutes of conversation — you MUST start
-    wrapping up and move to the candidate-questions phase by the 9-minute mark.
+        wrapping up and move to the candidate-questions phase by the 9-minute mark,
+        but NEVER before the PHASE 3 coverage floor is met unless the candidate asks
+        to end or guardrails require termination.
     If you are running long, skip remaining competency areas and go straight to closing.
     • Time-budget rule: by roughly minute 6-7, you should have covered at least 4
         distinct bank questions. If you have not, reduce depth and advance faster.
@@ -618,7 +624,8 @@ Rules for answering candidate questions:
 3. Ask for introduction / "tell me about yourself" → listen and react.
 4. Segue from intro into first competency question naturally.
 5. Dynamic conversation: probe, challenge, follow up based on what they say.
-6. After covering ~5-7 competency areas in depth, ask one unexpected or challenging follow-up.
+6. Ensure you cover at least 4 distinct bank questions and at least 10 total
+    interviewer questions (including follow-ups) before moving to candidate questions.
 7. Ask "Do you have any questions for me?" — answer up to 2 candidate questions.
 8. Close naturally: "Okay — I think that covers everything I had. Thanks for your time today."
    Add one of: "We'll be in touch." / "Best of luck with the rest of your process."
@@ -671,6 +678,7 @@ class InterviewEngineAgent:
         questions: list[dict[str, Any]],
         persona: str,
         job_role: str = "Software Engineer",
+        difficulty: str = "medium",
     ) -> dict[str, Any]:
         # Abandon any orphaned sessions before creating a new one so the user
         # never sees duplicate in-progress entries on the dashboard.
@@ -714,6 +722,7 @@ class InterviewEngineAgent:
             "user_id": user_id,
             "persona": persona,
             "job_role": job_role,
+            "difficulty": difficulty,
             "voice": voice,
             "interviewer_name": interviewer_name,
             "interviewer_avatar_url": interviewer_avatar_url,
@@ -886,6 +895,7 @@ class InterviewEngineAgent:
                 "session_id":       data.get("session_id"),
                 "persona":          data.get("persona"),
                 "job_role":         data.get("job_role"),
+                "difficulty":       data.get("difficulty", "medium"),
                 "interviewer_name": data.get("interviewer_name"),
                 "status":           data.get("status"),
                 "ended_by":         data.get("ended_by"),
@@ -1032,6 +1042,7 @@ class InterviewEngineAgent:
             "session_id":       data.get("session_id"),
             "persona":          data.get("persona"),
             "job_role":         data.get("job_role"),
+            "difficulty":       data.get("difficulty", "medium"),
             "interviewer_name": data.get("interviewer_name"),
             "status":           data.get("status"),
             "ended_by":         data.get("ended_by"),
@@ -1326,7 +1337,9 @@ Instead:
         # ── Posture analysis queue ─────────────────────────────────────────
         # Video frames from the browser are routed here (NOT to the live
         # audio agent) for asynchronous posture scoring.
-        _posture_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=30)
+        _POSTURE_MIN_INTERVAL_MS = 30_000
+        _last_posture_enqueue_ms = 0
+        _posture_queue: asyncio.Queue[tuple[bytes, int]] = asyncio.Queue(maxsize=30)
 
         async def _upstream() -> None:
             """Receive mixed browser frames (text control + binary PCM) → Gemini."""
@@ -1354,10 +1367,16 @@ Instead:
                             # Route video frames to posture analysis — NOT to
                             # the live audio agent (it shouldn't see the video).
                             frame_b64 = payload.get("data", "")
+                            client_ts = payload.get("timestamp_ms")
                             if frame_b64 and posture_analyzer:
                                 try:
+                                    nonlocal _last_posture_enqueue_ms
+                                    ts_ms = int(client_ts) if client_ts is not None else int(time.time() * 1000)
+                                    if ts_ms - _last_posture_enqueue_ms < _POSTURE_MIN_INTERVAL_MS:
+                                        continue
                                     frame_bytes = base64.b64decode(frame_b64)
-                                    _posture_queue.put_nowait(frame_bytes)
+                                    _posture_queue.put_nowait((frame_bytes, ts_ms))
+                                    _last_posture_enqueue_ms = ts_ms
                                 except Exception:
                                     pass  # drop frame on decode error / full queue
                             continue
@@ -1417,11 +1436,13 @@ Instead:
             try:
                 while _ws_open:
                     try:
-                        frame_bytes = await asyncio.wait_for(
+                        frame_item = await asyncio.wait_for(
                             _posture_queue.get(), timeout=2.0,
                         )
                     except asyncio.TimeoutError:
                         continue  # check _ws_open flag periodically
+
+                    frame_bytes, ts_ms = frame_item
 
                     score = await posture_analyzer.analyse_frame(frame_bytes)
                     if not score:
@@ -1429,9 +1450,7 @@ Instead:
 
                     score["frame_index"] = _posture_frame_count
                     score["session_id"] = session_id
-                    score["timestamp_ms"] = int(
-                        (time.monotonic() - _session_start_time) * 1000
-                    )
+                    score["timestamp_ms"] = int(ts_ms)
                     await posture_analyzer.persist_score(
                         session_id, _posture_frame_count, score,
                     )

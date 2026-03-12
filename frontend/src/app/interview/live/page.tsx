@@ -1373,7 +1373,7 @@ function LiveInterviewContent() {
   useEffect(() => {
     if (!isActive || !cameraOn) return;
 
-    const intervalId = window.setInterval(() => {
+    const sendPostureFrame = () => {
       const video = camVideoRef.current;
       const ws = wsRef.current;
       if (!video || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -1398,11 +1398,24 @@ function LiveInterviewContent() {
         const dataUrl = canvas.toDataURL("image/jpeg", POSTURE_FRAME_QUALITY);
         const base64Data = dataUrl.split(",")[1];
         if (base64Data) {
-          ws.send(JSON.stringify({ type: "video_frame", data: base64Data }));
+          ws.send(
+            JSON.stringify({
+              type: "video_frame",
+              data: base64Data,
+              timestamp_ms: Date.now(),
+            }),
+          );
         }
       } catch {
         // Best effort — don't crash the interview for a failed frame capture
       }
+    };
+
+    // Capture one frame immediately when posture tracking becomes active.
+    sendPostureFrame();
+
+    const intervalId = window.setInterval(() => {
+      sendPostureFrame();
     }, POSTURE_FRAME_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);

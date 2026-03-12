@@ -265,10 +265,11 @@ class PerformanceCardAgent:
         score: int,
         decision: str,
         motivational_line: str = "",
+        force_regenerate: bool = False,
     ) -> Optional[bytes]:
         """Synchronous background generation (run in executor)."""
         try:
-            if self._exists_in_gcs(session_id):
+            if not force_regenerate and self._exists_in_gcs(session_id):
                 logger.debug("Performance card cache hit — session=%s", session_id)
                 return self._download_from_gcs(session_id)
 
@@ -314,7 +315,11 @@ class PerformanceCardAgent:
     # Public API
     # ------------------------------------------------------------------
 
-    async def generate(self, session_id: str) -> dict[str, Any] | None:
+    async def generate(
+        self,
+        session_id: str,
+        force_regenerate: bool = False,
+    ) -> dict[str, Any] | None:
         """
         Generate a performance card for a completed session.
 
@@ -327,9 +332,13 @@ class PerformanceCardAgent:
         existing = await self.get_card_metadata(session_id)
         existing_line = None
         if existing:
-            existing_line = str(existing.get("motivational_line") or "").strip() or None
+            existing_line = (
+                None
+                if force_regenerate
+                else str(existing.get("motivational_line") or "").strip() or None
+            )
             has_background = bool(existing.get("has_background"))
-            if has_background:
+            if has_background and not force_regenerate:
                 loop = asyncio.get_event_loop()
                 image_exists = await loop.run_in_executor(
                     None, self._exists_in_gcs, session_id
@@ -378,6 +387,7 @@ class PerformanceCardAgent:
             None,
             self._sync_generate_background,
             session_id, persona, job_role, score, decision, motivational_line,
+            force_regenerate,
         )
 
         if image_bytes is None:
@@ -397,6 +407,7 @@ class PerformanceCardAgent:
             "persona": persona,
             "interviewer_name": interviewer_name,
             "motivational_line": motivational_line,
+            "feedback_compiled_at": feedback.get("compiled_at"),
             "has_background": True,
             "image_url": f"/performance-card/{session_id}/image",
         }
@@ -405,6 +416,47 @@ class PerformanceCardAgent:
         await self._db.collection(_COL_PERFORMANCE_CARDS).document(session_id).set(card_meta)
         logger.info("Performance card generated — session=%s  score=%d", session_id, score)
 
+        return card_meta
+
+    async def refresh_metadata(self, session_id: str) -> dict[str, Any] | None:
+        """Refresh card text/values from latest feedback without regenerating image.
+
+        If no existing card metadata is present yet, this falls back to full
+        generation (which may create the image).
+        """
+        existing = await self.get_card_metadata(session_id)
+        if not existing:
+            return await self.generate(session_id)
+
+        feedback_doc = await self._db.collection(_COL_FEEDBACK).document(session_id).get()
+        if not feedback_doc.exists:
+            return existing
+        feedback = feedback_doc.to_dict()
+
+        session_doc = await self._db.collection(_COL_SESSIONS).document(session_id).get()
+        if not session_doc.exists:
+            return existing
+        session = session_doc.to_dict()
+
+        loop = asyncio.get_event_loop()
+        image_exists = await loop.run_in_executor(None, self._exists_in_gcs, session_id)
+
+        card_meta = {
+            "session_id": session_id,
+            "score": feedback.get("overall_score", 0),
+            "decision": feedback.get("decision", "rejection"),
+            "job_role": session.get("job_role", "Software Engineer"),
+            "persona": session.get("persona", "neutral"),
+            "interviewer_name": session.get("interviewer_name", "Interviewer"),
+            "motivational_line": existing.get("motivational_line")
+            or "Keep going — each practice round makes you interview-ready.",
+            "feedback_compiled_at": feedback.get("compiled_at"),
+            "has_background": image_exists,
+            "image_url": f"/performance-card/{session_id}/image",
+        }
+
+        await self._db.collection(_COL_PERFORMANCE_CARDS).document(session_id).set(card_meta)
+        logger.info("Performance card metadata refreshed — session=%s", session_id)
         return card_meta
 
     async def get_card_metadata(self, session_id: str) -> dict[str, Any] | None:

@@ -175,7 +175,7 @@ invent facts about the candidate beyond the provided résumé.
 
 The target job role is **{job_role}**. This MUST drive the majority of your question design:
 
-1. At least 4 out of 8 questions MUST be directly relevant to the day-to-day
+1. At least 4 out of 6 questions MUST be directly relevant to the day-to-day
    responsibilities, skills, and challenges of a {job_role}.
    - For example, if the role is "DevOps Engineer", ask about CI/CD pipelines,
      infrastructure-as-code, monitoring, incident response, container orchestration, etc.
@@ -198,7 +198,7 @@ The target job role is **{job_role}**. This MUST drive the majority of your ques
 
 ━━━ GENERAL RULES ━━━
 
-Generate exactly 8 interview questions as a JSON array. Each element must have:
+Generate exactly 6 interview questions as a JSON array. Each element must have:
 {{
   "id"        : <1-based integer>,
   "type"      : "behavioural" | "technical" | "situational" | "curveball",
@@ -212,16 +212,17 @@ Rules (strictly enforced):
   (e.g. a named project, technology, company, or metric the candidate listed).
 - At least 2 questions MUST be curveballs — unexpected angle or provocative
   challenge designed to test composure and original thinking.
-- Questions MUST escalate in difficulty from id 1 → 8.
+- Questions MUST escalate in difficulty from id 1 → 6.
 - Tone and phrasing MUST match the persona described above.
 - If difficulty is "easy", avoid highly technical deep-dives but still keep questions role-relevant.
 - If difficulty is "hard", include at least 3 technical / system-design questions
   appropriate for {job_role}.
 - Do NOT include generic filler questions. Every question should feel tailored
   to this specific candidate applying for this specific role.
-- At least 6 out of 8 questions must explicitly mention role-relevant concepts
-    for {job_role}, and at least 5 out of 8 must be tied to concrete résumé
+- At least 5 out of 6 questions must explicitly mention role-relevant concepts
+    for {job_role}, and at least 4 out of 6 must be tied to concrete résumé
     evidence points.
+- Every question MUST include exactly 2 follow-up prompts in "follow_ups".
 """
 
 # ---------------------------------------------------------------------------
@@ -282,7 +283,7 @@ class QuestionGeneratorAgent:
 
         Returns
         -------
-        list[dict]  The 8 generated question objects.
+        list[dict]  The 6 generated question objects.
 
         Raises
         ------
@@ -452,5 +453,51 @@ class QuestionGeneratorAgent:
                 f"Expected a JSON array from Gemini, got {type(questions).__name__}."
             )
 
-        logger.debug("Received %d questions from Gemini", len(questions))
+        questions = self._normalize_questions(questions)
+        logger.debug("Received %d normalized questions from Gemini", len(questions))
         return questions
+
+    @staticmethod
+    def _normalize_questions(questions: list[Any]) -> list[dict[str, Any]]:
+        """Normalize model output to exactly 6 questions, each with 2 follow-ups."""
+        normalized: list[dict[str, Any]] = []
+
+        for i, raw in enumerate(questions[:6], start=1):
+            if not isinstance(raw, dict):
+                continue
+
+            q_text = str(raw.get("question") or "").strip()
+            if not q_text:
+                continue
+
+            q_type = str(raw.get("type") or "behavioural").strip().lower()
+            if q_type not in {"behavioural", "technical", "situational", "curveball"}:
+                q_type = "behavioural"
+
+            intent = str(raw.get("intent") or "Assess candidate suitability for the role.").strip()
+            follow_ups_raw = raw.get("follow_ups") or []
+            follow_ups = [str(f).strip() for f in follow_ups_raw if str(f).strip()]
+            follow_ups = follow_ups[:2]
+
+            while len(follow_ups) < 2:
+                if len(follow_ups) == 0:
+                    follow_ups.append("Can you share one concrete example from your experience?")
+                else:
+                    follow_ups.append("What was the measurable outcome of that decision?")
+
+            normalized.append(
+                {
+                    "id": i,
+                    "type": q_type,
+                    "question": q_text,
+                    "intent": intent,
+                    "follow_ups": follow_ups,
+                }
+            )
+
+        if len(normalized) < 6:
+            raise ValueError(
+                f"Question generator returned only {len(normalized)} usable questions; expected 6."
+            )
+
+        return normalized

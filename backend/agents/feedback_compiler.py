@@ -147,6 +147,7 @@ no extra keys, no trailing commas:
   "tone_analysis": "<honest assessment of tone, attitude, and professionalism — cite specific moments>",
   "technical_depth_analysis": "<detailed analysis of the candidate's technical depth: evaluate specificity of technical answers, use of concrete examples vs vague generalities, accuracy of technical terminology, depth of system design or architectural reasoning, and whether they demonstrated hands-on expertise or only surface-level knowledge. Cite specific moments from the transcript.>",{posture_summary_schema}
   "decision": "offer" | "rejection",
+    "decision_reason": "<2-4 sentence plain-language reason for why this is an offer/rejection, grounded in transcript evidence and calibrated to job role + difficulty>",
   "decision_letter": "<full text of the mock offer or rejection letter, signed 'The MockMate Hiring Committee'>"
 }}
 
@@ -197,6 +198,10 @@ class FeedbackCompilerAgent:
             posture_avg,
             resume_data,
         )
+
+        # Post-process model output so decision policy remains consistent and
+        # clearly explained across roles and difficulties.
+        report = self._postprocess_report(report, session, posture_avg)
         report["session_id"] = session_id
         report["compiled_at"] = datetime.now(timezone.utc).isoformat()
         await self._persist(session_id, report, session)
@@ -258,7 +263,7 @@ class FeedbackCompilerAgent:
             # ── Legacy fallback: one document per frame ───────────────
             query = (
                 self._db.collection(_COL_POSTURE)
-                .where("session_id", "==", session_id)
+                .where(filter=firestore.FieldFilter("session_id", "==", session_id))
             )
             async for legacy_doc in query.stream():
                 data = legacy_doc.to_dict()
@@ -283,6 +288,7 @@ class FeedbackCompilerAgent:
             "user_id": session.get("user_id"),
             "persona": session.get("persona"),
             "job_role": session.get("job_role", "Software Engineer"),
+            "difficulty": session.get("difficulty", "medium"),
             "questions_count": len(session.get("questions", [])),
             "status": session.get("status"),
             "created_at": session.get("created_at"),
@@ -422,6 +428,169 @@ class FeedbackCompilerAgent:
             raise RuntimeError(
                 "Feedback model returned invalid JSON. Please try again."
             ) from exc
+
+    def _postprocess_report(
+        self,
+        report: dict[str, Any],
+        session: dict[str, Any],
+        posture_avg: dict[str, Any],
+    ) -> dict[str, Any]:
+        report = dict(report or {})
+        decision = str(report.get("decision") or "rejection").strip().lower()
+        if decision not in {"offer", "rejection"}:
+            decision = "rejection"
+
+        overall = self._safe_score(report.get("overall_score"))
+        role = str(session.get("job_role") or "Software Engineer")
+        difficulty = str(session.get("difficulty") or "medium").strip().lower()
+
+        threshold = self._decision_threshold(role, difficulty)
+        calibrated_decision = "offer" if overall >= threshold else "rejection"
+
+        # Always compute the reason ourselves to guarantee consistent
+        # polarity: offers emphasise positives, rejections emphasise
+        # improvement areas.
+        reason = self._build_decision_reason(
+            decision=calibrated_decision,
+            overall=overall,
+            threshold=threshold,
+            role=role,
+            difficulty=difficulty,
+            strengths=report.get("strengths", []),
+            improvements=report.get("improvement_areas", []),
+        )
+
+        report["overall_score"] = overall
+        report["decision"] = calibrated_decision
+        report["decision_reason"] = reason
+        report["posture_data_used"] = posture_avg.get("frames_analysed", 0) > 0
+        report["posture_frames_analysed"] = int(posture_avg.get("frames_analysed", 0) or 0)
+
+        original_decision = decision
+        letter = str(report.get("decision_letter") or "").strip()
+        if calibrated_decision != original_decision or not letter:
+            report["decision_letter"] = self._compose_decision_letter(
+                decision=calibrated_decision,
+                role=role,
+                reason=reason,
+                strengths=report.get("strengths", []),
+                improvements=report.get("improvement_areas", []),
+            )
+
+        return report
+
+    @staticmethod
+    def _safe_score(value: Any) -> int:
+        try:
+            score = int(round(float(value)))
+        except Exception:  # noqa: BLE001
+            score = 0
+        return max(0, min(100, score))
+
+    @staticmethod
+    def _role_level(job_role: str) -> int:
+        role = job_role.lower()
+        if any(k in role for k in ("intern", "trainee", "apprentice")):
+            return 0
+        if any(k in role for k in ("junior", "entry", "new grad", "graduate", "associate i", "sde1", "sde 1", "l3")):
+            return 1
+        if any(k in role for k in ("staff", "principal", "architect", "distinguished", "l6", "l7", "sde4", "sde 4")):
+            return 4
+        if any(k in role for k in ("lead", "manager", "director", "vp", "head", "l5", "sde3", "sde 3", "senior")):
+            return 3
+        if any(k in role for k in ("ii", "2", "mid", "intermediate", "sde2", "sde 2", "l4")):
+            return 2
+        return 2
+
+    def _decision_threshold(self, job_role: str, difficulty: str) -> int:
+        # Baseline tuned so medium mid-level roles can pass in high-60s when
+        # the transcript evidence is strong.
+        base = 68
+
+        role_offsets = {
+            0: -9,  # intern / trainee
+            1: -6,  # junior / entry
+            2: -3,  # mid / SDE2
+            3: 0,   # senior / lead
+            4: 3,   # staff+ / principal
+        }
+        difficulty_offsets = {
+            "easy": +1,
+            "medium": 0,
+            "hard": -3,
+        }
+
+        level = self._role_level(job_role)
+        threshold = base + role_offsets.get(level, 0) + difficulty_offsets.get(difficulty, 0)
+        return max(55, min(78, threshold))
+
+    def _build_decision_reason(
+        self,
+        decision: str,
+        overall: int,
+        threshold: int,
+        role: str,
+        difficulty: str,
+        strengths: Any,
+        improvements: Any,
+    ) -> str:
+        strengths_list = [str(s).strip() for s in (strengths or []) if str(s).strip()]
+        improvements_list = [str(s).strip() for s in (improvements or []) if str(s).strip()]
+
+        def _clean_fragment(text: str) -> str:
+            return text.rstrip(". !?;:")
+
+        top_strength = _clean_fragment(
+            strengths_list[0] if strengths_list else "solid role-relevant fundamentals"
+        )
+        top_gap = _clean_fragment(
+            improvements_list[0] if improvements_list else "more consistency in high-signal examples"
+        )
+
+        if decision == "offer":
+            return (
+                f"Offer recommended for {role} ({difficulty}) because interview performance met the calibrated bar "
+                f"({overall}/100 vs threshold {threshold}). Strongest signal: {top_strength}. "
+                f"Next-level improvement area: {top_gap}."
+            )
+
+        return (
+            f"Rejection recommended for {role} ({difficulty}) because performance stayed below the calibrated bar "
+            f"({overall}/100 vs threshold {threshold}). Priority improvement: {top_gap}. "
+            f"Positive signal to build on: {top_strength}."
+        )
+
+    def _compose_decision_letter(
+        self,
+        decision: str,
+        role: str,
+        reason: str,
+        strengths: Any,
+        improvements: Any,
+    ) -> str:
+        strengths_list = [str(s).strip() for s in (strengths or []) if str(s).strip()]
+        improvements_list = [str(s).strip() for s in (improvements or []) if str(s).strip()]
+        strengths_block = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Demonstrated relevant potential in this interview."
+        gaps_block = "\n".join(f"- {s}" for s in improvements_list[:3]) or "- Continue improving consistency across responses."
+
+        if decision == "offer":
+            return (
+                f"Dear Candidate,\n\n"
+                f"Thank you for interviewing for the {role} position. Based on this session, we are extending an offer.\n\n"
+                f"Why this decision:\n{reason}\n\n"
+                f"Key strengths observed:\n{strengths_block}\n\n"
+                f"Development focus areas as you onboard:\n{gaps_block}\n\n"
+                f"Sincerely,\nThe MockMate Hiring Committee"
+            )
+
+        return (
+            f"Dear Candidate,\n\n"
+            f"Thank you for interviewing for the {role} position. After review, we are not moving forward with an offer at this time.\n\n"
+            f"Why this decision:\n{reason}\n\n"
+            f"What worked well:\n{strengths_block}\n\n"
+            f"Top areas to improve before reapplying:\n{gaps_block}\n\n"
+            f"Sincerely,\nThe MockMate Hiring Committee"
+        )
 
     async def _persist(
         self,

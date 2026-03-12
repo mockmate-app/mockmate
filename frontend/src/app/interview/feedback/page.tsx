@@ -64,7 +64,7 @@ async function regenerateFeedback(sessionId: string): Promise<FeedbackReport> {
   const res = await fetch(`${API_BASE}/feedback/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ session_id: sessionId }),
+    body: JSON.stringify({ session_id: sessionId, refresh_card_values: true }),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -103,7 +103,10 @@ interface FeedbackReport {
   technical_depth_analysis: string;
   posture_summary?: string;
   decision: "offer" | "rejection";
+  decision_reason?: string;
   decision_letter: string;
+  posture_data_used?: boolean;
+  posture_frames_analysed?: number;
   session_id: string;
   compiled_at: string;
 }
@@ -125,6 +128,7 @@ interface SessionMeta {
   user_id?: string;
   persona: string;
   job_role: string;
+  difficulty?: string;
   interviewer_name: string;
   interviewer_avatar_url?: string;
   status: string;
@@ -363,8 +367,21 @@ function FeedbackContent() {
 
   const retryFeedbackMutation = useMutation({
     mutationFn: () => regenerateFeedback(sessionId),
-    onSuccess: (newReport) => {
+    onSuccess: async (newReport) => {
       queryClient.setQueryData(["feedback", sessionId], newReport);
+      try {
+        const refreshedCard = await fetch(
+          `${API_BASE}/performance-card/${sessionId}?refresh_values=true`,
+          { cache: "no-store" },
+        ).then((r) => (r.ok ? r.json() : null));
+        if (refreshedCard) {
+          queryClient.setQueryData(["performance-card", sessionId], refreshedCard);
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["performance-card", sessionId] });
+        }
+      } catch {
+        queryClient.invalidateQueries({ queryKey: ["performance-card", sessionId] });
+      }
       setRetryAttempts((prev) => prev + 1);
       setLastRetryAt(Date.now());
       toast.success("Feedback has been regenerated.");
@@ -384,6 +401,7 @@ function FeedbackContent() {
   // sessionMeta already declared above for the ownership guard
 
   const turns = transcript?.turns ?? [];
+  const expectedCardVersion = report?.compiled_at;
   // Build the interviewer avatar URL from the stored path (backend-relative)
   const interviewerAvatarUrl = sessionMeta?.interviewer_avatar_url
     ? `${API_BASE}${sessionMeta.interviewer_avatar_url}`
@@ -394,12 +412,17 @@ function FeedbackContent() {
     useQuery<PerformanceCardData | null>({
       queryKey: ["performance-card", sessionId],
       queryFn: () =>
-        fetch(`${API_BASE}/performance-card/${sessionId}`).then((r) =>
+        fetch(`${API_BASE}/performance-card/${sessionId}`, { cache: "no-store" }).then((r) =>
           r.ok ? r.json() : null,
         ),
       enabled: !!sessionId && !!report,
-      // Poll every 5s until the card arrives (background generation)
-      refetchInterval: (query) => (query.state.data ? false : 5000),
+      // Keep polling until card metadata matches the latest feedback version.
+      refetchInterval: (query) => {
+        const card = query.state.data as PerformanceCardData | null | undefined;
+        if (!expectedCardVersion) return 3000;
+        if (!card) return 3000;
+        return card.feedback_compiled_at === expectedCardVersion ? false : 3000;
+      },
     });
 
   const error = !sessionId
@@ -425,6 +448,8 @@ function FeedbackContent() {
               <div className="flex flex-wrap items-center gap-2 mt-2 text-white/40 text-sm">
                 {/* <p className="text-white/40 text-xs md:text-sm"> */}
                 <span className="text-primary">Job role </span>{sessionMeta.job_role}
+                {" | "}
+                <span className="text-primary">Difficulty </span>{sessionMeta.difficulty ?? "medium"}
                 {" | "}
                 <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
                 {" | "}
@@ -559,6 +584,19 @@ function FeedbackContent() {
               )}
 
               {/* Decision letter */}
+              {report.decision_reason && (
+                <Section
+                  title={report.decision === "offer" ? "Why Offer" : "Why Rejection"}
+                  className={report.decision === "offer"
+                    ? "border-emerald-500/40 bg-emerald-500/10"
+                    : "border-red-500/40 bg-red-500/10"
+                  }
+                >
+                  <p className="text-sm text-white/85 leading-relaxed">{report.decision_reason}</p>
+                </Section>
+              )}
+
+              {/* Decision letter */}
               <Section title={report.decision === "offer" ? "Offer Letter" : "Rejection Letter"} className="border-orange bg-orange-500/20">
                 <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap">
                   {report.decision_letter}
@@ -599,8 +637,8 @@ function FeedbackContent() {
                 <Button
                   onClick={() => retryFeedbackMutation.mutate()}
                   disabled={retryDisabled}
-                  variant="ghost"
-                  className="rounded-full border-white/20 bg-white/5"
+                  variant="outline"
+                  className="rounded-full"
                 >
                   {retryFeedbackMutation.isPending ? "Regenerating…" : "Retry feedback generation"}
                 </Button>

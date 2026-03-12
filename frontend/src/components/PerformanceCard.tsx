@@ -19,6 +19,7 @@ export interface PerformanceCardData {
   persona: string;
   interviewer_name: string;
   motivational_line: string;
+  feedback_compiled_at?: string;
   has_background: boolean;
   image_url: string | null;
 }

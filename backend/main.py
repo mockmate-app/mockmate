@@ -98,6 +98,8 @@ class SessionConfig(BaseModel):
 
 class FeedbackRequest(BaseModel):
     session_id: str
+    refresh_card_values: bool = False
+    regenerate_performance_card: bool = False
 
 
 class SessionEndRequest(BaseModel):
@@ -248,6 +250,7 @@ async def start_session(config: SessionConfig, background_tasks: BackgroundTasks
         questions=questions,
         persona=config.persona,
         job_role=config.job_role,
+        difficulty=config.difficulty,
     )
     # Eagerly warm up the avatar cache in the background so it is ready
     # by the time the user enters the live interview page.
@@ -414,9 +417,18 @@ async def generate_feedback(req: FeedbackRequest, background_tasks: BackgroundTa
         report = await app.state.feedback_compiler.compile(req.session_id)
         # Kick off performance-card generation in the background so
         # it's ready by the time the user visits the dashboard.
-        background_tasks.add_task(
-            app.state.performance_card.generate, req.session_id,
-        )
+        if req.refresh_card_values:
+            background_tasks.add_task(
+                app.state.performance_card.refresh_metadata, req.session_id,
+            )
+        elif req.regenerate_performance_card:
+            background_tasks.add_task(
+                app.state.performance_card.generate, req.session_id, True,
+            )
+        else:
+            background_tasks.add_task(
+                app.state.performance_card.generate, req.session_id,
+            )
         return report
     except ValueError as exc:
         # Session not found
@@ -444,13 +456,22 @@ async def generate_feedback(req: FeedbackRequest, background_tasks: BackgroundTa
 # ---------------------------------------------------------------------------
 
 @app.get("/performance-card/{session_id}", tags=["performance-card"])
-async def get_performance_card(session_id: str):
+async def get_performance_card(
+    session_id: str,
+    refresh_values: bool = False,
+    force_regenerate: bool = False,
+):
     """
     Return card metadata (score, motivational line, persona, job role, …).
     Generates the card on-the-fly if feedback exists but the card hasn't been
     created yet (idempotent).
     """
-    card = await app.state.performance_card.generate(session_id)
+    if refresh_values:
+        card = await app.state.performance_card.refresh_metadata(session_id)
+    else:
+        card = await app.state.performance_card.generate(
+            session_id, force_regenerate=force_regenerate,
+        )
     if card is None:
         raise HTTPException(
             status_code=404,
