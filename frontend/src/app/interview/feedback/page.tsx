@@ -172,7 +172,7 @@ function Section({ title, children, className }: { title: string; children: Reac
   return (
     <Card className={`rounded-2xl border border-white/10 bg-white/5 ${className}`}>
       <CardContent className="p-5">
-        <h2 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-4">
+        <h2 className="text-sm font-semibold text-white/50 underline underline-offset-6 uppercase tracking-widest mb-4">
           {title}
         </h2>
         {children}
