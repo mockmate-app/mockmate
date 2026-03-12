@@ -445,11 +445,11 @@ function FeedbackContent() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Interview Feedback</h1>
             {sessionMeta ? (
-              <div className="flex flex-wrap items-center gap-2 mt-2 text-white/40 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 text-white/40 text-sm capitalize">
                 {/* <p className="text-white/40 text-xs md:text-sm"> */}
                 <span className="text-primary">Job role </span>{sessionMeta.job_role}
                 {" | "}
-                <span className="text-primary">Difficulty </span>{sessionMeta.difficulty ?? "medium"}
+                <span className="text-primary">Difficulty </span>{sessionMeta.difficulty}
                 {" | "}
                 <span className="text-primary">Persona </span>{PERSONA_LABELS[sessionMeta.persona] ?? sessionMeta.persona}
                 {" | "}
