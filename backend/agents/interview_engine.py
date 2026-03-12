@@ -943,186 +943,84 @@ class InterviewEngineAgent:
         user_id: str,
         limit: int = 7,
     ) -> dict[str, Any]:
-        """Return progression and benchmark analytics for dashboard charts."""
+        """Return progression and benchmark analytics from Postgres only."""
+        import asyncpg
 
-        # Prefer Postgres analytics cache (materialized views) when configured.
-        if _PGHOST and _PGUSER and _PGPASSWORD and _PGDATABASE:
-            try:
-                import asyncpg
-
-                conn = await asyncpg.connect(
-                    host=_PGHOST,
-                    port=_PGPORT,
-                    user=_PGUSER,
-                    password=_PGPASSWORD,
-                    database=_PGDATABASE,
-                )
-                try:
-                    trend_rows = await conn.fetch(
-                        """
-                        SELECT session_id, overall_score, created_at
-                        FROM analytics_feedback_scores
-                        WHERE user_id = $1 AND overall_score IS NOT NULL
-                        ORDER BY created_at DESC
-                        LIMIT $2
-                        """,
-                        user_id,
-                        max(1, limit),
-                    )
-                    trend_rows = list(reversed(trend_rows))
-                    progression = [
-                        {
-                            "session_id": r["session_id"],
-                            "overall_score": int(round(float(r["overall_score"]))),
-                            "created_at": r["created_at"].isoformat(),
-                        }
-                        for r in trend_rows
-                    ]
-
-                    user_avg_row = await conn.fetchrow(
-                        """
-                        SELECT communication, confidence, structure,
-                               technical_depth, domain_vocabulary,
-                               posture_presence, sessions_count
-                        FROM analytics_user_dimension_averages
-                        WHERE user_id = $1
-                        """,
-                        user_id,
-                    )
-
-                    global_avg_row = await conn.fetchrow(
-                        """
-                        SELECT communication, confidence, structure,
-                               technical_depth, domain_vocabulary,
-                               posture_presence, reports_count
-                        FROM analytics_global_dimension_averages
-                        """
-                    )
-
-                    if user_avg_row or global_avg_row:
-                        user_avg = {
-                            "communication": float(user_avg_row["communication"]) if user_avg_row and user_avg_row["communication"] is not None else None,
-                            "confidence": float(user_avg_row["confidence"]) if user_avg_row and user_avg_row["confidence"] is not None else None,
-                            "structure": float(user_avg_row["structure"]) if user_avg_row and user_avg_row["structure"] is not None else None,
-                            "technical_depth": float(user_avg_row["technical_depth"]) if user_avg_row and user_avg_row["technical_depth"] is not None else None,
-                            "domain_vocabulary": float(user_avg_row["domain_vocabulary"]) if user_avg_row and user_avg_row["domain_vocabulary"] is not None else None,
-                            "posture_presence": float(user_avg_row["posture_presence"]) if user_avg_row and user_avg_row["posture_presence"] is not None else None,
-                        }
-                        global_avg = {
-                            "communication": float(global_avg_row["communication"]) if global_avg_row and global_avg_row["communication"] is not None else None,
-                            "confidence": float(global_avg_row["confidence"]) if global_avg_row and global_avg_row["confidence"] is not None else None,
-                            "structure": float(global_avg_row["structure"]) if global_avg_row and global_avg_row["structure"] is not None else None,
-                            "technical_depth": float(global_avg_row["technical_depth"]) if global_avg_row and global_avg_row["technical_depth"] is not None else None,
-                            "domain_vocabulary": float(global_avg_row["domain_vocabulary"]) if global_avg_row and global_avg_row["domain_vocabulary"] is not None else None,
-                            "posture_presence": float(global_avg_row["posture_presence"]) if global_avg_row and global_avg_row["posture_presence"] is not None else None,
-                        }
-                        return {
-                            "user_id": user_id,
-                            "progression": progression,
-                            "user_average_dimensions": user_avg,
-                            "global_average_dimensions": global_avg,
-                            "sample_sizes": {
-                                "user_sessions": int(user_avg_row["sessions_count"]) if user_avg_row and user_avg_row["sessions_count"] is not None else 0,
-                                "global_feedback_reports": int(global_avg_row["reports_count"]) if global_avg_row and global_avg_row["reports_count"] is not None else 0,
-                            },
-                            "source": "postgres_materialized",
-                        }
-                finally:
-                    await conn.close()
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Postgres dashboard analytics unavailable, falling back to Firestore: %s", exc)
-
-        dim_keys = [
-            "communication",
-            "confidence",
-            "structure",
-            "technical_depth",
-            "domain_vocabulary",
-            "posture_presence",
-        ]
-
-        # 1) Fetch all sessions for the user to build progression and user averages.
-        sessions_query = (
-            self._db.collection(_COLLECTION)
-            .where(filter=firestore.FieldFilter("user_id", "==", user_id))
+        conn = await asyncpg.connect(
+            host=_PGHOST,
+            port=_PGPORT,
+            user=_PGUSER,
+            password=_PGPASSWORD,
+            database=_PGDATABASE,
         )
+        try:
+            trend_rows = await conn.fetch(
+                """
+                SELECT session_id, overall_score, created_at
+                FROM analytics_feedback_scores
+                WHERE user_id = $1 AND overall_score IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT $2
+                """,
+                user_id,
+                max(1, limit),
+            )
+            trend_rows = list(reversed(trend_rows))
+            progression = [
+                {
+                    "session_id": r["session_id"],
+                    "overall_score": int(round(float(r["overall_score"]))),
+                    "created_at": r["created_at"].isoformat(),
+                }
+                for r in trend_rows
+            ]
 
-        user_sessions: list[dict[str, Any]] = []
-        async for doc in sessions_query.stream():
-            data = doc.to_dict()
-            if data.get("feedback_ready"):
-                user_sessions.append(data)
+            user_avg_row = await conn.fetchrow(
+                """
+                SELECT communication, confidence, structure,
+                       technical_depth, domain_vocabulary,
+                       posture_presence, sessions_count
+                FROM analytics_user_dimension_averages
+                WHERE user_id = $1
+                """,
+                user_id,
+            )
 
-        user_sessions.sort(
-            key=lambda s: s.get("last_retried_at") or s.get("created_at") or "",
-            reverse=True,
-        )
+            global_avg_row = await conn.fetchrow(
+                """
+                SELECT communication, confidence, structure,
+                       technical_depth, domain_vocabulary,
+                       posture_presence, reports_count
+                FROM analytics_global_dimension_averages
+                """
+            )
 
-        # 2) Last-N progression points.
-        recent_sessions = user_sessions[: max(1, limit)]
-        progression: list[dict[str, Any]] = [
-            {
-                "session_id": s.get("session_id"),
-                "overall_score": s.get("overall_score"),
-                "created_at": s.get("created_at"),
+            _dim_keys = [
+                "communication", "confidence", "structure",
+                "technical_depth", "domain_vocabulary", "posture_presence",
+            ]
+
+            def _extract_dims(row):
+                if not row:
+                    return {k: None for k in _dim_keys}
+                return {
+                    k: float(row[k]) if row[k] is not None else None
+                    for k in _dim_keys
+                }
+
+            return {
+                "user_id": user_id,
+                "progression": progression,
+                "user_average_dimensions": _extract_dims(user_avg_row),
+                "global_average_dimensions": _extract_dims(global_avg_row),
+                "sample_sizes": {
+                    "user_sessions": int(user_avg_row["sessions_count"]) if user_avg_row and user_avg_row["sessions_count"] is not None else 0,
+                    "global_feedback_reports": int(global_avg_row["reports_count"]) if global_avg_row and global_avg_row["reports_count"] is not None else 0,
+                },
+                "source": "postgres",
             }
-            for s in reversed(recent_sessions)
-            if s.get("overall_score") is not None
-        ]
-
-        # 3) User dimension averages (across all feedback-ready sessions for this user).
-        user_dim_sums = {k: 0.0 for k in dim_keys}
-        user_dim_counts = {k: 0 for k in dim_keys}
-
-        for s in user_sessions:
-            sid = s.get("session_id")
-            if not sid:
-                continue
-            feedback_doc = await self._db.collection(_FEEDBACK_COLLECTION).document(sid).get()
-            if not feedback_doc.exists:
-                continue
-            dim_scores = feedback_doc.to_dict().get("dimension_scores", {})
-            for key in dim_keys:
-                val = dim_scores.get(key)
-                if isinstance(val, (int, float)):
-                    user_dim_sums[key] += float(val)
-                    user_dim_counts[key] += 1
-
-        user_avg = {
-            k: round(user_dim_sums[k] / user_dim_counts[k], 1) if user_dim_counts[k] else None
-            for k in dim_keys
-        }
-
-        # 4) Global dimension averages (across all feedback reports).
-        global_dim_sums = {k: 0.0 for k in dim_keys}
-        global_dim_counts = {k: 0 for k in dim_keys}
-        global_reports = 0
-
-        async for doc in self._db.collection(_FEEDBACK_COLLECTION).stream():
-            global_reports += 1
-            dim_scores = doc.to_dict().get("dimension_scores", {})
-            for key in dim_keys:
-                val = dim_scores.get(key)
-                if isinstance(val, (int, float)):
-                    global_dim_sums[key] += float(val)
-                    global_dim_counts[key] += 1
-
-        global_avg = {
-            k: round(global_dim_sums[k] / global_dim_counts[k], 1) if global_dim_counts[k] else None
-            for k in dim_keys
-        }
-
-        return {
-            "user_id": user_id,
-            "progression": progression,
-            "user_average_dimensions": user_avg,
-            "global_average_dimensions": global_avg,
-            "sample_sizes": {
-                "user_sessions": len(user_sessions),
-                "global_feedback_reports": global_reports,
-            },
-            "source": "firestore_fallback",
-        }
+        finally:
+            await conn.close()
 
     async def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Return lightweight metadata for a single session, or None."""

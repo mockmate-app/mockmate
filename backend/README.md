@@ -232,11 +232,18 @@ gcloud run deploy mockmate-backend \
   --env-vars-file cloudrun-env.yaml
 ```
 
-Or use the deployment script from the repo root, which reads all variables from `backend/.env` automatically:
+Or use the deployment script:
 
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
+```
+
+You can also deploy from the repo root:
+
+```bash
+chmod +x deploy.sh
+./deploy.sh backend
 ```
 
 ---

@@ -21,6 +21,7 @@ MockMate is an AI-powered mock interview platform that conducts real, adaptive i
 - [Quick Start (Local Setup)](#-quick-start-local-setup)
 - [Project Structure](#-project-structure)
 - [Cloud Deployment](#-cloud-deployment)
+- [Automating Cloud Deployment](#-automating-cloud-deployment)
 - [Proof of Google Cloud Deployment](#-proof-of-google-cloud-deployment)
 - [How It Works — User Flow](#-how-it-works--user-flow)
 - [What Makes MockMate Different](#-what-makes-mockmate-different)
@@ -326,6 +327,7 @@ mockmate/
 │   ├── main.py                         # REST + WebSocket endpoints, lifespan
 │   ├── Dockerfile                      # Multi-stage production container
 │   ├── requirements.txt                # Python dependencies
+│   ├── deploy.sh                       # Backend deployment script (Cloud Run)
 │   ├── .env.example                    # Environment variable template
 │   └── agents/
 │       ├── config.py                   # Shared configuration & env var loading
@@ -340,6 +342,7 @@ mockmate/
 │       └── personas.json              # 13 interviewer persona definitions
 │
 ├── frontend/                           # Next.js web app (TypeScript)
+│   ├── deploy.sh                       # Frontend deployment script (Vercel)
 │   ├── src/
 │   │   ├── app/                        # Pages (App Router)
 │   │   │   ├── dashboard/              # Session history, stats, performance card, next-interview recommendation
@@ -358,7 +361,7 @@ mockmate/
 │   ├── package.json
 │   └── next.config.ts
 │
-└── deploy.sh                           # Cloud Run deployment script
+└── deploy.sh                           # Full-stack deployment orchestrator
 ```
 
 ---
@@ -384,15 +387,6 @@ gcloud run deploy mockmate-backend \
   --env-vars-file backend/cloudrun-env.yaml
 ```
 
-Or use the deployment script, which automatically reads all variables from `backend/.env`:
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-> **Note:** The `deploy.sh` script parses `backend/.env` and passes every key-value pair to Cloud Run via `--set-env-vars`. Make sure your `.env` file is populated before deploying.
-
 ### Frontend → Vercel
 
 The frontend is deployed on Vercel with environment variables configured in the Vercel dashboard:
@@ -406,6 +400,41 @@ Set these environment variables in Vercel:
 - `NEXT_PUBLIC_API_URL` → your Cloud Run backend URL (e.g., `https://mockmate-backend-xxxxx.run.app`)
 - `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - PostgreSQL connection variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`)
+
+---
+
+## 🚀 Automating Cloud Deployment
+
+Both the backend and frontend have **fully automated continuous deployments** linked directly to the GitHub repository:
+
+| Service | Platform | Trigger | How |
+|---------|----------|---------|-----|
+| **Backend** | Google Cloud Run | Push to `main` (changes in `backend/`) | Cloud Run continuous deployment connected to GitHub via the GCP Console |
+| **Frontend** | Vercel | Push to `main` (changes in `frontend/`) | Vercel Git integration connected to the GitHub repository |
+
+Every push to `main` automatically builds and deploys the affected service — no manual steps required.
+
+### Deployment Scripts
+
+For local or manual deployments, each service also has its own deployment script:
+
+```bash
+# Deploy backend only (Cloud Run)
+chmod +x backend/deploy.sh
+./backend/deploy.sh
+
+# Deploy frontend only (Vercel)
+chmod +x frontend/deploy.sh
+./frontend/deploy.sh
+
+# Deploy both at once from repo root
+chmod +x deploy.sh
+./deploy.sh                 # deploys backend + frontend
+./deploy.sh backend         # backend only
+./deploy.sh frontend        # frontend only
+```
+
+> **Note:** The backend `deploy.sh` script parses `backend/.env` and passes every key-value pair to Cloud Run via `--set-env-vars`. Make sure your `.env` file is populated before deploying.
 
 ---
 
