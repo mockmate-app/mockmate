@@ -691,17 +691,15 @@ function LiveInterviewContent() {
               ? rms
               : noiseFloorRef.current * 0.92 + rms * 0.08;
 
-          const dynamicThreshold = Math.max(0.015, noiseFloorRef.current * 2.2);
+          const dynamicThreshold = Math.max(0.02, noiseFloorRef.current * 2.4);
 
           if (rms > dynamicThreshold) {
             speechStreakRef.current += 1;
           } else {
-            // Gradual decay instead of hard reset — tolerates brief quiet
-            // frames (plosives, breaths) during natural speech.
-            speechStreakRef.current = Math.max(0, speechStreakRef.current - 1);
+            speechStreakRef.current = 0;
           }
 
-          if (speechStreakRef.current >= 1) {
+          if (speechStreakRef.current >= 2) {
             setYouSpeaking(true);
             setYourTurn(true);
             if (userSpeakingTimeoutRef.current) {
@@ -709,7 +707,7 @@ function LiveInterviewContent() {
             }
             userSpeakingTimeoutRef.current = window.setTimeout(() => {
               setYouSpeaking(false);
-            }, 2500);
+            }, 1800);
           }
         }
         sendChunkRef.current(e.data);
@@ -885,44 +883,17 @@ function LiveInterviewContent() {
             msg.type === "input_transcription" ? "you" : "interviewer";
           const finished = msg.finished ?? false;
 
-          // When we receive the user's own transcribed speech, reset the
-          // local speaking-timeout so the indicator stays alive until
-          // the transcript entry is visible (avoids the bubble flickering
-          // off while Gemini is still streaming partial text back).
-          if (speaker === "you") {
-            if (userSpeakingTimeoutRef.current) {
-              window.clearTimeout(userSpeakingTimeoutRef.current);
-            }
-            if (finished) {
-              // Final transcript arrived — fade out the indicator shortly
-              userSpeakingTimeoutRef.current = window.setTimeout(() => {
-                setYouSpeaking(false);
-              }, 400);
-            } else {
-              // Partial transcript — keep indicator alive a bit longer
-              setYouSpeaking(true);
-              userSpeakingTimeoutRef.current = window.setTimeout(() => {
-                setYouSpeaking(false);
-              }, 2500);
-            }
+          // Only add to transcript once the utterance is complete.
+          // Partials cause flickering word-by-word display and fragment
+          // bubbles ("oo", "about") — the typing indicator already gives
+          // visual feedback that someone is speaking.
+          if (!finished) {
+            if (speaker === "interviewer") setYourTurn(false);
+            return;
           }
 
-          // Show partials in real-time by updating the last in-progress
-          // entry for this speaker.  When the final transcript arrives
-          // we replace the partial text with the authoritative version.
           setTranscript((prev) => {
-            const lastIdx = prev.length - 1;
-            const last = lastIdx >= 0 ? prev[lastIdx] : null;
-
-            // Same speaker, still in-progress → update in place
-            if (last && last.speaker === speaker && !last.finished) {
-              const updated = [...prev];
-              updated[lastIdx] = { ...last, text, finished };
-              return updated;
-            }
-
-            // New entry (either first partial or new finished utterance)
-            return [...prev, { speaker, text, finished, ts: Date.now() }];
+            return [...prev, { speaker, text, finished: true, ts: Date.now() }];
           });
 
           if (speaker === "interviewer") setYourTurn(false);
@@ -1236,11 +1207,7 @@ function LiveInterviewContent() {
         ts: Date.now(),
       };
       const finalTranscript = [...transcriptRef.current, stageEntry];
-      // Mark any lingering partial as finished before persisting
-      const persistTranscript = finalTranscript.map((e) =>
-        e.finished === false ? { ...e, finished: true } : e,
-      );
-      setTranscript(persistTranscript);
+      setTranscript(finalTranscript);
 
       // Graceful shutdown: signal end first, then fallback close if backend
       // hasn't closed the socket shortly after.
@@ -1270,7 +1237,7 @@ function LiveInterviewContent() {
       setYouSpeaking(false);
       setYourTurn(false);
       speechStreakRef.current = 0;
-      await persistSessionEnd(endedBy, persistTranscript);
+      await persistSessionEnd(endedBy, finalTranscript);
       const transcriptUploaded = await waitForTranscriptUpload();
       // Bust the React Query cache for this session so the feedback page
       // always fetches the latest transcript and regenerates feedback from
@@ -1540,7 +1507,7 @@ function LiveInterviewContent() {
 
         <main className="flex-1 min-h-0 flex flex-col">
           {/* Sticky camera-on reminder for posture analysis */}
-          {!isActive && cameraOn && (
+          {isActive && !cameraOn && (
             <div className="p-4">
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange/15 border border-orange/30 text-orange text-xs font-medium w-fit mx-auto">
                 <Video size={14} className="shrink-0" />
@@ -1637,9 +1604,8 @@ function LiveInterviewContent() {
               ),
             )}
 
-            {/* Typing indicator — only shown when speaking but no partial text yet */}
-            {isActive && transcript.length > 0 && aiSpeaking &&
-              !(transcript[transcript.length - 1]?.speaker === "interviewer" && transcript[transcript.length - 1]?.finished === false) && (
+            {/* Typing indicator — anchored at bottom once transcript has started */}
+            {isActive && transcript.length > 0 && aiSpeaking && (
               <TypingBubble
                 speaker="interviewer"
                 interviewerInitial={interviewerInitial}
@@ -1649,9 +1615,8 @@ function LiveInterviewContent() {
             )}
             {isActive &&
               transcript.length > 0 &&
-              youSpeaking &&
-              !muted &&
-              !(transcript[transcript.length - 1]?.speaker === "you" && transcript[transcript.length - 1]?.finished === false) && (
+              (youSpeaking || (yourTurn && !aiSpeaking)) &&
+              !muted && (
                 <TypingBubble
                   speaker="you"
                   interviewerInitial={interviewerInitial}

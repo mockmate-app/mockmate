@@ -62,6 +62,7 @@ logger = logging.getLogger(__name__)
 
 _APP_NAME     = "mockmate"
 _DEFAULT_VOICE = "Aoede"
+_RESUME_TRANSCRIPT_MAX_TURNS = 24
 
 # ---------------------------------------------------------------------------
 # Per-session flavor randomization
@@ -1174,9 +1175,12 @@ class InterviewEngineAgent:
                 if prior_turns:
                     _is_resume = True
                     _prior_transcript_turns = prior_turns
+                    # Keep replay context bounded so reconnect does not dilute
+                    # core persona/accent instructions from the base prompt.
+                    replay_turns = prior_turns[-_RESUME_TRANSCRIPT_MAX_TURNS:]
                     # Build conversation history text
                     history_lines = []
-                    for entry in prior_turns:
+                    for entry in replay_turns:
                         speaker = entry.get("speaker", "unknown")
                         label = "CANDIDATE" if speaker == "user" else "INTERVIEWER"
                         text = entry.get("text", "").strip()
@@ -1188,7 +1192,7 @@ class InterviewEngineAgent:
 ━━━ SESSION RESUME — CONNECTION WAS INTERRUPTED ━━━
 
 This is a RESUMED session. The connection was interrupted mid-interview.
-Below is the COMPLETE conversation that already took place before the drop.
+Below is the most recent conversation context before the drop.
 You MUST treat this as continuous — do NOT:
   • Re-introduce yourself or greet the candidate again
   • Ask for their introduction again
@@ -1206,11 +1210,19 @@ Instead:
 --- Prior conversation transcript ---
 {transcript_text}
 --- End of prior conversation ---
+
+━━━ RE-ANCHOR (MUST APPLY IMMEDIATELY AFTER RECONNECT) ━━━
+Before your next spoken response, silently re-apply all base rules from this
+system prompt, with highest emphasis on:
+1) Accent consistency ({accent_hint})
+2) Persona voice and tone ({interviewer_name})
+3) Guardrails and interview flow constraints
+Do NOT switch to neutral/robotic style after reconnect.
 """
                     logger.info(
-                        "Resuming session with prior transcript — "
-                        "session_id=%s  prior_turns=%d",
-                        session_id, len(prior_turns),
+                        "Resuming session with replay context — "
+                        "session_id=%s  prior_turns=%d  replay_turns=%d",
+                        session_id, len(prior_turns), len(replay_turns),
                     )
 
         # ── Phase 1: init ADK runner (per-session; system prompt is dynamic) ──
@@ -1257,8 +1269,8 @@ Instead:
                 # activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
-                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_MEDIUM,
-                    silence_duration_ms=1200,  # faster turn detection → transcript arrives sooner
+                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
+                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
                     prefix_padding_ms=300,     # capture speech onset with padding
                 ),
             ),

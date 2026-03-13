@@ -74,6 +74,23 @@ _PERSONA_VISUAL: dict[str, str] = {
     "ai_engineer":           "mystical AI neural network visualization with glowing nodes",
 }
 
+_ROLE_VISUAL_HINTS: dict[str, str] = {
+    "software engineer": "interlocking circuit pathways and modular logic blocks",
+    "frontend": "layered interface grids and fluid interaction waves",
+    "backend": "server lattice structures and resilient data streams",
+    "full stack": "bridged dual-layer networks connecting UI and data cores",
+    "data": "flowing analytical contours and clustered signal constellations",
+    "machine learning": "neural mesh patterns and adaptive gradient fields",
+    "ai": "self-organizing node webs and emergent intelligence motifs",
+    "product": "roadmap arcs, decision nodes, and converging trajectory lines",
+    "manager": "orchestrated pathways and coordinated directional vectors",
+    "consultant": "structured frameworks, matrix planes, and strategic axes",
+    "bank": "precision geometry, momentum vectors, and high-contrast kinetic lines",
+    "finance": "market-wave topographies and disciplined geometric rhythm",
+    "designer": "spatial composition forms and expressive shape balance",
+    "architect": "system blueprint layers and structural geometric depth",
+}
+
 # ---------------------------------------------------------------------------
 # Score → mood mapping for the image
 # ---------------------------------------------------------------------------
@@ -102,6 +119,60 @@ def _score_mood(score: int) -> dict[str, str]:
         "scene_extra": "dramatic storm clouds parting to reveal distant light, rain clearing, resilience",
         "palette": "deep purple, midnight blue, silver edges, faint warm glow on the horizon",
     }
+
+
+def _score_abstract_motif(score: int) -> str:
+    if score >= 85:
+        return "ascending luminous geometry, confident upward vectors, expansive open negative space"
+    if score >= 70:
+        return "stable layered forms, forward motion arcs, balanced rhythm with clear focal flow"
+    if score >= 50:
+        return "transitional gradients, rebuilding symmetry, breakthrough lines emerging from tension"
+    return "compressed dark forms opening into subtle light channels, resilience-through-friction composition"
+
+
+def _role_visual_hint(job_role: str) -> str:
+    role = (job_role or "").lower()
+    for k, v in _ROLE_VISUAL_HINTS.items():
+        if k in role:
+            return v
+    return "professional abstract geometry with disciplined visual hierarchy"
+
+
+def _motivation_visual_hint(motivational_line: str) -> str:
+    text = (motivational_line or "").lower()
+    if not text:
+        return "progress, clarity, growth, and composure"
+
+    mapping = {
+        "grow": "expanding concentric forms",
+        "growth": "expanding concentric forms",
+        "improve": "iterative refinement lines",
+        "progress": "forward trajectory ribbons",
+        "forward": "forward trajectory ribbons",
+        "confidence": "grounded central axis",
+        "calm": "soft stable wavefields",
+        "focus": "sharp focal beam geometry",
+        "clarity": "crisp layered translucency",
+        "learn": "branching knowledge pathways",
+        "build": "modular block synthesis",
+        "strong": "high-contrast structural anchors",
+        "resilience": "fracture-to-flow transitions",
+        "momentum": "accelerating directional strokes",
+        "next": "gateway-like progression frames",
+        "peak": "summit-oriented angular ascent",
+        "win": "radiant convergence burst",
+        "ready": "aligned vector lock-in",
+    }
+
+    hints: list[str] = []
+    for token, hint in mapping.items():
+        if token in text:
+            hints.append(hint)
+    if not hints:
+        return "forward momentum, structured optimism, and disciplined growth"
+    # Keep prompt concise while still grounded in the quote semantics.
+    return ", ".join(hints[:4])
 
 
 # ---------------------------------------------------------------------------
@@ -142,26 +213,36 @@ def _build_card_prompt(
     mood = score_info["mood"]
     scene_extra = score_info["scene_extra"]
     palette = score_info["palette"]
-    trophy = "with a subtle golden trophy silhouette" if score >= 85 else ""
+    score_motif = _score_abstract_motif(score)
+    role_hint = _role_visual_hint(job_role)
+    motivation_hint = _motivation_visual_hint(motivational_line)
 
-    # Distill the motivational line into visual imagery keywords
-    quote_hint = ""
-    if motivational_line:
-        quote_hint = (
-            f"The artwork should visually evoke the feeling of: \"{motivational_line}\". "
-            f"Translate this sentiment into abstract visual metaphors — do NOT render any text. "
-        )
+    decision_tone = (
+        "achievement-forward but tasteful"
+        if decision == "offer"
+        else "constructive and determined"
+    )
+
+    quote_hint = (
+        f"Motivational anchor: \"{motivational_line}\". "
+        f"Convert this into non-literal abstract symbolism using {motivation_hint}. "
+        if motivational_line
+        else ""
+    )
 
     return (
-        f"Abstract, cinematic wide-format background artwork for a premium achievement card. "
-        f"Scene: {visual}, blended with {scene_extra}. "
-        f"Mood: {mood}. Color palette: {palette}. {trophy} "
+        f"Abstract-first, cinematic wide-format background artwork for a premium interview performance card. "
+        f"Persona cue: {persona}. Role cue: {job_role}. "
+        f"Visual DNA: {visual}. Role abstraction: {role_hint}. "
+        f"Score: {score}/100 with {decision_tone} energy. Score motif: {score_motif}. "
+        f"Mood: {mood}. Supporting atmosphere: {scene_extra}. Color palette: {palette}. "
         f"{quote_hint}"
-        f"Style: ultra-wide 16:9 aspect ratio, soft bokeh, rich depth of field, "
-        f"subtle lens flare, premium gradient overlay transitioning from deep navy/charcoal "
-        f"on the left third to the scene on the right. The left side MUST be dark and clean "
-        f"enough to serve as a text overlay area. "
-        f"NO text, NO letters, NO numbers, NO watermarks, NO people, NO faces. "
+        f"Composition rules: keep it mostly abstract (at least 80% abstract forms), "
+        f"no literal office scenes, no literal trophies, no literal mountains, and no explicit symbols. "
+        f"Style: ultra-wide 16:9, rich depth, subtle atmospheric glow, premium editorial finish, "
+        f"left third must stay darker and visually quiet for text overlay readability, "
+        f"right side can carry the strongest visual energy and detail. "
+        f"NO text, NO letters, NO numbers, NO logos, NO watermarks, NO people, NO faces. "
         f"Photorealistic, high quality, editorial magazine aesthetic."
     )
 

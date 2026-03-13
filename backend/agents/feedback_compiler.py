@@ -108,6 +108,17 @@ CRITICAL — speaker attribution (MUST enforce):
 - Vocabulary calibration and domain_vocabulary scoring must be based EXCLUSIVELY
   on words the CANDIDATE actually spoke.
 
+Transcript quality control (CRITICAL):
+- The transcript may contain occasional ASR artifacts/noise (e.g., stray one-word
+    fragments, repeated nonsense like "love love love", accidental greetings,
+    or clipped syllables).
+- Treat low-signal noise as non-evidence. Do NOT interpret these artifacts as
+    explicit candidate claims, intent, or knowledge.
+- Prioritize substantive candidate turns that include coherent reasoning,
+    concrete examples, and role-relevant content.
+- Never anchor scoring on a single noisy line; form judgments from sustained,
+    relevant evidence across multiple meaningful candidate turns.
+
 Scoring rules (enforce strictly):
 - communication  : clarity, articulation, active listening, professional tone.
   Deduct heavily for unprofessional behavior, rudeness, hostility, dismissiveness.
@@ -304,18 +315,9 @@ class FeedbackCompilerAgent:
 
         job_role = meta["job_role"]
 
-        # Build transcript text — turns are {speaker: user|interviewer, text, ts}
-        if transcript_turns:
-            lines = []
-            for entry in transcript_turns:
-                speaker = entry.get("speaker", "unknown")
-                label = "CANDIDATE" if speaker == "user" else "INTERVIEWER"
-                text = entry.get("text", "").strip()
-                if text:
-                    lines.append(f"{label}: {text}")
-            transcript_text = "\n".join(lines)
-        else:
-            transcript_text = "(no transcript recorded — do not fabricate content; set all scores to 0)"
+        # Build transcript text from cleaned turns so accidental ASR noise does not
+        # disproportionately affect feedback/scoring.
+        transcript_text, transcript_meta = self._build_feedback_transcript_text(transcript_turns)
 
         has_posture = posture_avg.get("frames_analysed", 0) > 0
 
@@ -365,9 +367,12 @@ class FeedbackCompilerAgent:
 
         logger.info(
             "Generating feedback report — session=%s  prompt_chars=%d  "
-            "transcript_turns=%d  model=%s",
+            "transcript_turns=%d  kept_turns=%d  dropped_low_signal=%d  model=%s",
             session.get("session_id", "?"), len(prompt),
-            len(transcript_turns), _MODEL,
+            len(transcript_turns),
+            transcript_meta.get("kept_turns", 0),
+            transcript_meta.get("dropped_low_signal_candidate_turns", 0),
+            _MODEL,
         )
 
         _FEEDBACK_TIMEOUT = 180  # seconds — generous for long transcripts
@@ -434,6 +439,90 @@ class FeedbackCompilerAgent:
             raise RuntimeError(
                 "Feedback model returned invalid JSON. Please try again."
             ) from exc
+
+    @staticmethod
+    def _is_low_signal_candidate_turn(text: str) -> bool:
+        """Heuristic filter for accidental ASR gibberish/low-signal snippets."""
+        t = str(text or "").strip()
+        if not t:
+            return True
+
+        lowered = t.lower()
+        words = [w for w in lowered.replace("\n", " ").split(" ") if w]
+        if not words:
+            return True
+
+        # Very short interjections are not reliable evidence for scoring.
+        low_signal_singletons = {
+            "hi", "hello", "hey", "hmm", "hm", "uh", "uhh", "um", "umm",
+            "ok", "okay", "yes", "yeah", "yep", "no", "nope", "nah", "alo",
+            "huh", "hmm.", "hmm,",
+        }
+        if len(words) <= 2 and all(w.strip(".,!?;:") in low_signal_singletons for w in words):
+            return True
+
+        # Repeated-token gibberish like "love love love" or "blah blah".
+        unique = {w.strip(".,!?;:") for w in words if w.strip(".,!?;:")}
+        if len(words) >= 3 and len(unique) == 1:
+            return True
+        if len(words) >= 4 and len(unique) <= 2 and max(words.count(w) for w in set(words)) >= 3:
+            return True
+
+        # Ultra-short one-word fragments are typically clipping noise.
+        if len(words) == 1 and len(words[0].strip(".,!?;:")) <= 2:
+            return True
+
+        return False
+
+    def _build_feedback_transcript_text(
+        self,
+        transcript_turns: list[dict[str, Any]],
+    ) -> tuple[str, dict[str, int]]:
+        if not transcript_turns:
+            return (
+                "(no transcript recorded — do not fabricate content; set all scores to 0)",
+                {"kept_turns": 0, "kept_candidate_turns": 0, "dropped_low_signal_candidate_turns": 0},
+            )
+
+        lines: list[str] = []
+        kept_candidate = 0
+        dropped_low_signal = 0
+
+        for entry in transcript_turns:
+            speaker = str(entry.get("speaker", "")).strip().lower()
+            text = str(entry.get("text", "")).strip()
+            if not text:
+                continue
+
+            if speaker == "user":
+                if self._is_low_signal_candidate_turn(text):
+                    dropped_low_signal += 1
+                    continue
+                label = "CANDIDATE"
+                kept_candidate += 1
+            else:
+                label = "INTERVIEWER"
+
+            lines.append(f"{label}: {text}")
+
+        if kept_candidate == 0:
+            return (
+                "(transcript had no reliable candidate content after noise filtering — set all scores to 0 and explain this)",
+                {
+                    "kept_turns": 0,
+                    "kept_candidate_turns": 0,
+                    "dropped_low_signal_candidate_turns": dropped_low_signal,
+                },
+            )
+
+        return (
+            "\n".join(lines),
+            {
+                "kept_turns": len(lines),
+                "kept_candidate_turns": kept_candidate,
+                "dropped_low_signal_candidate_turns": dropped_low_signal,
+            },
+        )
 
     def _postprocess_report(
         self,
