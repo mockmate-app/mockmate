@@ -2,7 +2,7 @@
 PerformanceCardAgent
 --------------------
 After feedback is compiled, generates a visually striking AI performance card
-for the session using **Imagen 3.0 Fast** (Vertex AI).  The card background is
+for the session using **Imagen 4.0 Fast** (Vertex AI).  The card background is
 a unique artistic image themed to the persona + job-role + score, and the
 metadata (score, role, persona, motivational line) is supplied as JSON for the
 frontend to overlay.
@@ -10,7 +10,7 @@ frontend to overlay.
 GCS layout:
   gs://{GCS_BUCKET}/performance-cards/{session_id}.jpg
 
-One Imagen 3 API call per session.  Results are cached in GCS + Firestore so
+One Imagen 4 API call per session.  Results are cached in GCS + Firestore so
 subsequent requests are free.
 """
 
@@ -380,7 +380,7 @@ class PerformanceCardAgent:
             score, decision, job_role, persona, strengths,
         )
 
-        # Generate background image (Imagen 3 — slower, run in executor)
+        # Generate background image (Imagen 4 — slower, run in executor)
         # Pass the motivational line so the image visually reflects the quote's sentiment.
         loop = asyncio.get_event_loop()
         image_bytes = await loop.run_in_executor(

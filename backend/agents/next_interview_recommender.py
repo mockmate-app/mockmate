@@ -109,6 +109,18 @@ Rules:
         prompt_wizard/ai_engineer.
     - Avoid non-technical personas like management_consultant or investment_banker
         for technical software roles.
+- ANTI-REPEAT RULE (CRITICAL):
+    - The user has already completed these persona + job_role combinations recently:
+      {completed_combos}
+    - You MUST NOT recommend any combination that appears in the list above.
+    - Pick a DIFFERENT persona, a different job_role, or both.
+    - If the user's weakest dimension suggests a persona they already used with the
+      same role, pick a different persona that also targets that dimension, or
+      suggest the same persona but with a different job_role variation.
+- Feedback quality:
+    - The "insight" field should reference specific dimension trends with numbers.
+    - The "practice_focus" should be actionable and specific (not generic advice).
+    - The "cta" should mention what's different about this next session vs previous ones.
 
 Input data:
 {input_json}
@@ -116,11 +128,11 @@ Input data:
 Return EXACTLY this schema:
 {{
   "headline": "<short title>",
-  "insight": "<one sentence insight about trend>",
-  "practice_focus": "<what to practice next>",
-  "recommended_persona": "<persona key>",
+  "insight": "<one sentence insight about trend with numbers>",
+  "practice_focus": "<specific, actionable focus area>",
+  "recommended_persona": "<persona key — must NOT repeat a recent combo>",
   "recommended_job_role": "<job role string>",
-  "cta": "<short call-to-action sentence>"
+  "cta": "<short call-to-action mentioning what's new/different>"
 }}
 """
 
@@ -293,6 +305,10 @@ class NextInterviewRecommenderAgent:
                 }
                 for s in ordered
             ],
+            "completed_combos": list({
+                f"{s.get('persona', 'unknown')} + {s.get('job_role', 'unknown')}"
+                for s in ordered
+            }),
             "overall_score_trend": {
                 "first": overall_series[0] if overall_series else None,
                 "last": overall_series[-1] if overall_series else None,
@@ -313,7 +329,12 @@ class NextInterviewRecommenderAgent:
         reraise=True,
     )
     async def _call_gemini(self, summary: dict[str, Any]) -> dict[str, Any]:
-        prompt = _PROMPT.format(input_json=json.dumps(summary, indent=2))
+        completed_combos = summary.get("completed_combos", [])
+        combos_str = ", ".join(completed_combos) if completed_combos else "(none yet)"
+        prompt = _PROMPT.format(
+            input_json=json.dumps(summary, indent=2),
+            completed_combos=combos_str,
+        )
         resp = await self._client.aio.models.generate_content(
             model=_MODEL,
             contents=prompt,
@@ -351,6 +372,19 @@ class NextInterviewRecommenderAgent:
 
         persona = summary.get("suggested_persona_from_rule") or "neutral"
         job_role = summary.get("suggested_job_role_from_rule") or "Software Engineer"
+
+        # Anti-repeat: if this combo was already done, rotate persona
+        completed = set(summary.get("completed_combos", []))
+        combo = f"{persona} + {job_role}"
+        if combo in completed:
+            allowed = self._allowed_personas_for_role(job_role)
+            used_personas = {
+                s.get("persona") for s in summary.get("recent_sessions", [])
+                if s.get("job_role") == job_role
+            }
+            alternatives = allowed - used_personas - {persona}
+            if alternatives:
+                persona = sorted(alternatives)[0]
 
         return {
             "headline": "Your Next Interview",

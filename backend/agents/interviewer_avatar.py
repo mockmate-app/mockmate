@@ -2,7 +2,7 @@
 InterviewerAvatarAgent
 ----------------------
 Generates and caches AI profile pictures for each interviewer using
-Imagen 3.0 Fast (Vertex AI). Images are stored in GCS and served lazily —
+Imagen 4.0 Fast (Vertex AI). Images are stored in GCS and served lazily —
 generated once per unique interviewer name, then reused across all sessions.
 
 GCS layout:

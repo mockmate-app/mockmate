@@ -57,16 +57,22 @@ in what actually happened in the transcript below. Do NOT invent positives
 or soften negatives — if the candidate was rude, disrespectful, incoherent,
 or unprofessional, say so directly and reflect it in every relevant score.
 
-Personalization context (MUST apply before scoring):
-- Evaluate using ALL FOUR inputs together:
-    1) Candidate resume (including inferred candidate YoE, past scope, claims, skills)
-    2) Interview target role ({job_role}) and expected role bar
-    3) Transcript evidence (primary source of what the candidate actually demonstrated)
-    4) Posture data if present
+Personalization context (MUST apply in this STRICT priority order):
+- Evaluate using ALL FOUR inputs, but weight them in this exact order:
+    1) Candidate responses in the transcript (PRIMARY — this is what they actually
+       demonstrated; weigh this the heaviest in every score)
+    2) Target job role ({job_role}) and its expected seniority bar
+    3) Interview difficulty level (easy / medium / hard)
+    4) Candidate resume (supporting context — use it to verify claims and detect
+       over-claiming, but NEVER inflate scores just because the resume looks good)
+- The transcript is king. A strong resume with weak interview answers = low scores.
+  A modest resume with strong interview answers = high scores.
 - Infer candidate YoE from resume (use experience durations + seniority cues).
 - Infer expected YoE range for this target role (e.g. Junior SWE ≈ 0-2,
     Mid ≈ 2-5, Senior ≈ 5-8, Staff+ ≈ 8+, Director/VP ≈ 12+).
 - Calibrate scores based on gap/alignment between candidate YoE/profile and role bar.
+- Difficulty impacts expectations: "hard" demands deeper, more precise answers;
+  "easy" tolerates more hand-waving but still requires substantive responses.
 
 Calibration rules (strict):
 - Lower YoE candidates:
@@ -489,40 +495,87 @@ class FeedbackCompilerAgent:
 
     @staticmethod
     def _role_level(job_role: str) -> int:
+        """Infer seniority level (0-4) from any job role string.
+
+        Returns:
+            0 = intern / trainee
+            1 = junior / entry-level
+            2 = mid-level (default)
+            3 = senior / lead / manager
+            4 = staff+ / principal / executive
+        """
         role = job_role.lower()
-        if any(k in role for k in ("intern", "trainee", "apprentice")):
+
+        # Level 0 — Intern / Trainee
+        if any(k in role for k in ("intern", "trainee", "apprentice", "co-op", "coop")):
             return 0
-        if any(k in role for k in ("junior", "entry", "new grad", "graduate", "associate i", "sde1", "sde 1", "l3")):
+
+        # Level 1 — Junior / Entry
+        if any(k in role for k in (
+            "junior", "entry", "new grad", "graduate", "fresher",
+            "associate i", "analyst i",
+            "sde1", "sde 1", "sde-1", "swe1", "swe 1",
+            "l3", "level 3", "e3", "ic1", "ic2",
+        )):
             return 1
-        if any(k in role for k in ("staff", "principal", "architect", "distinguished", "l6", "l7", "sde4", "sde 4")):
+
+        # Level 4 — Staff+ / Principal / Executive (check before level 3
+        # because "staff" and "chief" should not match "lead"/"manager" first)
+        if any(k in role for k in (
+            "staff", "principal", "architect", "distinguished", "fellow",
+            "chief", "cto", "cfo", "ceo", "coo", "cmo", "cio", "cpo",
+            "evp", "svp",
+            "sde4", "sde 4", "sde-4", "swe4", "swe 4",
+            "l6", "l7", "l8", "level 6", "level 7", "level 8",
+            "e6", "e7", "ic6", "ic7",
+        )):
             return 4
-        if any(k in role for k in ("lead", "manager", "director", "vp", "head", "l5", "sde3", "sde 3", "senior")):
+
+        # Level 3 — Senior / Lead / Manager / Director
+        if any(k in role for k in (
+            "senior", "sr.", "sr ",
+            "lead", "manager", "director", "vp", "vice president",
+            "head of", "head,",
+            "sde3", "sde 3", "sde-3", "swe3", "swe 3",
+            "l5", "level 5", "e5", "ic5", "ic4",
+        )):
             return 3
-        if any(k in role for k in ("ii", "2", "mid", "intermediate", "sde2", "sde 2", "l4")):
+
+        # Level 2 — Mid-level (explicit markers)
+        if any(k in role for k in (
+            "ii", " 2", "mid", "intermediate",
+            "sde2", "sde 2", "sde-2", "swe2", "swe 2",
+            "l4", "level 4", "e4", "ic3",
+        )):
             return 2
+
+        # Default: assume mid-level for unrecognized roles
         return 2
 
     def _decision_threshold(self, job_role: str, difficulty: str) -> int:
-        # Baseline tuned so medium mid-level roles can pass in high-60s when
-        # the transcript evidence is strong.
-        base = 68
+        """Compute the pass/fail threshold dynamically from role seniority and difficulty.
+
+        The threshold is stricter for senior roles (they're expected to perform
+        better) and slightly more lenient for harder difficulty (tougher questions).
+        """
+        base = 75
 
         role_offsets = {
-            0: -9,  # intern / trainee
-            1: -6,  # junior / entry
-            2: -3,  # mid / SDE2
-            3: 0,   # senior / lead
-            4: 3,   # staff+ / principal
+            0: -10,  # intern / trainee
+            1: -7,   # junior / entry
+            2: -3,   # mid-level          → medium lands at 72
+            3: 0,    # senior / lead       → medium lands at 75
+            4: 3,    # staff+ / executive  → medium lands at 78
         }
         difficulty_offsets = {
-            "easy": +1,
-            "medium": 0,
-            "hard": -3,
+            "easy":   -5,   # easier questions → slightly lower bar
+            "medium":  0,   # baseline
+            "hard":   -3,   # harder questions → small leniency
         }
 
         level = self._role_level(job_role)
         threshold = base + role_offsets.get(level, 0) + difficulty_offsets.get(difficulty, 0)
-        return max(55, min(78, threshold))
+        return max(58, min(82, threshold))
 
     def _build_decision_reason(
         self,
@@ -537,28 +590,46 @@ class FeedbackCompilerAgent:
         strengths_list = [str(s).strip() for s in (strengths or []) if str(s).strip()]
         improvements_list = [str(s).strip() for s in (improvements or []) if str(s).strip()]
 
-        def _clean_fragment(text: str) -> str:
-            return text.rstrip(". !?;:")
-
-        top_strength = _clean_fragment(
-            strengths_list[0] if strengths_list else "solid role-relevant fundamentals"
-        )
-        top_gap = _clean_fragment(
-            improvements_list[0] if improvements_list else "more consistency in high-signal examples"
-        )
+        s1 = strengths_list[0] if len(strengths_list) > 0 else "some relevant fundamentals"
+        s2 = strengths_list[1] if len(strengths_list) > 1 else None
+        g1 = improvements_list[0] if len(improvements_list) > 0 else "more depth and specificity in responses"
+        g2 = improvements_list[1] if len(improvements_list) > 1 else None
 
         if decision == "offer":
-            return (
-                f"Offer recommended for {role} ({difficulty}) because interview performance met the calibrated bar "
-                f"({overall}/100 vs threshold {threshold}). Strongest signal: {top_strength}. "
-                f"Next-level improvement area: {top_gap}."
+            para1 = (
+                f"This was a strong interview. For a {role} position on {difficulty} difficulty, "
+                f"we were looking for a score of at least {threshold} — and you came in at {overall}. "
+                f"That tells us you're well-calibrated for this level."
             )
+            para2 = f"What stood out most was {s1.lower()}."
+            if s2:
+                para2 += f" We also noticed {s2.lower()}, which reinforced the overall impression."
+            para3 = (
+                f"That said, there's always room to grow. If we had to pick one thing to sharpen "
+                f"for your next round, it would be {g1.lower()}."
+            )
+            if g2:
+                para3 += f" {g2} would also take you to the next level."
+            return f"{para1}\n\n{para2}\n\n{para3}"
 
-        return (
-            f"Rejection recommended for {role} ({difficulty}) because performance stayed below the calibrated bar "
-            f"({overall}/100 vs threshold {threshold}). Priority improvement: {top_gap}. "
-            f"Positive signal to build on: {top_strength}."
+        para1 = (
+            f"This was a solid effort, but for a {role} position on {difficulty} difficulty, "
+            f"we needed to see a score of at least {threshold} to move forward — and "
+            f"this session came in at {overall}. The gap isn't insurmountable, but it's there."
         )
+        para2 = (
+            f"The biggest area holding things back was {g1.lower()}. "
+            f"In a real interview loop, this is the kind of thing that separates a 'maybe' from a 'yes'."
+        )
+        if g2:
+            para2 += f" Beyond that, {g2.lower()} would also make a noticeable difference."
+        para3 = (
+            f"On the positive side, {s1.lower()} — that's a real strength to build on."
+        )
+        if s2:
+            para3 += f" {s2} was also a bright spot."
+        para3 += " The foundation is there. A few more focused practice sessions and the outcome could look very different."
+        return f"{para1}\n\n{para2}\n\n{para3}"
 
     def _compose_decision_letter(
         self,
@@ -570,27 +641,54 @@ class FeedbackCompilerAgent:
     ) -> str:
         strengths_list = [str(s).strip() for s in (strengths or []) if str(s).strip()]
         improvements_list = [str(s).strip() for s in (improvements or []) if str(s).strip()]
-        strengths_block = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Demonstrated relevant potential in this interview."
-        gaps_block = "\n".join(f"- {s}" for s in improvements_list[:3]) or "- Continue improving consistency across responses."
 
         if decision == "offer":
-            return (
+            letter = (
                 f"Dear Candidate,\n\n"
-                f"Thank you for interviewing for the {role} position. Based on this session, we are extending an offer.\n\n"
-                f"Why this decision:\n{reason}\n\n"
-                f"Key strengths observed:\n{strengths_block}\n\n"
-                f"Development focus areas as you onboard:\n{gaps_block}\n\n"
-                f"Sincerely,\nThe MockMate Hiring Committee"
+                f"Thank you for taking the time to interview for the {role} position. "
+                f"We're pleased to let you know that based on this session, we'd like to extend an offer.\n\n"
+                f"{reason}\n\n"
             )
+            if strengths_list:
+                highlights = ", ".join(s.lower().rstrip(". ") for s in strengths_list[:3])
+                letter += (
+                    f"A few highlights from the conversation: {highlights}. "
+                    f"These are the kinds of signals that make us confident in this decision.\n\n"
+                )
+            if improvements_list:
+                areas = " and ".join(s.lower().rstrip(". ") for s in improvements_list[:2])
+                letter += (
+                    f"As you settle into the role, we'd encourage you to keep working on {areas}. "
+                    f"Even strong candidates have growth edges — leaning into yours will set you apart.\n\n"
+                )
+            letter += "We're excited about what's ahead.\n\nSincerely,\nThe MockMate Hiring Committee"
+            return letter
 
-        return (
+        letter = (
             f"Dear Candidate,\n\n"
-            f"Thank you for interviewing for the {role} position. After review, we are not moving forward with an offer at this time.\n\n"
-            f"Why this decision:\n{reason}\n\n"
-            f"What worked well:\n{strengths_block}\n\n"
-            f"Top areas to improve before reapplying:\n{gaps_block}\n\n"
-            f"Sincerely,\nThe MockMate Hiring Committee"
+            f"Thank you for interviewing for the {role} position. We appreciate the time and "
+            f"effort you put into this session. After careful review, we've decided not to move "
+            f"forward with an offer at this time.\n\n"
+            f"{reason}\n\n"
         )
+        if improvements_list:
+            areas = " and ".join(s.lower().rstrip(". ") for s in improvements_list[:2])
+            letter += (
+                f"If you were to come back for another round, the single biggest unlock would be {areas}. "
+                f"Practicing with that specific focus would meaningfully change the outcome.\n\n"
+            )
+        if strengths_list:
+            highlights = " and ".join(s.lower().rstrip(". ") for s in strengths_list[:2])
+            letter += (
+                f"We don't want to leave you without the good news: {highlights} came through clearly "
+                f"and would serve you well in any interview setting. Don't lose that.\n\n"
+            )
+        letter += (
+            "This isn't the end of the road — it's a data point. Use the feedback, "
+            "practice deliberately, and come back stronger.\n\n"
+            "Sincerely,\nThe MockMate Hiring Committee"
+        )
+        return letter
 
     async def _persist(
         self,

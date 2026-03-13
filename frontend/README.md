@@ -188,7 +188,7 @@ Displays the AI-generated feedback with:
 - Tone analysis and vocabulary calibration
 - Filler word detection
 - Mock offer or rejection letter
-- **AI Performance Card** — Imagen 3.0 artistic background with score, decision badge, and Gemini-generated motivational quote. Downloadable as image or shareable to LinkedIn.
+- **AI Performance Card** — Imagen 4.0 artistic background with score, decision badge, and Gemini-generated motivational quote. Downloadable as image or shareable to LinkedIn.
 - Full interview transcript sidebar
 
 ### Dashboard

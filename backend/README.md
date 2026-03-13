@@ -26,7 +26,7 @@ graph TB
         LIVE[Gemini Live API<br/>Native Audio]
         FLASH[Gemini 2.5 Flash Lite]
         FLASH_LITE[Gemini 2.5 Flash Lite]
-        IMAGEN[Imagen 3.0 Fast]
+        IMAGEN[Imagen 4.0 Fast]
         FS[(Firestore)]
         GCS[(Cloud Storage)]
     end
@@ -53,9 +53,9 @@ graph TB
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages live bidirectional audio interviews with interruption support, persona-specific accents, and adaptive follow-ups |
 | **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite (Vision) | Scores posture, eye contact, and facial confidence from webcam frames |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash Lite | Compiles post-interview feedback report with scores across 6 dimensions and a mock hiring decision letter |
-| **PerformanceCardAgent** | Gemini 2.5 Flash Lite + Imagen 3.0 Fast | Generates an AI performance card per session — Imagen creates a unique artistic background themed to the persona, role, and score; Gemini writes a motivational quote. Cached in GCS + Firestore |
+| **PerformanceCardAgent** | Gemini 2.5 Flash Lite + Imagen 4.0 Fast | Generates an AI performance card per session — Imagen creates a unique artistic background themed to the persona, role, and score; Gemini writes a motivational quote. Cached in GCS + Firestore |
 | **NextInterviewRecommenderAgent** | Gemini 2.5 Flash Lite | Analyzes recent feedback sessions to find the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the next interview |
-| **InterviewerAvatarAgent** | Imagen 3.0 Fast | Generates and caches AI profile pictures for interviewer personas |
+| **InterviewerAvatarAgent** | Imagen 4.0 Fast | Generates and caches AI profile pictures for interviewer personas |
 
 ### Google Cloud Services
 
@@ -263,7 +263,7 @@ backend/
     ├── interview_engine.py    # Gemini Live API session management
     ├── posture_analyzer.py    # Real-time video posture scoring
     ├── feedback_compiler.py   # Post-session feedback & decision letter
-    ├── performance_card.py    # AI performance card (Imagen 3.0 background + Gemini quote)
+    ├── performance_card.py    # AI performance card (Imagen 4.0 background + Gemini quote)
     ├── next_interview_recommender.py  # Next interview recommendation engine
     ├── interviewer_avatar.py  # AI avatar generation with Imagen
     └── personas.json          # 13 interviewer persona definitions
