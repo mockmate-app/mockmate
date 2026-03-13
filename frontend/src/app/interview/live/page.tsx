@@ -207,7 +207,7 @@ function ParticipantCard({
             autoPlay
             muted
             playsInline
-            className="aspect-video h-20 object-cover rounded-lg bg-black"
+            className="aspect-video h-18 object-cover rounded-lg bg-black"
           />
         </div>
       ) : (
@@ -359,7 +359,7 @@ function LiveInterviewContent() {
   const sessionId = params.get("session_id") ?? "";
   const personaId = params.get("persona") ?? "neutral";
   const jobRole = params.get("job_role") ?? "Software Engineer";
-  const interviewerName = params.get("interviewer_name") ?? "Alex";
+  const interviewerName = params.get("interviewer_name") ?? "MockMate interviewer";
   const avatarUrlPath = params.get("avatar_url") ?? "";
 
   // ── Auth guard: redirect to /login if not authenticated ──────────────────
@@ -691,15 +691,17 @@ function LiveInterviewContent() {
               ? rms
               : noiseFloorRef.current * 0.92 + rms * 0.08;
 
-          const dynamicThreshold = Math.max(0.02, noiseFloorRef.current * 2.4);
+          const dynamicThreshold = Math.max(0.015, noiseFloorRef.current * 2.2);
 
           if (rms > dynamicThreshold) {
             speechStreakRef.current += 1;
           } else {
-            speechStreakRef.current = 0;
+            // Gradual decay instead of hard reset — tolerates brief quiet
+            // frames (plosives, breaths) during natural speech.
+            speechStreakRef.current = Math.max(0, speechStreakRef.current - 1);
           }
 
-          if (speechStreakRef.current >= 2) {
+          if (speechStreakRef.current >= 1) {
             setYouSpeaking(true);
             setYourTurn(true);
             if (userSpeakingTimeoutRef.current) {
@@ -707,7 +709,7 @@ function LiveInterviewContent() {
             }
             userSpeakingTimeoutRef.current = window.setTimeout(() => {
               setYouSpeaking(false);
-            }, 1800);
+            }, 2500);
           }
         }
         sendChunkRef.current(e.data);
@@ -883,17 +885,44 @@ function LiveInterviewContent() {
             msg.type === "input_transcription" ? "you" : "interviewer";
           const finished = msg.finished ?? false;
 
-          // Only add to transcript once the utterance is complete.
-          // Partials cause flickering word-by-word display and fragment
-          // bubbles ("oo", "about") — the typing indicator already gives
-          // visual feedback that someone is speaking.
-          if (!finished) {
-            if (speaker === "interviewer") setYourTurn(false);
-            return;
+          // When we receive the user's own transcribed speech, reset the
+          // local speaking-timeout so the indicator stays alive until
+          // the transcript entry is visible (avoids the bubble flickering
+          // off while Gemini is still streaming partial text back).
+          if (speaker === "you") {
+            if (userSpeakingTimeoutRef.current) {
+              window.clearTimeout(userSpeakingTimeoutRef.current);
+            }
+            if (finished) {
+              // Final transcript arrived — fade out the indicator shortly
+              userSpeakingTimeoutRef.current = window.setTimeout(() => {
+                setYouSpeaking(false);
+              }, 400);
+            } else {
+              // Partial transcript — keep indicator alive a bit longer
+              setYouSpeaking(true);
+              userSpeakingTimeoutRef.current = window.setTimeout(() => {
+                setYouSpeaking(false);
+              }, 2500);
+            }
           }
 
+          // Show partials in real-time by updating the last in-progress
+          // entry for this speaker.  When the final transcript arrives
+          // we replace the partial text with the authoritative version.
           setTranscript((prev) => {
-            return [...prev, { speaker, text, finished: true, ts: Date.now() }];
+            const lastIdx = prev.length - 1;
+            const last = lastIdx >= 0 ? prev[lastIdx] : null;
+
+            // Same speaker, still in-progress → update in place
+            if (last && last.speaker === speaker && !last.finished) {
+              const updated = [...prev];
+              updated[lastIdx] = { ...last, text, finished };
+              return updated;
+            }
+
+            // New entry (either first partial or new finished utterance)
+            return [...prev, { speaker, text, finished, ts: Date.now() }];
           });
 
           if (speaker === "interviewer") setYourTurn(false);
@@ -1207,7 +1236,11 @@ function LiveInterviewContent() {
         ts: Date.now(),
       };
       const finalTranscript = [...transcriptRef.current, stageEntry];
-      setTranscript(finalTranscript);
+      // Mark any lingering partial as finished before persisting
+      const persistTranscript = finalTranscript.map((e) =>
+        e.finished === false ? { ...e, finished: true } : e,
+      );
+      setTranscript(persistTranscript);
 
       // Graceful shutdown: signal end first, then fallback close if backend
       // hasn't closed the socket shortly after.
@@ -1237,7 +1270,7 @@ function LiveInterviewContent() {
       setYouSpeaking(false);
       setYourTurn(false);
       speechStreakRef.current = 0;
-      await persistSessionEnd(endedBy, finalTranscript);
+      await persistSessionEnd(endedBy, persistTranscript);
       const transcriptUploaded = await waitForTranscriptUpload();
       // Bust the React Query cache for this session so the feedback page
       // always fetches the latest transcript and regenerates feedback from
@@ -1507,7 +1540,7 @@ function LiveInterviewContent() {
 
         <main className="flex-1 min-h-0 flex flex-col">
           {/* Sticky camera-on reminder for posture analysis */}
-          {isActive && !cameraOn && (
+          {!isActive && cameraOn && (
             <div className="p-4">
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange/15 border border-orange/30 text-orange text-xs font-medium w-fit mx-auto">
                 <Video size={14} className="shrink-0" />
@@ -1604,8 +1637,9 @@ function LiveInterviewContent() {
               ),
             )}
 
-            {/* Typing indicator — anchored at bottom once transcript has started */}
-            {isActive && transcript.length > 0 && aiSpeaking && (
+            {/* Typing indicator — only shown when speaking but no partial text yet */}
+            {isActive && transcript.length > 0 && aiSpeaking &&
+              !(transcript[transcript.length - 1]?.speaker === "interviewer" && transcript[transcript.length - 1]?.finished === false) && (
               <TypingBubble
                 speaker="interviewer"
                 interviewerInitial={interviewerInitial}
@@ -1615,8 +1649,9 @@ function LiveInterviewContent() {
             )}
             {isActive &&
               transcript.length > 0 &&
-              (youSpeaking || (yourTurn && !aiSpeaking)) &&
-              !muted && (
+              youSpeaking &&
+              !muted &&
+              !(transcript[transcript.length - 1]?.speaker === "you" && transcript[transcript.length - 1]?.finished === false) && (
                 <TypingBubble
                   speaker="you"
                   interviewerInitial={interviewerInitial}

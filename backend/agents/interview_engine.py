@@ -1257,8 +1257,8 @@ Instead:
                 # activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
-                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
-                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
+                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_MEDIUM,
+                    silence_duration_ms=1200,  # faster turn detection → transcript arrives sooner
                     prefix_padding_ms=300,     # capture speech onset with padding
                 ),
             ),
