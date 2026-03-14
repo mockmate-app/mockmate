@@ -36,8 +36,7 @@ export const PERSONA_COLORS: Record<string, string> = {
   recruiter: "bg-lime-500/15 text-lime-600 dark:text-lime-400",
   algorithm_guru: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
   system_designer: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
-  prompt_wizard: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
-  ai_engineer: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
+  prompt_wizard: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400"
 };
 
 // ── Persona helpers ─────────────────────────────────────────────────────────

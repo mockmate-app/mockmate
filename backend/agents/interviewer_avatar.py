@@ -164,15 +164,7 @@ _PERSONA_STYLE: dict[str, dict[str, str]] = {
         "lighting": "cool-toned ambient lighting",
         "expression": "curious, slightly playful smile",
         "vibe": "modern tech portrait photograph",
-    },
-    "ai_engineer": {
-        "descriptor": "AI/ML engineer",
-        "setting": "tech workspace with multiple monitors, blurred background",
-        "attire": "casual — t-shirt, hoodie, developer aesthetic",
-        "lighting": "soft screen-lit ambiance mixed with natural light",
-        "expression": "focused, relaxed confidence",
-        "vibe": "candid developer portrait",
-    },
+    }
 }
 
 

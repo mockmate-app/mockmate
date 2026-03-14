@@ -114,16 +114,107 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
         "prompting and evaluation strategy, model quality trade-offs, safety/guardrails, and "
         "production AI system architecture. Expects concrete discussion of metrics, data quality, "
         "and operational reliability for AI features."
-    ),
-    "ai_engineer": (
-        "An AI/ML interviewer focused on machine learning fundamentals, LLM application design, "
-        "prompting and evaluation strategy, model quality trade-offs, safety/guardrails, and "
-        "production AI system architecture. Expects concrete discussion of metrics, data quality, "
-        "and operational reliability for AI features."
-    ),
+    )
 }
 
 _VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+
+# ---------------------------------------------------------------------------
+# Per-persona question-type policy
+# ---------------------------------------------------------------------------
+
+_PERSONA_QUESTION_POLICY: dict[str, str] = {
+    "neutral": (
+        "Use a balanced mix of all question types (behavioural, technical, "
+        "situational, curveball). Include at least 1 of each type."
+    ),
+    "startup_founder": (
+        "Focus on behavioural and situational questions about ownership, "
+        "execution speed, and decision-making under ambiguity. "
+        "Technical questions are allowed ONLY if the target role is "
+        "explicitly technical (engineering, data science, etc.) — at most 1. "
+        "Curveballs should test scrappiness and bias-to-action."
+    ),
+    "investment_banker": (
+        "Focus on situational and behavioural questions demanding precision, "
+        "numbers, and structured thinking. Do NOT ask coding or system "
+        "design questions. Curveballs should test composure under pressure "
+        "and mental math."
+    ),
+    "tech_lead": (
+        "Heavily prioritise technical questions (at least 3 out of 6): "
+        "system design trade-offs, code quality, debugging, architecture. "
+        "Remaining questions should be behavioural or situational about "
+        "engineering leadership and collaboration."
+    ),
+    "hr_manager": (
+        "Ask ONLY behavioural and situational questions. Do NOT ask any "
+        "technical or coding questions — an HR manager would never ask "
+        "those. Focus on teamwork, conflict resolution, communication, "
+        "cultural fit, growth mindset, and adaptability. Curveballs should "
+        "test self-awareness and emotional intelligence, not technical "
+        "knowledge."
+    ),
+    "product_manager": (
+        "Focus on behavioural and situational questions about user empathy, "
+        "prioritisation, stakeholder management, and data-driven decisions. "
+        "Do NOT ask coding or system design questions. Curveballs should "
+        "test product sense and creative problem-solving."
+    ),
+    "vp_engineering": (
+        "Focus on behavioural and situational questions about engineering "
+        "leadership, team building, process maturity, and org design. "
+        "At most 1–2 technical questions, focused on architectural "
+        "decisions at scale rather than coding. Curveballs should test "
+        "strategic thinking and leadership judgment."
+    ),
+    "management_consultant": (
+        "Focus on situational and curveball questions requiring structured "
+        "problem-solving, MECE thinking, and quantitative analysis. "
+        "Do NOT ask coding or system design questions. Frame questions as "
+        "mini-cases. Behavioural questions should probe hypothesis-led "
+        "communication and stakeholder influence."
+    ),
+    "cto": (
+        "Mix technical and behavioural questions. Technical questions "
+        "should focus on technology strategy, build-vs-buy, and "
+        "architectural judgment — not coding puzzles. Behavioural "
+        "questions should probe engineering org transformation and "
+        "board-level influence. Curveballs should test visionary thinking."
+    ),
+    "recruiter": (
+        "Ask ONLY behavioural and situational questions. Do NOT ask any "
+        "technical or coding questions — a recruiter would never ask "
+        "those. Focus on career narrative, motivations, transitions, "
+        "cultural fit, self-awareness, and communication skills. "
+        "Curveballs should test authenticity and self-reflection."
+    ),
+    "algorithm_guru": (
+        "Heavily prioritise technical questions (at least 4 out of 6): "
+        "algorithms, data structures, complexity analysis, problem "
+        "decomposition, and edge-case reasoning. Remaining questions can "
+        "be situational about debugging approach or behavioural about "
+        "problem-solving mindset. Curveballs should be tricky algorithmic "
+        "puzzles or unexpected constraint changes."
+    ),
+    "system_designer": (
+        "Heavily prioritise technical questions (at least 4 out of 6): "
+        "system design, distributed systems, scalability, reliability, "
+        "and trade-off analysis. Remaining questions can be situational "
+        "about handling production incidents or behavioural about "
+        "cross-team architecture collaboration. Curveballs should involve "
+        "unexpected scale changes or failure scenarios."
+    ),
+    "prompt_wizard": (
+        "Heavily prioritise technical questions (at least 4 out of 6): "
+        "ML/AI fundamentals, LLM application design, prompt engineering, "
+        "evaluation methodology, RAG, safety/guardrails, and production "
+        "AI systems. Remaining questions can be situational about "
+        "debugging ML pipelines or behavioural about shipping AI features "
+        "responsibly. Curveballs should involve unusual model failure "
+        "modes or adversarial scenarios."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Prompt
@@ -141,6 +232,10 @@ Persona description : {persona_desc}
 
 Target job role     : {job_role}
 Difficulty level    : {difficulty}  (easy | medium | hard)
+
+━━━ PERSONA QUESTION-TYPE POLICY (MUST FOLLOW) ━━━
+
+{question_type_policy}
 
 ━━━ MANDATORY RESUME-FIRST ANALYSIS ━━━
 
@@ -210,13 +305,18 @@ Generate exactly 6 interview questions as a JSON array. Each element must have:
 Rules (strictly enforced):
 - At least 3 questions MUST reference specific details found in the résumé
   (e.g. a named project, technology, company, or metric the candidate listed).
-- At least 2 questions MUST be curveballs — unexpected angle or provocative
-  challenge designed to test composure and original thinking.
+- At least 1 question SHOULD be a curveball — unexpected angle or provocative
+  challenge designed to test composure and original thinking (unless the
+  persona question-type policy above says otherwise).
 - Questions MUST escalate in difficulty from id 1 → 6.
 - Tone and phrasing MUST match the persona described above.
+- The PERSONA QUESTION-TYPE POLICY above takes precedence over all other
+  type-distribution rules. If the persona says "do NOT ask technical
+  questions", then even on hard difficulty you MUST NOT include technical
+  questions.
 - If difficulty is "easy", avoid highly technical deep-dives but still keep questions role-relevant.
-- If difficulty is "hard", include at least 3 technical / system-design questions
-  appropriate for {job_role}.
+- If difficulty is "hard" AND the persona allows technical questions, include
+  at least 3 technical / system-design questions appropriate for {job_role}.
 - Do NOT include generic filler questions. Every question should feel tailored
   to this specific candidate applying for this specific role.
 - At least 5 out of 6 questions must explicitly mention role-relevant concepts
@@ -376,12 +476,17 @@ class QuestionGeneratorAgent:
     ) -> list[dict[str, Any]]:
         """Send the generation prompt to Gemini and return the parsed list."""
         persona_desc = PERSONA_DESCRIPTIONS[persona]
+        question_policy = _PERSONA_QUESTION_POLICY.get(
+            persona,
+            _PERSONA_QUESTION_POLICY["neutral"],
+        )
         prompt = GENERATION_PROMPT.format(
             resume_json=json.dumps(resume_data, indent=2),
             persona_name=persona,
             persona_desc=persona_desc,
             job_role=job_role,
             difficulty=difficulty,
+            question_type_policy=question_policy,
         )
 
         generation_config = genai_types.GenerateContentConfig(

@@ -251,6 +251,7 @@ function SetupContent({
         `/interview/live?session_id=${result.session_id}` +
         `&persona=${encodeURIComponent(persona)}` +
         `&job_role=${encodeURIComponent(jobRole.trim())}` +
+        `&difficulty=${encodeURIComponent(difficulty)}` +
         `&interviewer_name=${encodeURIComponent(result.interviewer_name ?? "Alex")}` +
         (result.interviewer_avatar_url ? `&avatar_url=${encodeURIComponent(result.interviewer_avatar_url)}` : ""),
       );

@@ -71,7 +71,6 @@ _PERSONA_VISUAL: dict[str, str] = {
     "algorithm_guru":        "abstract mathematical landscape with flowing geometric patterns",
     "system_designer":       "vast architectural blueprint environment with interconnected systems",
     "prompt_wizard":         "mystical AI neural network visualization with glowing nodes",
-    "ai_engineer":           "mystical AI neural network visualization with glowing nodes",
 }
 
 _ROLE_VISUAL_HINTS: dict[str, str] = {

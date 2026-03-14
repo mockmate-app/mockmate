@@ -359,6 +359,7 @@ function LiveInterviewContent() {
   const sessionId = params.get("session_id") ?? "";
   const personaId = params.get("persona") ?? "neutral";
   const jobRole = params.get("job_role") ?? "Software Engineer";
+  const difficulty = params.get("difficulty") ?? "medium";
   const interviewerName = params.get("interviewer_name") ?? "MockMate interviewer";
   const avatarUrlPath = params.get("avatar_url") ?? "";
 
@@ -1452,6 +1453,8 @@ function LiveInterviewContent() {
           <span className="text-primary">Job role </span>{jobRole}
           {" | "}
           <span className="text-primary">Persona </span>{personaLabel}
+          {" | "}
+          <span className="text-primary">Difficulty </span>{difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
         </p>
         <span
           className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium ${status === "active"

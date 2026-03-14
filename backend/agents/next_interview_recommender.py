@@ -76,8 +76,7 @@ _VALID_PERSONAS = {
     "recruiter",
     "algorithm_guru",
     "system_designer",
-    "prompt_wizard",
-    "ai_engineer",
+    "prompt_wizard"
 }
 
 _TECHNICAL_PERSONAS = {
@@ -86,7 +85,6 @@ _TECHNICAL_PERSONAS = {
     "algorithm_guru",
     "system_designer",
     "prompt_wizard",
-    "ai_engineer",
     "vp_engineering",
     "startup_founder",
     "neutral",
@@ -106,7 +104,7 @@ Rules:
     - For technical software roles (e.g. Software Engineer, SDE, Backend, Frontend,
         Full Stack, DevOps, Data Engineer, ML/AI Engineer), choose a technical
         interviewer persona such as tech_lead/cto/system_designer/algorithm_guru/
-        prompt_wizard/ai_engineer.
+        prompt_wizard.
     - Avoid non-technical personas like management_consultant or investment_banker
         for technical software roles.
 - ANTI-REPEAT RULE (CRITICAL):
