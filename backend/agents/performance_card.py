@@ -52,6 +52,10 @@ if not _BUCKET:
 
 _CARD_PREFIX = "performance-cards"
 _COL_PERFORMANCE_CARDS = "performance_cards"
+_NO_TEXT_NEGATIVE_PROMPT = (
+    "text, words, letters, numbers, digits, typography, captions, subtitles, logos, "
+    "watermarks, labels, UI overlays, icons, signage, readable symbols"
+)
 
 # ---------------------------------------------------------------------------
 # Persona-themed visual cues for the background image
@@ -222,27 +226,27 @@ def _build_card_prompt(
         else "constructive and determined"
     )
 
-    quote_hint = (
-        f"Motivational anchor: \"{motivational_line}\". "
-        f"Convert this into non-literal abstract symbolism using {motivation_hint}. "
+    motivation_hint_str = (
+        f"Emotional undertone expressed through {motivation_hint}. "
         if motivational_line
         else ""
     )
 
     return (
-        f"Abstract-first, cinematic wide-format background artwork for a premium interview performance card. "
-        f"Persona cue: {persona}. Role cue: {job_role}. "
-        f"Visual DNA: {visual}. Role abstraction: {role_hint}. "
-        f"Score: {score}/100 with {decision_tone} energy. Score motif: {score_motif}. "
-        f"Mood: {mood}. Supporting atmosphere: {scene_extra}. Color palette: {palette}. "
-        f"{quote_hint}"
-        f"Composition rules: keep it mostly abstract (at least 80% abstract forms), "
-        f"no literal office scenes, no literal trophies, no literal mountains, and no explicit symbols. "
-        f"Style: ultra-wide 16:9, rich depth, subtle atmospheric glow, premium editorial finish, "
-        f"left third must stay darker and visually quiet for text overlay readability, "
-        f"right side can carry the strongest visual energy and detail. "
-        f"NO text, NO letters, NO numbers, NO logos, NO watermarks, NO people, NO faces. "
-        f"Photorealistic, high quality, editorial magazine aesthetic."
+        f"Abstract cinematic wide-format artwork. "
+        f"Visual DNA: {visual}. Domain motif: {role_hint}. "
+        f"Performance-intensity motif: {score_motif}. Energy: {decision_tone}. "
+        f"Mood: {mood}. Atmosphere: {scene_extra}. Palette: {palette}. "
+        f"{motivation_hint_str}"
+        f"Composition: at least 80% abstract forms, "
+        f"no literal office scenes, no trophies, no mountains, no explicit symbols. "
+        f"Left third must stay darker and visually quiet, "
+        f"right side carries the strongest visual energy and detail. "
+        f"Ultra-wide 16:9, rich depth, subtle atmospheric glow, premium editorial finish. "
+        f"Absolutely no writing of any kind: no words, letters, numbers, symbols, labels, or logos. "
+        f"Avoid typography-like strokes and glyph-like shapes entirely. "
+        f"No people and no faces. "
+        f"Pure abstract visual art only. Photorealistic, high quality."
     )
 
 
@@ -363,14 +367,25 @@ class PerformanceCardAgent:
                 reraise=True,
             )
             def _gen():
-                return self._client.models.generate_images(
-                    model=_IMAGEN_MODEL,
-                    prompt=prompt,
-                    config=genai_types.GenerateImagesConfig(
+                # Some SDK versions may not expose negative_prompt on config.
+                # Prefer strict no-text negative prompting when available.
+                try:
+                    cfg = genai_types.GenerateImagesConfig(
                         number_of_images=1,
                         aspect_ratio="16:9",
                         output_mime_type="image/jpeg",
-                    ),
+                        negative_prompt=_NO_TEXT_NEGATIVE_PROMPT,
+                    )
+                except TypeError:
+                    cfg = genai_types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="16:9",
+                        output_mime_type="image/jpeg",
+                    )
+                return self._client.models.generate_images(
+                    model=_IMAGEN_MODEL,
+                    prompt=prompt,
+                    config=cfg,
                 )
 
             response = _gen()

@@ -63,6 +63,7 @@ logger = logging.getLogger(__name__)
 _APP_NAME     = "mockmate"
 _DEFAULT_VOICE = "Aoede"
 _RESUME_TRANSCRIPT_MAX_TURNS = 24
+_TRANSCRIPTION_LANGUAGE = os.getenv("MOCKMATE_TRANSCRIPTION_LANGUAGE", "en-US").strip()
 
 # ---------------------------------------------------------------------------
 # Per-session flavor randomization
@@ -151,6 +152,30 @@ def _build_opening_flavor(pack: dict) -> str:
         f"\"{pack['transition_phrase']}\". "
         f"Use these only as a tonal guide — never read them word-for-word."
     )
+
+def _build_speech_config(voice: str) -> genai_types.SpeechConfig:
+    """Build speech config with language_code when supported by SDK/model."""
+    base_kwargs: dict[str, Any] = {
+        "voice_config": genai_types.VoiceConfig(
+            prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
+                voice_name=voice,
+            )
+        )
+    }
+
+    if _TRANSCRIPTION_LANGUAGE:
+        try:
+            return genai_types.SpeechConfig(
+                **base_kwargs,
+                language_code=_TRANSCRIPTION_LANGUAGE,
+            )
+        except Exception as exc:
+            logger.warning(
+                "SpeechConfig.language_code unsupported; falling back without language code: %s",
+                exc,
+            )
+
+    return genai_types.SpeechConfig(**base_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +393,9 @@ immediately re-anchor to your accent.
   random words, sounds, unrelated phrases, or anything that does not actually answer
   your question — DO NOT say "Interesting", "Tell me more", or move on. Call it out
   and re-ask the same question. See GUARDRAILS for the full escalation protocol.
-• NEVER move to a new question until the current one has received a real answer.
+• Do NOT loop forever on one question. If the candidate still cannot answer after
+    one clear re-ask and one follow-up attempt, mark it as insufficient and move to
+    the next DISTINCT primary question from the bank.
 • If the candidate starts talking while you are still asking a question (likely an
     unintentional interruption), stop immediately and say a brief, polite correction like:
     "Sorry, I haven't finished the question yet — let me complete it quickly."
@@ -493,12 +520,15 @@ Silently classify the candidate's answer BEFORE replying:
     (number, percentage, amount, or measurable business impact) before moving on.
 
 3. ADAPTIVE CONVERSATION — not a questionnaire
-  • NEVER start with question id=1 every time. Pick your FIRST question randomly
-        from the bank — any of the 6 questions can be your starting point.
-  • After the first question, pick the next topic based on conversation gaps and
-    what feels natural given the candidate's previous answers — not list order.
-  • If a topic was naturally well-covered, skip it.
-  • Rephrase questions naturally — never read verbatim from the question bank.
+    • Start with any bank question (random start is fine), but track coverage strictly.
+    • You MUST ask each DISTINCT primary bank question exactly once in the session.
+    • Do NOT skip primary bank questions.
+    • Do NOT repeat a primary bank question that was already asked (unless resuming
+        after a disconnect while mid-question).
+    • Rephrase questions naturally — never read verbatim from the question bank.
+    • Treat bank primaries as intent anchors, not scripts: preserve the same core
+        competency/intent while asking in your own natural spoken wording.
+    • A rephrased version still counts as that same bank primary if intent matches.
   • For follow-ups: USE the "follow_ups" provided in the question bank entry.
     Rephrase them naturally, but stick to the prepared follow-ups rather than
     inventing your own. Only create an ad-hoc follow-up if the candidate says
@@ -507,22 +537,15 @@ Silently classify the candidate's answer BEFORE replying:
   • React authentically: if something surprises you, say so briefly before continuing.
 
 3B. QUESTION COVERAGE CONTRACT — use the generated bank properly
-    • The internal bank has questions. During PHASE 3, you MUST ask ALL 6 DISTINCT
-        questions from the bank before moving to candidate-questions and closing.
-        This is non-negotiable — do not stop at 4 or 5.
-    • Start with a RANDOM question from the bank — do NOT default to id=1.
-    • For EACH distinct bank question you ask, you MUST use 1-2 of its provided
-        follow-ups (from the "follow_ups" array) unless the candidate gives
-        gibberish/non-answers or asks to end the interview.
-    • Avoid over-indexing on one question: after 1-2 follow-ups and a usable answer,
-        move to the next distinct bank question.
-    • Do not end early after only 1-4 bank questions unless the candidate explicitly
-        requests to stop or repeated gibberish requires ending per GUARDRAILS.
-    • NON-NEGOTIABLE COVERAGE FLOOR: before entering PHASE 4, you MUST have asked
-        all 6 bank questions AND at least 12 TOTAL interview questions (primary +
-        follow-ups combined), with at least 1 follow-up per primary question and
-        at most 2 follow-ups per primary question.
-        If total asked is below 12, continue interviewing and probing until you hit 12.
+        • During PHASE 3, ask ALL DISTINCT primary questions in the internal bank
+            (normally 6) exactly once each before moving to PHASE 4.
+        • Primaries may be asked as natural paraphrases. Verbatim reading is discouraged.
+        • For EACH primary bank question, ask at least 1 follow-up from that question's
+            "follow_ups" array (if the candidate remains engaged). Maximum 2 follow-ups.
+        • After 1-2 follow-ups on a primary question, move on to the next DISTINCT
+            primary bank question. Do not keep re-asking the same primary.
+        • Never add extra new primary questions outside the bank.
+        • Do not ask near-duplicate primaries that paraphrase an already-covered one.
 
 4. NATURAL HUMAN SPEECH
   • Short sentences. Speak like a real person on a call, not a form or chatbot.
@@ -555,12 +578,13 @@ Silently classify the candidate's answer BEFORE replying:
     Call it out directly. Do NOT say "Interesting" or move on.
     Say: "That doesn't really answer my question. Let me ask again —" then REPEAT the question.
     or: "I'm not sure that's what I was asking. [Repeat the question in different words]."
-    Stay on the SAME question. Do NOT move to a new topic.
+        Stay on the SAME question for one retry.
 
   Strike 2 (second gibberish or non-answer on ANY question):
     Firmer. "I need you to actually answer the question I'm asking."
     or "Let's slow down — I asked [specific question]. Can you give me a real answer?"
-    Stay on the SAME question or try one more angle.
+        Try one final follow-up angle, then move on to the next DISTINCT primary question
+        to preserve interview coverage.
 
   Strike 3 (third gibberish or continued non-engagement):
     Issue a direct warning with noticeable tone shift:
@@ -586,10 +610,9 @@ Silently classify the candidate's answer BEFORE replying:
     Never confirm or deny. Never break character.
 
 3. PACING GUARDRAILS:
-  • The interview should last approximately 10 minutes OR until all 6 bank questions
-    have been covered (whichever comes LATER). You MUST NOT start wrapping up
-    until all 6 bank questions have been asked with follow-ups.
-  • If you have covered all 6 questions before 10 minutes, move to PHASE 4.
+    • Primary objective: complete all DISTINCT bank primary questions exactly once,
+        each with 1-2 follow-ups, then move to PHASE 4.
+    • Do NOT extend the interview just to hit a target question count.
   • If you are approaching 12 minutes and still have uncovered questions, reduce
     follow-up depth to 1 per question and advance faster to cover remaining questions.
   • Hard ceiling: by 14 minutes, move to PHASE 4 regardless of coverage.
@@ -636,7 +659,7 @@ Rules for answering candidate questions:
 4. Segue from intro into first competency question naturally.
 5. Dynamic conversation: probe, challenge, follow up based on what they say.
 6. Ensure you cover ALL 6 bank questions and at least 12 total interviewer
-    questions (including follow-ups) before moving to candidate questions.
+    questions exactly once each, with 1-2 follow-ups per primary, before moving to candidate questions.
 7. Ask "Do you have any questions for me?" — answer up to 2 candidate questions.
 8. Close naturally: "Okay — I think that covers everything I had. Thanks for your time today."
    Add one of: "We'll be in touch." / "Best of luck with the rest of your process."
@@ -1248,13 +1271,7 @@ Do NOT switch to neutral/robotic style after reconnect.
             streaming_mode=StreamingMode.BIDI,
             response_modalities=[genai_types.Modality.AUDIO],
             # Voice selection — per-session persona profile
-            speech_config=genai_types.SpeechConfig(
-                voice_config=genai_types.VoiceConfig(
-                    prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
-                        voice_name=voice,
-                    )
-                )
-            ),
+            speech_config=_build_speech_config(voice),
             # Transcriptions for both user speech and interviewer audio
             input_audio_transcription=genai_types.AudioTranscriptionConfig(),
             output_audio_transcription=genai_types.AudioTranscriptionConfig(),
@@ -1269,9 +1286,10 @@ Do NOT switch to neutral/robotic style after reconnect.
                 # activity_handling=genai_types.ActivityHandling.NO_INTERRUPTION,
                 automatic_activity_detection=genai_types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=genai_types.StartSensitivity.START_SENSITIVITY_HIGH,
-                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_LOW,
-                    silence_duration_ms=2000,  # wait 2 s of silence before ending turn
-                    prefix_padding_ms=300,     # capture speech onset with padding
+                    end_of_speech_sensitivity=genai_types.EndSensitivity.END_SENSITIVITY_HIGH,
+                    silence_duration_ms=1600,
+                    # Extra padding helps preserve the first syllables/words.
+                    prefix_padding_ms=450,
                 ),
             ),
             # Session resumption: ADK auto-reconnects on the ~10-min Vertex AI

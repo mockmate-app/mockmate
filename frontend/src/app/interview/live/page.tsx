@@ -439,6 +439,9 @@ function LiveInterviewContent() {
   const transcriptRef = useRef<TranscriptEntry[]>([]);
   const micWorkletLoadedRef = useRef(false);
   const cameraOnRef = useRef(false);
+  const lastMicFrameAtRef = useRef(0);
+  const micRecoveryInProgressRef = useRef(false);
+  const lastMicRecoveryAtRef = useRef(0);
 
   useEffect(() => {
     cameraOnRef.current = cameraOn;
@@ -674,8 +677,10 @@ function LiveInterviewContent() {
       const source = ctx.createMediaStreamSource(stream);
       const worklet = new AudioWorkletNode(ctx, "pcm-capture-processor");
       workletNodeRef.current = worklet;
+      lastMicFrameAtRef.current = Date.now();
 
       worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+        lastMicFrameAtRef.current = Date.now();
         // Always stream audio to server — VAD is handled server-side.
         // Speech indicators run regardless of AI speaking state so the
         // user always sees visual feedback for their own voice.
@@ -1085,10 +1090,46 @@ function LiveInterviewContent() {
       ws.onmessage = handleMessage;
 
       ws.onerror = () => {
-        // If the interview was already active, this is likely just the WS
-        // closing gracefully (common on mobile browsers).  Let onclose
-        // handle the state transition instead of showing a scary error.
-        if (endingRef.current || wasEverActiveRef.current) return;
+        if (endingRef.current) return;
+
+        // Some browser/network failures fire onerror first and delay/skip
+        // a meaningful onclose. Kick off reconnect here as well.
+        if (
+          wasEverActiveRef.current &&
+          !reconnectingRef.current &&
+          reconnectAttemptsRef.current < WS_RECONNECT_MAX_ATTEMPTS
+        ) {
+          reconnectAttemptsRef.current += 1;
+          reconnectingRef.current = true;
+          const attempt = reconnectAttemptsRef.current;
+          appendStage(`Connection error — reconnecting (${attempt}/${WS_RECONNECT_MAX_ATTEMPTS})…`);
+
+          window.setTimeout(() => {
+            if (endingRef.current) return;
+            const safeWsBase =
+              typeof window !== "undefined" &&
+                window.location.protocol === "https:" &&
+                WS_BASE.startsWith("ws://")
+                ? WS_BASE.replace("ws://", "wss://")
+                : WS_BASE;
+            const rws = new WebSocket(`${safeWsBase}/ws/interview/${sessionId}?user_id=${encodeURIComponent(session?.user?.id ?? "")}`);
+            wsRef.current = rws;
+            rws.binaryType = "arraybuffer";
+
+            rws.onopen = () => {
+              reconnectAttemptsRef.current = 0;
+              reconnectingRef.current = false;
+              appendStage("Reconnected — interview continues");
+            };
+            rws.onmessage = handleMessage;
+            rws.onerror = ws.onerror;
+            rws.onclose = ws.onclose;
+          }, WS_RECONNECT_DELAY_MS);
+          return;
+        }
+
+        // If the interview was already active, let reconnect/close flow handle it.
+        if (wasEverActiveRef.current) return;
 
         // SecurityError (ws:// from https://) and network errors both surface here.
         const isHttps =
@@ -1119,6 +1160,7 @@ function LiveInterviewContent() {
           e.code !== 1000 &&
           wasEverActiveRef.current &&
           !endingRef.current &&
+          !reconnectingRef.current &&
           reconnectAttemptsRef.current < WS_RECONNECT_MAX_ATTEMPTS
         ) {
           reconnectAttemptsRef.current += 1;
@@ -1160,6 +1202,9 @@ function LiveInterviewContent() {
             rws.onclose = ws.onclose;
           }, WS_RECONNECT_DELAY_MS);
         } else {
+          if (reconnectingRef.current && !endingRef.current) {
+            return;
+          }
           reconnectingRef.current = false;
           setStatus((prev) => {
             if (prev === "active") {
@@ -1187,6 +1232,45 @@ function LiveInterviewContent() {
     closeAudioContextSafely,
     stopMicCapture,
   ]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    const timer = window.setInterval(() => {
+      if (endingRef.current || muted) return;
+      if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+      if (micRecoveryInProgressRef.current) return;
+
+      const hasLiveTrack =
+        mediaStreamRef.current
+          ?.getAudioTracks()
+          .some((track) => track.readyState === "live") ?? false;
+      const stalledMs = Date.now() - lastMicFrameAtRef.current;
+      const cooldownMs = Date.now() - lastMicRecoveryAtRef.current;
+
+      if (hasLiveTrack && stalledMs < 9000) return;
+      if (cooldownMs < 7000) return;
+
+      micRecoveryInProgressRef.current = true;
+      lastMicRecoveryAtRef.current = Date.now();
+      appendStage("Microphone signal dropped — recovering…");
+
+      void (async () => {
+        try {
+          await startMic(selectedMicId || undefined);
+          appendStage("Microphone recovered");
+        } catch {
+          setError("Microphone capture dropped. Please check mic permissions/device.");
+        } finally {
+          micRecoveryInProgressRef.current = false;
+        }
+      })();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isActive, muted, appendStage, startMic, selectedMicId]);
 
   const endInterview = useCallback(
     async (endedBy: "candidate" | "interviewer" | "system" = "candidate") => {

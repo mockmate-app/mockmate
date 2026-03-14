@@ -371,7 +371,7 @@ function FeedbackContent() {
       queryClient.setQueryData(["feedback", sessionId], newReport);
       try {
         const refreshedCard = await fetch(
-          `${API_BASE}/performance-card/${sessionId}?refresh_values=true`,
+          `${API_BASE}/performance-card/${sessionId}?refresh_values=true&force_regenerate=false`,
           { cache: "no-store" },
         ).then((r) => (r.ok ? r.json() : null));
         if (refreshedCard) {

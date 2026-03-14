@@ -302,6 +302,41 @@ Generate exactly 6 interview questions as a JSON array. Each element must have:
   "follow_ups": ["<follow-up 1>", "<follow-up 2>"]
 }}
 
+━━━ QUESTION TYPE DEFINITIONS (MUST follow these exactly when assigning "type") ━━━
+
+• "behavioural" — Asks about a PAST experience using "Tell me about a time…"
+  or "Describe a situation where…" framing. The answer should be a story about
+  what the candidate DID, how they handled a situation, how they collaborated,
+  led, failed, or grew. It must NOT require the candidate to explain HOW a
+  technology works, compare tools, or solve a technical problem.
+  ✅ "Tell me about a time you disagreed with a teammate on an approach."
+  ✅ "Describe a situation where you had to meet a tight deadline."
+  ✗  "How do you decide between Databricks and Data Factory?" ← this is TECHNICAL
+
+• "technical" — Asks the candidate to explain, compare, design, debug, or
+  reason about technology, tools, systems, algorithms, or architecture.
+  If the question requires domain knowledge to answer (e.g. knowing how a
+  framework, protocol, data structure, or system works), it is technical —
+  even if it references a résumé project.
+  ✅ "How would you design a caching layer for this service?"
+  ✅ "When building a new data pipeline, how do you decide which tool to use?"
+  ✅ "Walk me through how you'd optimize this SQL query."
+
+• "situational" — Poses a HYPOTHETICAL future scenario: "What would you do
+  if…" or "Imagine you are…". The candidate has NOT experienced this yet.
+  ✅ "What would you do if a critical deployment failed at 2am?"
+  ✅ "Imagine your team disagrees on the tech stack — how would you handle it?"
+
+• "curveball" — An unexpected, creative, or provocative question designed to
+  test composure, lateral thinking, or self-awareness. It doesn't fit neatly
+  into the other categories.
+  ✅ "If you could mass-delete one technology from existence, what would it be?"
+  ✅ "What's the worst technical decision you've ever made?"
+
+CRITICAL: If a question asks the candidate to compare tools, explain how
+something works, discuss trade-offs between technologies, or reason about
+system design — it is "technical", NOT "behavioural", regardless of phrasing.
+
 Rules (strictly enforced):
 - At least 3 questions MUST reference specific details found in the résumé
   (e.g. a named project, technology, company, or metric the candidate listed).
@@ -505,8 +540,10 @@ class QuestionGeneratorAgent:
         async def _generate_with_retry(tools: list[genai_types.Tool] | None):
             cfg = generation_config
             if tools:
+                # Google Search grounding is incompatible with controlled
+                # generation (response_mime_type), so omit the MIME type
+                # when grounding is active.
                 cfg = genai_types.GenerateContentConfig(
-                    response_mime_type="application/json",
                     temperature=0.7,
                     max_output_tokens=4096,
                     tools=tools,

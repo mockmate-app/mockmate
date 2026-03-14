@@ -466,7 +466,11 @@ async def get_performance_card(
     Generates the card on-the-fly if feedback exists but the card hasn't been
     created yet (idempotent).
     """
-    if refresh_values:
+    if force_regenerate:
+        card = await app.state.performance_card.generate(
+            session_id, force_regenerate=True,
+        )
+    elif refresh_values:
         card = await app.state.performance_card.refresh_metadata(session_id)
     else:
         card = await app.state.performance_card.generate(
