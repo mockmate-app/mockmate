@@ -20,7 +20,7 @@ MockMate is an AI-powered mock interview platform that conducts real, adaptive i
 - [Technologies Used](#-technologies-used)
 - [Quick Start (Local Setup)](#-quick-start-local-setup)
 - [Project Structure](#-project-structure)
-- [Cloud Deployment](#-cloud-deployment)
+- [Cloud Deployment](#cloud-deployment)
 - [Automating Cloud Deployment](#-automating-cloud-deployment)
 - [Proof of Google Cloud Deployment](#-proof-of-google-cloud-deployment)
 - [How It Works — User Flow](#-how-it-works--user-flow)
@@ -365,6 +365,7 @@ mockmate/
 
 ---
 
+<a id="cloud-deployment"></a>
 ## ☁️ Cloud Deployment
 
 ### Backend → Google Cloud Run
