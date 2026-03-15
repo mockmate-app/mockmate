@@ -249,15 +249,32 @@ build a role-fit map:
 3) Correlate each evidence point with expected responsibilities of {job_role}:
     - direct match,
     - adjacent transfer,
-    - likely gap / risk area.
+    - IRRELEVANT — skill/tool/experience has NO meaningful connection to {job_role}.
 4) Use this correlation to decide what to probe:
-    - verify strongest claims,
+    - verify strongest claims THAT ARE RELEVANT to {job_role},
     - test role-critical skills,
     - pressure-test probable gaps.
 
-Do NOT ask generic résumé questions. Every question must be traceable to either:
-  (a) a specific résumé evidence point, or
-  (b) a role-critical competency for {job_role}.
+━━━ CRITICAL: DISCARD IRRELEVANT RESUME ITEMS ━━━
+
+NOT everything on a résumé is relevant to every role. You MUST filter:
+• If a technology, tool, project, or skill on the résumé has NO meaningful
+  connection to {job_role}, DO NOT build a question around it.
+  Example: Azure Databricks on a résumé is IRRELEVANT for a UI/UX Designer role.
+  Example: Figma expertise is IRRELEVANT for a Backend Engineer role.
+• Do NOT force awkward connections between unrelated resume items and the target
+  role. Asking "How would you leverage Azure Data Factory in a UI/UX role?" is
+  absurd — never do this.
+• When the résumé has FEW items relevant to {job_role}, fill the gap with
+  GENERIC but ROLE-SPECIFIC questions — questions any strong {job_role}
+  candidate should be able to answer, even without resume evidence.
+  Examples for UI/UX Designer: design process, user research, wireframing,
+  usability testing, design systems, accessibility, information architecture.
+• A question is traceable to EITHER:
+  (a) a résumé evidence point that is RELEVANT to {job_role}, OR
+  (b) a role-critical competency for {job_role} (no resume tie needed).
+• It is BETTER to ask a strong generic role question than to awkwardly shoehorn
+  an irrelevant resume detail into a question.
 
 ━━━ OPTIONAL EXTERNAL GROUNDING ━━━
 
@@ -339,7 +356,10 @@ system design — it is "technical", NOT "behavioural", regardless of phrasing.
 
 Rules (strictly enforced):
 - At least 3 questions MUST reference specific details found in the résumé
-  (e.g. a named project, technology, company, or metric the candidate listed).
+  (e.g. a named project, technology, company, or metric the candidate listed)
+  — but ONLY details that are RELEVANT to {job_role}. If the résumé contains
+  fewer than 3 role-relevant details, fill the remaining slots with strong
+  generic questions for {job_role} instead of forcing irrelevant résumé items.
 - At least 1 question SHOULD be a curveball — unexpected angle or provocative
   challenge designed to test composure and original thinking (unless the
   persona question-type policy above says otherwise).
@@ -355,8 +375,11 @@ Rules (strictly enforced):
 - Do NOT include generic filler questions. Every question should feel tailored
   to this specific candidate applying for this specific role.
 - At least 5 out of 6 questions must explicitly mention role-relevant concepts
-    for {job_role}, and at least 4 out of 6 must be tied to concrete résumé
-    evidence points.
+    for {job_role}.
+- At least 3 out of 6 should be tied to concrete résumé evidence points —
+    but ONLY if those evidence points are RELEVANT to {job_role}. If the résumé
+    lacks relevant material, use generic role-specific questions instead.
+    NEVER force-connect irrelevant resume items to the role.
 - Every question MUST include exactly 2 follow-up prompts in "follow_ups".
 """
 

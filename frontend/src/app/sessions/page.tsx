@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect, useCallback } from "react";
+import React, { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
@@ -9,6 +9,7 @@ import AppHeader from "@/components/AppHeader";
 import {
   ChevronRight, Award, ArrowLeft,
   Search, BarChart2, Loader2, RotateCcw,
+  ChevronDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SessionStatusPill, canRetry } from "@/components/SessionStatusPill";
@@ -48,8 +49,10 @@ interface SessionSummary {
   live_started_at?: string | null;
   question_count: number;
   overall_score: number | null;
+  dimension_scores?: Record<string, number> | null;
   feedback_ready: boolean;
   decision?: "offer" | "rejection" | null;
+  decision_reason?: string | null;
   last_retried_at?: string | null;
   interviewer_avatar_url?: string | null;
 }
@@ -81,6 +84,7 @@ function SessionsContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const uid = session?.user?.id;
 
@@ -248,7 +252,8 @@ function SessionsContent() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(s => (
-                    <TableRow key={s.session_id} className="hover:bg-surface/60">
+                    <React.Fragment key={s.session_id}>
+                    <TableRow className="hover:bg-surface/60">
                       <TableCell className="py-3.5 max-w-64">
                         <p className="mx-0.5 text-xs text-muted-foreground truncate w-full">{s.job_role}</p>
                         <Badge variant="secondary" className={`mt-2 text-xs font-medium ${personaColor(s.persona)}`}>
@@ -269,9 +274,21 @@ function SessionsContent() {
                       </TableCell> */}
                       <TableCell className="text-center">
                         {s.overall_score !== null ? (
-                          <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>
-                            {s.overall_score}
-                          </Badge>
+                          <button
+                            onClick={() => setExpandedId(expandedId === s.session_id ? null : s.session_id)}
+                            className="inline-flex items-center gap-1 cursor-pointer"
+                            title={s.dimension_scores ? "Click to see score breakdown" : undefined}
+                          >
+                            <Badge className={`text-xs font-semibold ${scorePillClass(s.overall_score)}`}>
+                              {s.overall_score}
+                            </Badge>
+                            {s.dimension_scores && (
+                              <ChevronDown
+                                size={12}
+                                className={`text-muted-foreground transition-transform ${expandedId === s.session_id ? "rotate-180" : ""}`}
+                              />
+                            )}
+                          </button>
                         ) : (
                           <span className="text-xs text-muted-foreground/40">—</span>
                         )}
@@ -306,6 +323,36 @@ function SessionsContent() {
                         )}
                       </TableCell>
                     </TableRow>
+                    {expandedId === s.session_id && s.dimension_scores && (
+                      <TableRow className="bg-surface/30">
+                        <TableCell colSpan={7} className="py-4 px-6">
+                          <div className="flex flex-col gap-4 max-w-2xl">
+                            {/* Dimension score bars */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                              {Object.entries(s.dimension_scores).map(([key, val]) => (
+                                <div key={key} className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground w-32 capitalize shrink-0">
+                                    {key.replace(/_/g, " ")}
+                                  </span>
+                                  <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        val >= 85 ? "bg-green-500" :
+                                        val >= 70 ? "bg-yellow-500" :
+                                        val >= 50 ? "bg-orange" : "bg-red-500"
+                                      }`}
+                                      style={{ width: `${val}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-semibold text-foreground w-7 text-right">{val}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

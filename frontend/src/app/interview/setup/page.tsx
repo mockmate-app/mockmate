@@ -440,7 +440,7 @@ function SetupContent({
                 </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground">
                   Generating tailored questions based on your résumé and selected role.
-                  This usually takes a few seconds — please don&apos;t close this page.
+                  This usually takes a minute — please don&apos;t close this page.
                 </DialogDescription>
               </div>
             </div>

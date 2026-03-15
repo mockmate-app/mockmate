@@ -790,9 +790,11 @@ class FeedbackCompilerAgent:
         # can show scores without loading the full feedback document.
         try:
             await self._db.collection(_COL_SESSIONS).document(session_id).update({
-                "overall_score":  report.get("overall_score"),
-                "feedback_ready": True,
-                "decision":       report.get("decision"),
+                "overall_score":    report.get("overall_score"),
+                "dimension_scores": report.get("dimension_scores"),
+                "feedback_ready":   True,
+                "decision":         report.get("decision"),
+                "decision_reason":  report.get("decision_reason"),
             })
         except Exception:  # noqa: BLE001
             pass  # best-effort; don't fail the whole compile if this update fails

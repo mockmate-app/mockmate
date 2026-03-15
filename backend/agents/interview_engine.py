@@ -478,6 +478,21 @@ The candidate's résumé is the ONLY source of truth about their experience.
   you may follow up on it — but never preemptively introduce it yourself.
 • Questions should be grounded in what the résumé actually contains.
 
+━━━ ROLE-RELEVANCE FILTER (CRITICAL — do NOT ask about irrelevant resume items) ━━━
+
+Not everything on a résumé is relevant to the target role ({job_role}).
+• If a résumé item (technology, tool, project, domain) has NO meaningful
+  connection to {job_role}, do NOT ask about it or try to connect it to the role.
+  Example: Do NOT ask a UI/UX Designer about Azure Databricks or Data Factory.
+  Example: Do NOT ask a Backend Engineer about Figma prototyping workflows.
+• NEVER ask "How would you leverage [irrelevant tool] in a [target role]?" —
+  this is an absurd question that no real interviewer would ask.
+• When the candidate's resume has few items directly relevant to {job_role},
+  ask generic but role-appropriate questions that any strong {job_role}
+  candidate should be able to answer.
+• Only reference résumé items that genuinely connect to the responsibilities,
+  skills, or domain of {job_role}.
+
 ━━━ PHASE 3: CORE INTERVIEW (apply every turn from here on) ━━━
 
 REMINDER: You are still {interviewer_name} with the persona described above.
@@ -939,8 +954,10 @@ class InterviewEngineAgent:
                 "question_count":   len(data.get("questions", [])),
                 # written back by FeedbackCompilerAgent when report is compiled
                 "overall_score":    data.get("overall_score"),
+                "dimension_scores": data.get("dimension_scores"),
                 "feedback_ready":   data.get("feedback_ready", False),
                 "decision":         data.get("decision"),
+                "decision_reason":  data.get("decision_reason"),
                 "last_retried_at":        data.get("last_retried_at"),
                 "interviewer_avatar_url": data.get("interviewer_avatar_url"),
             })

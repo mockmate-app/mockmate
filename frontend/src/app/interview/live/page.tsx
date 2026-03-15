@@ -77,13 +77,15 @@ const WS_BASE =
   process.env.NEXT_PUBLIC_WS_URL ?? API_BASE.replace(/^http/, "ws");
 const MIC_SAMPLE_RATE = 16000;
 const OUT_SAMPLE_RATE = 24000;
+const CUSTOM_JITTER_BUFFER_MS = 180;
 const WS_RECONNECT_MAX_ATTEMPTS = 3;
 const WS_RECONNECT_DELAY_MS = 2000;
 const TRANSCRIPT_SYNC_MAX_WAIT_MS = 30_000;
 const TRANSCRIPT_SYNC_POLL_MS = 800;
 const POSTURE_FRAME_INTERVAL_MS = 30_000; // capture a frame every 30 seconds
 const POSTURE_FRAME_QUALITY = 0.5;        // JPEG quality (0-1)
-const POSTURE_FRAME_SIZE = 512;           // resize to 512x512 for the model
+const POSTURE_FRAME_WIDTH = 640;
+const POSTURE_FRAME_HEIGHT = 480;
 
 function int16ToFloat32(buffer: ArrayBuffer): Float32Array<ArrayBuffer> {
   const view = new Int16Array(buffer);
@@ -120,7 +122,9 @@ function ProfileAvatar({
   fallback: string;
   ai?: boolean;
 }) {
-  if (image) {
+  const [err, setErr] = useState(false);
+
+  if (image && !err) {
     if (ai) {
       // Use unoptimized Next.js Image for interviewer avatars: they come from
       // the backend API and remote pattern configuration would vary per env.
@@ -131,6 +135,7 @@ function ProfileAvatar({
           width={80}
           height={80}
           unoptimized
+          onError={() => setErr(true)}
           className="w-20 h-20 rounded-full border border-white/15 object-cover"
         />
       );
@@ -141,6 +146,7 @@ function ProfileAvatar({
         alt={fallback}
         width={80}
         height={80}
+        onError={() => setErr(true)}
         className="w-20 h-20 rounded-full border border-white/15 object-cover"
       />
     );
@@ -417,7 +423,7 @@ function LiveInterviewContent() {
   const wsRef = useRef<WebSocket | null>(null);
   const micCtxRef = useRef<AudioContext | null>(null);
   const outCtxRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const micProcessorRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -437,11 +443,13 @@ function LiveInterviewContent() {
   const noiseFloorRef = useRef(0);
   const speechStreakRef = useRef(0);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
-  const micWorkletLoadedRef = useRef(false);
   const cameraOnRef = useRef(false);
   const lastMicFrameAtRef = useRef(0);
   const micRecoveryInProgressRef = useRef(false);
   const lastMicRecoveryAtRef = useRef(0);
+  const jitterQueueRef = useRef<ArrayBuffer[]>([]);
+  const jitterQueuedMsRef = useRef(0);
+  const jitterPrimedRef = useRef(false);
 
   useEffect(() => {
     cameraOnRef.current = cameraOn;
@@ -510,8 +518,11 @@ function LiveInterviewContent() {
   }, [refreshMediaDevices]);
 
   const stopMicCapture = useCallback(() => {
-    workletNodeRef.current?.disconnect();
-    workletNodeRef.current = null;
+    if (micProcessorRef.current) {
+      micProcessorRef.current.port.close();
+      micProcessorRef.current.disconnect();
+      micProcessorRef.current = null;
+    }
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaStreamRef.current = null;
   }, []);
@@ -519,7 +530,17 @@ function LiveInterviewContent() {
   const startCameraStream = useCallback(
     async (deviceId?: string) => {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        video: deviceId
+          ? {
+            deviceId: { exact: deviceId },
+            width: { ideal: POSTURE_FRAME_WIDTH },
+            height: { ideal: POSTURE_FRAME_HEIGHT },
+          }
+          : {
+            facingMode: { ideal: "user" },
+            width: { ideal: POSTURE_FRAME_WIDTH },
+            height: { ideal: POSTURE_FRAME_HEIGHT },
+          },
         audio: false,
       });
 
@@ -669,23 +690,19 @@ function LiveInterviewContent() {
       const ctx = micCtxRef.current!;
       if (ctx.state === "suspended") await ctx.resume();
 
-      if (!micWorkletLoadedRef.current) {
-        await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
-        micWorkletLoadedRef.current = true;
-      }
-
+      await ctx.audioWorklet.addModule("/audio-processor.worklet.js");
       const source = ctx.createMediaStreamSource(stream);
-      const worklet = new AudioWorkletNode(ctx, "pcm-capture-processor");
-      workletNodeRef.current = worklet;
+      const workletNode = new AudioWorkletNode(ctx, "pcm-capture-processor");
+      micProcessorRef.current = workletNode;
       lastMicFrameAtRef.current = Date.now();
 
-      worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+      workletNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
         lastMicFrameAtRef.current = Date.now();
-        // Always stream audio to server — VAD is handled server-side.
+        const pcmBuffer = e.data;
         // Speech indicators run regardless of AI speaking state so the
         // user always sees visual feedback for their own voice.
         if (!muted && wsRef.current?.readyState === WebSocket.OPEN) {
-          const samples = new Int16Array(e.data);
+          const samples = new Int16Array(pcmBuffer);
           let sumSquares = 0;
           for (let i = 0; i < samples.length; i++) {
             const normalized = samples[i] / 0x8000;
@@ -716,51 +733,71 @@ function LiveInterviewContent() {
             }, 1800);
           }
         }
-        sendChunkRef.current(e.data);
+        sendChunkRef.current(pcmBuffer);
       };
 
-      source.connect(worklet);
-      worklet.connect(ctx.destination);
+      source.connect(workletNode);
       await refreshMediaDevices();
     },
     [muted, refreshMediaDevices, stopMicCapture],
   );
 
-  const playPcmChunk = useCallback((buffer: ArrayBuffer) => {
+  const drainJitterQueue = useCallback(() => {
     if (!outCtxRef.current) {
       outCtxRef.current = new AudioContext({ sampleRate: OUT_SAMPLE_RATE });
     }
 
     const ctx = outCtxRef.current;
-    const float32 = int16ToFloat32(buffer);
-    const audioBuffer = ctx.createBuffer(1, float32.length, OUT_SAMPLE_RATE);
-    audioBuffer.copyToChannel(float32, 0);
+    if (!jitterPrimedRef.current && jitterQueuedMsRef.current < CUSTOM_JITTER_BUFFER_MS) {
+      return;
+    }
+    jitterPrimedRef.current = true;
 
-    const src = ctx.createBufferSource();
-    src.buffer = audioBuffer;
-    src.connect(ctx.destination);
+    while (jitterQueueRef.current.length > 0) {
+      const buffer = jitterQueueRef.current.shift();
+      if (!buffer) break;
+      const float32 = int16ToFloat32(buffer);
+      const audioBuffer = ctx.createBuffer(1, float32.length, OUT_SAMPLE_RATE);
+      audioBuffer.copyToChannel(float32, 0);
 
-    const now = ctx.currentTime;
-    const startAt = Math.max(now, nextPlayTimeRef.current);
-    src.start(startAt);
-    nextPlayTimeRef.current = startAt + audioBuffer.duration;
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(ctx.destination);
 
-    setYourTurn(false);
-    setAiSpeaking(true);
-    setYouSpeaking(false);
-    speechStreakRef.current = 0;
-    src.onended = () => {
-      if (nextPlayTimeRef.current <= ctx.currentTime) setAiSpeaking(false);
-    };
+      const now = ctx.currentTime;
+      const startAt = Math.max(now, nextPlayTimeRef.current);
+      src.start(startAt);
+      nextPlayTimeRef.current = startAt + audioBuffer.duration;
+
+      jitterQueuedMsRef.current = Math.max(0, jitterQueuedMsRef.current - (audioBuffer.duration * 1000));
+
+      setYourTurn(false);
+      setAiSpeaking(true);
+      setYouSpeaking(false);
+      speechStreakRef.current = 0;
+      src.onended = () => {
+        if (nextPlayTimeRef.current <= ctx.currentTime) {
+          jitterPrimedRef.current = false;
+          setAiSpeaking(false);
+        }
+      };
+    }
   }, []);
+
+  const enqueuePcmChunk = useCallback((buffer: ArrayBuffer) => {
+    const frameMs = (new Int16Array(buffer).length / OUT_SAMPLE_RATE) * 1000;
+    jitterQueueRef.current.push(buffer);
+    jitterQueuedMsRef.current += frameMs;
+    drainJitterQueue();
+  }, [drainJitterQueue]);
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
         if (event.data instanceof Blob) {
-          event.data.arrayBuffer().then(playPcmChunk);
+          event.data.arrayBuffer().then(enqueuePcmChunk);
         } else {
-          playPcmChunk(event.data);
+          enqueuePcmChunk(event.data);
         }
         return;
       }
@@ -981,7 +1018,7 @@ function LiveInterviewContent() {
         // ignore non-json
       }
     },
-    [playPcmChunk, scheduleInterviewerEnd, appendStage],
+    [enqueuePcmChunk, scheduleInterviewerEnd, appendStage],
   );
 
   const startInterview = useCallback(async () => {
@@ -1015,11 +1052,11 @@ function LiveInterviewContent() {
 
     // Clean up any stale resources from a previous failed attempt so
     // the retry starts fresh (avoids orphaned AudioContexts and lets
-    // the worklet be loaded on the new context).
+    // the audio processor be re-created on the new context.
     stopMicCapture();
     closeAudioContextSafely(micCtxRef.current);
     micCtxRef.current = null;
-    micWorkletLoadedRef.current = false;
+    micProcessorRef.current = null;
     setFeedbackReady(false);
 
     try {
@@ -1305,7 +1342,7 @@ function LiveInterviewContent() {
         }, 350);
       }
 
-      workletNodeRef.current?.disconnect();
+      micProcessorRef.current?.disconnect();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       camStreamRef.current?.getTracks().forEach((track) => track.stop());
       camStreamRef.current = null;
@@ -1466,18 +1503,13 @@ function LiveInterviewContent() {
 
       try {
         const canvas = document.createElement("canvas");
-        canvas.width = POSTURE_FRAME_SIZE;
-        canvas.height = POSTURE_FRAME_SIZE;
+        canvas.width = POSTURE_FRAME_WIDTH;
+        canvas.height = POSTURE_FRAME_HEIGHT;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Draw the video frame scaled/cropped to a square
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        const side = Math.min(vw, vh);
-        const sx = (vw - side) / 2;
-        const sy = (vh - side) / 2;
-        ctx.drawImage(video, sx, sy, side, side, 0, 0, POSTURE_FRAME_SIZE, POSTURE_FRAME_SIZE);
+        // Draw frame directly to 640x480 for stable transport payload.
+        ctx.drawImage(video, 0, 0, POSTURE_FRAME_WIDTH, POSTURE_FRAME_HEIGHT);
 
         // Convert to base64 JPEG (strip the data:image/jpeg;base64, prefix)
         const dataUrl = canvas.toDataURL("image/jpeg", POSTURE_FRAME_QUALITY);

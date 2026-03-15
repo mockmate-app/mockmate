@@ -15,6 +15,8 @@ export interface PerformanceCardData {
   session_id: string;
   score: number;
   decision: "offer" | "rejection";
+  decision_reason?: string | null;
+  dimension_scores?: Record<string, number> | null;
   job_role: string;
   persona: string;
   interviewer_name: string;
@@ -66,13 +68,31 @@ export default function PerformanceCard({
   const captureRef = useRef<HTMLDivElement>(null);
 
   const buildShareText = useCallback(() => {
-    return [
+    const lines: string[] = [
       `I scored ${card.score}/100 in a MockMate ${card.job_role} interview.`,
+      `Interviewer persona: ${personaLabel(card.persona)}.`
+    ];
+
+    // Score breakdown
+    if (card.dimension_scores && Object.keys(card.dimension_scores).length > 0) {
+      const breakdown = Object.entries(card.dimension_scores)
+        .map(([key, val]) => `  ${key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}: ${val}/100`)
+        .join("\n");
+      lines.push(`Score breakdown:\n${breakdown}`);
+    }
+
+    // Verdict
+    const verdict = card.decision === "offer" ? "Offer ✅" : "Rejection ❌";
+    
+    lines.push(`Verdict: ${verdict}`);
+
+    lines.push(
       `Response from MockMate: "${card.motivational_line}"`,
-      `Interviewer persona: ${personaLabel(card.persona)}.`,
       "Attend your first mock interview for free at https://getmockmate.com!",
       "#MockMate #InterviewPrep #CareerGrowth",
-    ].join("\n\n");
+    );
+
+    return lines.join("\n\n");
   }, [card]);
 
   const renderCardBlob = useCallback(async () => {
