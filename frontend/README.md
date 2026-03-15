@@ -88,7 +88,7 @@ graph LR
 | **Data Fetching** | TanStack React Query |
 | **Auth** | Better Auth (Google OAuth) → PostgreSQL |
 | **Real-time Audio** | AudioWorklet (PCM Int16, 16 kHz capture / 24 kHz playback) |
-| **Video** | react-webcam (768×768 JPEG frames every 10s) |
+| **Video** | react-webcam (640×480 JPEG frames every 10s) |
 | **Icons** | Lucide React |
 | **Styling** | Tailwind + class-variance-authority + tailwind-merge |
 
@@ -176,7 +176,7 @@ graph LR
 - Mute/unmute and camera toggle controls
 - Device selection (mic + camera)
 - Auto-reconnect (3 attempts) with session resumption
-- Posture frame capture at 768×768 JPEG, 0.7 quality
+- Posture frame capture at 640×480 JPEG, 0.7 quality
 - Graceful interview end detection (interviewer goodbye phrases)
 
 ### Feedback Report (`/interview/feedback`)

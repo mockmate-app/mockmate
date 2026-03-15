@@ -141,7 +141,7 @@ The backend is composed of **8 specialized AI agents**, each handling a distinct
 | **ResumeParserAgent** | Gemini 2.5 Flash Lite | Extracts structured JSON from PDF/DOCX résumés, stores raw files in Cloud Storage, persists structured data in Firestore |
 | **QuestionGeneratorAgent** | Gemini 2.5 Flash Lite | Generates 8 personalized interview questions based on the candidate's résumé, chosen persona, and difficulty level |
 | **InterviewEngineAgent** | Gemini Live API (native audio) | Manages the live bidirectional voice interview session — handles real-time audio streaming, adaptive follow-ups, interruption support, and transcript persistence |
-| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite | Scores posture, eye contact, and facial confidence from webcam frames captured every 30 seconds |
+| **PostureAnalyzerAgent** | Gemini 2.5 Flash Lite | Scores posture, eye contact, and facial confidence from webcam frames captured every 20 seconds |
 | **FeedbackCompilerAgent** | Gemini 2.5 Flash Lite | Aggregates transcript, posture data, and session metadata to produce a detailed feedback report with scores across 6 dimensions and a mock hiring decision letter |
 | **PerformanceCardAgent** | Gemini 2.5 Flash Lite + Imagen 4.0 Fast | Generates a unique AI performance card per session — Imagen creates a themed artistic background, Gemini writes a motivational quote. Cards are cached in GCS + Firestore. |
 | **NextInterviewRecommenderAgent** | Gemini 2.5 Flash Lite | Analyzes recent feedback sessions to identify the weakest skill dimension and recommends a targeted persona, job role, and practice focus for the user's next interview |
@@ -221,7 +221,7 @@ sequenceDiagram
 | **Backend** | FastAPI, Python 3.13, WebSockets, Uvicorn |
 | **Auth** | Better Auth with Google OAuth → PostgreSQL |
 | **Real-time Audio** | Browser AudioWorklet (PCM Int16 @ 16 kHz capture, 24 kHz playback) |
-| **Real-time Video** | react-webcam (768×768 JPEG frames every 30 seconds) |
+| **Real-time Video** | react-webcam (640×480 JPEG frames every 20 seconds) |
 | **Deployment** | Cloud Run (backend), Vercel (frontend) |
 
 ---

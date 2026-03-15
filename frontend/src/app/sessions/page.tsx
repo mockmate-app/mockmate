@@ -334,12 +334,11 @@ function SessionsContent() {
                                   <span className="text-xs text-muted-foreground w-32 capitalize shrink-0">
                                     {key.replace(/_/g, " ")}
                                   </span>
-                                  <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
+                                  <div className="flex-1 h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${
-                                        val >= 85 ? "bg-green-500" :
-                                        val >= 70 ? "bg-yellow-500" :
-                                        val >= 50 ? "bg-orange" : "bg-red-500"
+                                        val >= 70 ? "bg-emerald-500" :
+                                        val >= 40 ? "bg-amber-500" : "bg-red-500"
                                       }`}
                                       style={{ width: `${val}%` }}
                                     />

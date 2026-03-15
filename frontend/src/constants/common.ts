@@ -24,7 +24,7 @@ export const PERSONA_LABELS: Record<string, string> = {
 };
 
 export const PERSONA_COLORS: Record<string, string> = {
-  neutral: "bg-zinc-500/15 text-zinc-400 dark:text-zinc-300",
+  neutral: "bg-orange-500/15 text-orange-500 dark:text-orange-300",
   startup_founder: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
   investment_banker: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   tech_lead: "bg-green-500/15 text-green-600 dark:text-green-400",
