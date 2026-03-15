@@ -452,14 +452,21 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 
 **Code-level proof of Google Cloud service usage:**
 
-| GCP Service | Code File | What It Does |
-|-------------|-----------|-------------|
-| Vertex AI + Gemini Live API | [`backend/agents/interview_engine.py`](./backend/agents/interview_engine.py) | Lines using `vertexai.init()`, `Agent()`, `Runner()`, and `LiveRequestQueue` for real-time audio streaming via the Gemini Live API |
-| Vertex AI + Gemini Flash Lite | [`backend/agents/feedback_compiler.py`](./backend/agents/feedback_compiler.py) | Uses `GenerativeModel("gemini-2.5-flash-lite")` via Vertex AI to compile feedback reports |
-| Cloud Firestore | [`backend/agents/config.py`](./backend/agents/config.py) | Centralised Firestore collection names; used in every agent via `firestore.AsyncClient()` |
-| Cloud Storage | [`backend/agents/resume_parser.py`](./backend/agents/resume_parser.py) | Uploads raw résumé files to GCS via `storage.Client()` |
-| Imagen 4.0 (Vertex AI) | [`backend/agents/interviewer_avatar.py`](./backend/agents/interviewer_avatar.py) | Generates interviewer avatars via `ImageGenerationModel` |
-| Cloud Run | [`backend/Dockerfile`](./backend/Dockerfile) | Multi-stage container deployed to Cloud Run |
+| GCP Service | Code Pointer | What It Does |
+|-------------|-------------|-------------|
+| Vertex AI + Gemini Live API | [`interview_engine.py#L696`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L696) | `vertexai.init()` initialises Vertex AI for the live interview session |
+| Gemini Live API (ADK) | [`interview_engine.py#L1269-L1327`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L1269-L1327) | Creates `Agent()`, `Runner()`, and `LiveRequestQueue()` for real-time bidirectional audio streaming |
+| Gemini Flash (GenAI SDK) | [`feedback_compiler.py#L199-L200`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/feedback_compiler.py#L199-L200) | `genai.Client(vertexai=True)` — routes Gemini calls through Vertex AI for feedback compilation |
+| Cloud Firestore | [`interview_engine.py#L697`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L697) | `firestore.AsyncClient()` for session state, transcripts, and posture scores |
+| Cloud Firestore | [`config.py#L28-L33`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/config.py#L28-L33) | Centralised Firestore collection config used by all 6 agents |
+| Cloud Storage | [`resume_parser.py#L165`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/resume_parser.py#L165) | `storage.Client()` for uploading raw résumé files to GCS |
+| Cloud Storage | [`resume_parser.py#L265-L279`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/resume_parser.py#L265-L279) | `_upload_to_gcs()` — uploads file bytes and returns `gs://` URI |
+| Cloud Pub/Sub | [`interview_engine.py#L698-L699`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L698-L699) | `pubsub_v1.PublisherClient()` for session-end event publishing |
+| Cloud Pub/Sub | [`interview_engine.py#L913`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L913) | `self._publisher.publish()` fires session-end event |
+| Imagen 4.0 (Vertex AI) | [`interviewer_avatar.py#L209-L215`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interviewer_avatar.py#L209-L215) | `genai.Client(vertexai=True)` + `storage.Client()` for avatar generation and caching |
+| Imagen 4.0 (Vertex AI) | [`interviewer_avatar.py#L267-L277`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interviewer_avatar.py#L267-L277) | `generate_images()` call to Imagen model |
+| Cloud Run | [`Dockerfile`](https://github.com/mockmate-app/mockmate/blob/main/backend/Dockerfile) | Multi-stage production container for Cloud Run deployment |
+| Cloud Run (deploy) | [`deploy.sh`](https://github.com/mockmate-app/mockmate/blob/main/deploy.sh) | Automated deployment script for Cloud Run with env var injection |
 
 ---
 
