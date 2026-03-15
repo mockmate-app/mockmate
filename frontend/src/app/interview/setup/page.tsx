@@ -439,7 +439,7 @@ function SetupContent({
                   Setting up your interview
                 </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground">
-                  Generating tailored questions based on your résumé and selected role.
+                  Generating tailored questions based on your résumé and selected job role.
                   This usually takes a minute — please don&apos;t close this page.
                 </DialogDescription>
               </div>

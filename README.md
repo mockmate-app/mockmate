@@ -76,58 +76,57 @@ Upload Résumé  →  Pick Persona & Difficulty  →  Live Voice Interview  → 
 ### System Architecture Diagram
 
 ```mermaid
-graph TB
-    subgraph "Frontend — Next.js on Vercel"
-        UI[Web App]
-        AW[AudioWorklet<br/>PCM Capture]
-        WC[Webcam<br/>Frame Capture]
-    end
-
-    subgraph "Backend — FastAPI on Cloud Run"
-        API[REST API]
-        WSA[WebSocket<br/>Audio Stream]
-        WSV[WebSocket<br/>Vision Stream]
-        RP[Resume Parser<br/>Agent]
-        QG[Question Generator<br/>Agent]
-        IE[Interview Engine<br/>Agent]
-        PA[Posture Analyzer<br/>Agent]
-        FC[Feedback Compiler<br/>Agent]
-        PC[Performance Card<br/>Agent]
-        NR[Next Interview<br/>Recommender Agent]
-        IA[Avatar Generator<br/>Agent]
-    end
-
-    subgraph "Google Cloud Platform"
-        GLA[Gemini Live API<br/>Native Audio]
-        GF[Gemini 2.5<br/>Flash]
-        GFL[Gemini 2.5<br/>Flash Lite]
-        IG[Imagen 4.0 Fast]
-        FS[(Cloud Firestore)]
-        GCS[(Cloud Storage)]
-    end
-
-    subgraph "Auth & Data"
-        GA[Google OAuth]
-        PG[(PostgreSQL)]
-    end
-
+---
+config:
+  layout: elk
+  look: neo
+---
+flowchart LR
+ subgraph subGraph0["Frontend — Next.js on Vercel"]
+        UI["Web App"]
+        AW["AudioWorklet<br>PCM Capture"]
+        WC["Webcam<br>Frame Capture"]
+  end
+ subgraph subGraph1["Backend — FastAPI on <b><i>Cloud Run</i></b>"]
+        API["REST API"]
+        WSA["WebSocket<br>Audio Stream"]
+        WSV["WebSocket<br>Vision Stream"]
+        RP["Resume Parser<br>Agent"]
+        QG["Question Generator<br>Agent"]
+        IE["Interview Engine<br>Agent"]
+        PA["Posture Analyzer<br>Agent"]
+        FC["Feedback Compiler<br>Agent"]
+        PC["Performance Card<br>Agent"]
+        NR["Next Interview<br>Recommender Agent"]
+        IA["Avatar Generator<br>Agent"]
+  end
+ subgraph subGraph2["Vertex AI — Models"]
+        GLA["Gemini Live API<br>Native Audio"]
+        GFL["Gemini 2.5<br>Flash Lite"]
+        IG["Imagen 4.0 Fast"]
+  end
+ subgraph subGraph3["Google Cloud — Infrastructure"]
+        FS[("Cloud Firestore")]
+        GCS[("Cloud Storage")]
+        PG[("Cloud SQL<br>PostgreSQL")]
+  end
+ subgraph subGraph4["Auth"]
+        GA["Google OAuth"]
+  end
     UI -- REST --> API
     AW -- PCM audio --> WSA
     WC -- JPEG frames --> WSV
-
     API --> RP & QG & FC & PC & NR & IA
     WSA --> IE
     WSV --> PA
-
-    RP --> GF & GCS & FS
-    QG --> GF
+    RP --> GFL & GCS & FS
+    QG --> GFL
     IE --> GLA & FS
     PA --> GFL & FS
-    FC --> GF & FS
-    PC --> GF & IG & GCS & FS
-    NR --> GF & FS
+    FC --> GFL & FS
+    PC --> GFL & IG & GCS & FS
+    NR --> GFL & FS
     IA --> IG & GCS
-
     UI --> GA
     GA --> PG
 ```
@@ -212,6 +211,7 @@ sequenceDiagram
 | **Cloud Run** | Hosts the FastAPI backend as a serverless container. Handles auto-scaling, HTTPS termination, and WebSocket upgrades for live interviews. |
 | **Cloud Firestore** | Primary database for all application data — sessions, transcripts, parsed résumés, feedback reports, and posture scores. |
 | **Cloud Storage (GCS)** | Stores raw résumé files (PDF/DOCX) and generated interviewer avatar images. |
+| **Cloud SQL (PostgreSQL)** | Stores user authentication data (Better Auth sessions) and skill progression analytics. |
 
 ### Application Stack
 
@@ -219,7 +219,7 @@ sequenceDiagram
 |-------|-----------|
 | **Frontend** | Next.js 16 (App Router, Turbopack), React 19, TailwindCSS 4, shadcn/ui (Radix), TanStack Query |
 | **Backend** | FastAPI, Python 3.13, WebSockets, Uvicorn |
-| **Auth** | Better Auth with Google OAuth → PostgreSQL |
+| **Auth** | Better Auth with Google OAuth → Cloud SQL (PostgreSQL) |
 | **Real-time Audio** | Browser AudioWorklet (PCM Int16 @ 16 kHz capture, 24 kHz playback) |
 | **Real-time Video** | react-webcam (640×480 JPEG frames every 20 seconds) |
 | **Deployment** | Cloud Run (backend), Vercel (frontend) |

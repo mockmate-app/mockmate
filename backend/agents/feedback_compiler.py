@@ -112,6 +112,11 @@ Transcript quality control (CRITICAL):
 - The transcript may contain occasional ASR artifacts/noise (e.g., stray one-word
     fragments, repeated nonsense like "love love love", accidental greetings,
     or clipped syllables).
+- The ASR engine may also mistranscribe English speech as words from other
+    languages (Hindi, Spanish, French, Japanese, etc.) or produce foreign-script
+    characters. These are transcription errors, NOT evidence that the candidate
+    was speaking another language. Ignore such fragments entirely — do NOT
+    penalize the candidate for them or mention them in your feedback.
 - Treat low-signal noise as non-evidence. Do NOT interpret these artifacts as
     explicit candidate claims, intent, or knowledge.
 - Prioritize substantive candidate turns that include coherent reasoning,
