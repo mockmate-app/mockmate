@@ -457,6 +457,15 @@ class FeedbackCompilerAgent:
         if not words:
             return True
 
+        # Non-Latin script detection: interviews are conducted in English, so
+        # text that is predominantly non-Latin (Devanagari, CJK, Arabic, etc.)
+        # is almost certainly an ASR mis-transcription artifact.
+        alpha_chars = [c for c in t if c.isalpha()]
+        if alpha_chars:
+            latin_count = sum(1 for c in alpha_chars if c.isascii())
+            if latin_count / len(alpha_chars) < 0.5:
+                return True
+
         # Very short interjections are not reliable evidence for scoring.
         low_signal_singletons = {
             "hi", "hello", "hey", "hmm", "hm", "uh", "uhh", "um", "umm",

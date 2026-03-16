@@ -83,6 +83,44 @@ async function fetchTranscript(sessionId: string): Promise<TranscriptData> {
   return res.json();
 }
 
+/**
+ * Mirror of the backend's low-signal filter — hides ASR artifacts (non-Latin
+ * script noise, single-word gibberish, filler-only turns) from the transcript
+ * panel so they don't distract from the real conversation.
+ */
+const LOW_SIGNAL_SINGLETONS = new Set([
+  "hi","hello","hey","hmm","hm","uh","uhh","um","umm",
+  "ok","okay","yes","yeah","yep","no","nope","nah","alo","huh",
+]);
+
+function isLowSignalTurn(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (!t) return true;
+
+  // Non-Latin script: if more than half the alphabetic chars are non-ASCII,
+  // it's almost certainly an ASR mis-transcription.
+  const alphas = [...t].filter((c) => /\p{L}/u.test(c));
+  if (alphas.length > 0) {
+    const latinCount = alphas.filter((c) => /[a-zA-Z]/.test(c)).length;
+    if (latinCount / alphas.length < 0.5) return true;
+  }
+
+  const words = t.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+
+  // Filler-only turns
+  if (words.length <= 2 && words.every((w) => LOW_SIGNAL_SINGLETONS.has(w.replace(/[.,!?;:]/g, "")))) return true;
+
+  // Single ultra-short word
+  if (words.length === 1 && words[0].replace(/[.,!?;:]/g, "").length <= 2) return true;
+
+  // Repeated-token gibberish
+  const unique = new Set(words.map((w) => w.replace(/[.,!?;:]/g, "")));
+  if (words.length >= 3 && unique.size === 1) return true;
+
+  return false;
+}
+
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
 interface FeedbackReport {
@@ -400,7 +438,9 @@ function FeedbackContent() {
 
   // sessionMeta already declared above for the ownership guard
 
-  const turns = transcript?.turns ?? [];
+  const turns = (transcript?.turns ?? []).filter(
+    (t) => t.speaker !== "user" || !isLowSignalTurn(t.text),
+  );
   const expectedCardVersion = report?.compiled_at;
   // Build the interviewer avatar URL from the stored path (backend-relative)
   const interviewerAvatarUrl = sessionMeta?.interviewer_avatar_url
