@@ -65,9 +65,9 @@ Upload Résumé  →  Pick Persona & Difficulty  →  Live Voice Interview  → 
 ## 🎬 Demo Video
 
 <!-- PLACEHOLDER: Replace with your YouTube/Vimeo link -->
-[![MockMate Demo](https://img.shields.io/badge/Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
+[![MockMate Demo](https://img.shields.io/badge/Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/watch?v=gzmhsGEHeHk)
 
-> A 4-minute walkthrough showing MockMate in action — from résumé upload through a live voice interview to the final feedback report and hiring decision.
+> A 4-minute walkthrough explaining what MockMate is, why it is different from other mock interview platforms, and demonstrating it in action — from résumé upload through a live voice interview to the final feedback report and hiring decision.
 
 ---
 
