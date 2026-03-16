@@ -188,7 +188,7 @@ sequenceDiagram
 
     par Posture analysis (parallel)
         Client->>API: JPEG frames (every 10s)
-        API->>AI: Posture analysis (Gemini Vision)
+        API->>AI: Posture analysis
     end
 
     Client->>API: POST /session/{id}/end

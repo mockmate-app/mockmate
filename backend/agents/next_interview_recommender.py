@@ -2,7 +2,7 @@
 NextInterviewRecommenderAgent
 -----------------------------
 Builds a "Your Next Interview" recommendation from the user's most recent
-feedback-ready sessions (last 3-5), then asks Gemini Flash to produce a short,
+feedback-ready sessions (last 3-5), then asks Gemini 2.5 Flash Lite to produce a short,
 actionable recommendation strip for the dashboard.
 """
 

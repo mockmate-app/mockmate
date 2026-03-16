@@ -2,7 +2,7 @@
 PostureAnalyzerAgent
 ---------------------
 Analyses video frames from the candidate's webcam during a live mock
-interview using Gemini Flash (vision).  Provides two usage modes:
+interview using Gemini 2.5 Flash Lite.  Provides two usage modes:
 
 1. **Standalone WebSocket** (`run_live_analysis`) — legacy mode where the
    browser opens a dedicated `/ws/vision/{session_id}` connection.
@@ -167,7 +167,7 @@ class PostureAnalyzerAgent:
 
         For each frame, this method:
           1. Decodes the JPEG bytes.
-          2. Sends the frame to Gemini Flash for vision analysis.
+          2. Sends the frame to Gemini 2.5 Flash Lite for vision analysis.
           3. Persists the scored result in Firestore.
           4. Sends the score JSON back to the browser.
         """

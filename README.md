@@ -52,12 +52,12 @@ Upload Résumé  →  Pick Persona & Difficulty  →  Live Voice Interview  → 
 | 📄 **Résumé-Aware Questions** | Reads your actual résumé and generates hyper-personalized questions. Claim you led a team of 30? Expect to be asked how you handled underperformance. |
 | 🎭 **13 Interviewer Personas** | From a warm HR manager to an aggressive investment banker, an algorithm guru to a system designer — each with distinct questioning styles, pressure levels, speech patterns, and follow-up behaviors. |
 | ⚡ **Adaptive Follow-ups** | The interviewer asks probing follow-ups, challenges weak answers, and digs deeper into your claims — just like a real interviewer would. |
-| 👁️ **Posture & Presence Vision** | Webcam-based scoring of posture, eye contact, and facial confidence in real time using Gemini Vision. |
+| 👁️ **Posture & Presence Vision** | Webcam-based scoring of posture, eye contact, and facial confidence in real time. |
 | 🎙️ **Live Native Audio** | Real-time bidirectional voice interview through the Gemini Live API — not text-to-speech, but native audio generation with natural intonation, interruption support, and persona-specific accents. |
 | 📬 **Mock Hiring Decision** | A simulated offer or rejection letter with personalized reasoning — making feedback feel consequential. |
 | 📈 **Skill Progression Dashboard** | Tracks improvement across communication, confidence, structure, technical depth, and domain vocabulary over time. |
 | 🪧 **AI Performance Card** | After every session, Imagen 4.0 generates a unique artistic background themed to your persona, role, and score. The card displays your result, a motivational quote from Gemini, and can be downloaded or shared to LinkedIn. |
-| 🧭 **Next Interview Recommender** | Gemini Flash analyzes your recent sessions to surface your weakest dimension, then recommends a specific persona, job role, and practice focus for your next session — with a one-click CTA to start. |
+| 🧭 **Next Interview Recommender** | Gemini 2.5 Flash Lite analyzes your recent sessions to surface your weakest dimension, then recommends a specific persona, job role, and practice focus for your next session — with a one-click CTA to start. |
 | �🌗 **Dark Mode** | Full dark/light/system theme support across the entire application. |
 
 ---
@@ -174,7 +174,7 @@ sequenceDiagram
 
     par Posture analysis (parallel)
         FE->>BE: JPEG frames (every 30s)
-        BE->>Gemini: Posture analysis (Gemini Vision)
+        BE->>Gemini: Posture analysis
     end
 
     User->>FE: End interview
@@ -182,11 +182,11 @@ sequenceDiagram
     BE->>Gemini: Compile feedback (Gemini 2.5 Flash Lite)
     BE-->>FE: Scores + decision letter
 
-    BE->>Gemini: Generate performance card (Imagen 4.0 + Gemini Flash)
+    BE->>Gemini: Generate performance card (Imagen 4.0 + Gemini 2.5 Flash Lite)
     BE-->>FE: Performance card metadata + image
 
     FE->>BE: GET /analytics/next-interview/{user_id}
-    BE->>Gemini: Recommend next interview (Gemini Flash)
+    BE->>Gemini: Recommend next interview (Gemini 2.5 Flash Lite)
     BE-->>FE: Recommendation (persona, role, focus)
 ```
 
@@ -341,10 +341,10 @@ mockmate/
 │   ├── .env.example                    # Environment variable template
 │   └── agents/
 │       ├── config.py                   # Shared configuration & env var loading
-│       ├── resume_parser.py            # Résumé extraction with Gemini Flash
+│       ├── resume_parser.py            # Résumé extraction with Gemini 2.5 Flash Lite
 │       ├── question_generator.py       # Personalized question generation
 │       ├── interview_engine.py         # Live audio interview via Gemini Live API
-│       ├── posture_analyzer.py         # Webcam posture scoring via Gemini Vision
+│       ├── posture_analyzer.py         # Webcam posture scoring via Gemini 2.5 Flash Lite
 │       ├── feedback_compiler.py        # Post-session feedback & decision letter
 │       ├── performance_card.py         # AI performance card (Imagen 4.0 + Gemini)
 │       ├── next_interview_recommender.py # Next interview recommendation engine
@@ -470,7 +470,7 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 |-------------|-------------|-------------|
 | Vertex AI + Gemini Live API | [`interview_engine.py#L696`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L696) | `vertexai.init()` initialises Vertex AI for the live interview session |
 | Gemini Live API (ADK) | [`interview_engine.py#L1269-L1327`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L1269-L1327) | Creates `Agent()`, `Runner()`, and `LiveRequestQueue()` for real-time bidirectional audio streaming |
-| Gemini Flash (GenAI SDK) | [`feedback_compiler.py#L199-L200`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/feedback_compiler.py#L199-L200) | `genai.Client(vertexai=True)` — routes Gemini calls through Vertex AI for feedback compilation |
+| Gemini 2.5 Flash Lite (GenAI SDK) | [`feedback_compiler.py#L199-L200`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/feedback_compiler.py#L199-L200) | `genai.Client(vertexai=True)` — routes Gemini calls through Vertex AI for feedback compilation |
 | Cloud Firestore | [`interview_engine.py#L697`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/interview_engine.py#L697) | `firestore.AsyncClient()` for session state, transcripts, and posture scores |
 | Cloud Firestore | [`config.py#L28-L33`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/config.py#L28-L33) | Centralised Firestore collection config used by all 6 agents |
 | Cloud Storage | [`resume_parser.py#L165`](https://github.com/mockmate-app/mockmate/blob/main/backend/agents/resume_parser.py#L165) | `storage.Client()` for uploading raw résumé files to GCS |
@@ -487,10 +487,10 @@ MockMate's backend runs entirely on Google Cloud. Here is the proof:
 ## 🎬 How It Works — User Flow
 
 1. **Sign in** — Log in with your Google account (OAuth 2.0 via Better Auth).
-2. **Upload résumé** — Drag and drop your PDF or DOCX. Gemini Flash parses it into structured data (skills, experience, education, bold claims).
+2. **Upload résumé** — Drag and drop your PDF or DOCX. Gemini 2.5 Flash Lite parses it into structured data (skills, experience, education, bold claims).
 3. **Choose your interviewer** — Pick from 13 personas (e.g., Startup Founder, Investment Banker, Algorithm Guru) and set your difficulty level (easy, medium, hard).
 4. **Live interview** — A real-time voice conversation begins. The AI interviewer asks personalized questions, follows up on your answers, challenges weak points, and adapts its questioning style based on your responses. Your webcam captures posture data in the background.
-5. **Get feedback** — After the interview ends, Gemini Flash compiles all data (transcript, posture scores, résumé context) into a detailed feedback report scoring you across 6 dimensions: communication, confidence, structure, technical depth, domain vocabulary, and posture.
+5. **Get feedback** — After the interview ends, Gemini 2.5 Flash Lite compiles all data (transcript, posture scores, résumé context) into a detailed feedback report scoring you across 6 dimensions: communication, confidence, structure, technical depth, domain vocabulary, and posture.
 6. **Hiring decision** — You receive a mock offer or rejection letter with specific reasoning, making the feedback feel real and consequential.
 7. **Performance card** — An AI-generated card with a unique Imagen 4.0 artistic background, your score, and a motivational quote from Gemini. Download it or share it to LinkedIn.
 8. **Track progress** — Your dashboard shows session history, score trends, skill progression, and a personalized "Your Next Interview" recommendation strip powered by Gemini.
