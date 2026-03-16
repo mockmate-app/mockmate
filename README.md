@@ -251,7 +251,18 @@ git clone https://github.com/mockmate-app/mockmate.git
 cd mockmate
 ```
 
-### Step 2 — Set up the backend
+### Step 2 — Provision Google Cloud resources first
+
+Before creating `.env` files, provision the required GCP resources and APIs:
+
+- Enable APIs: **Vertex AI API**, **Cloud Firestore API**, **Cloud Storage API**, **Cloud SQL Admin API**
+- Create a **Firestore database** (Native mode)
+- Create a **Cloud SQL for PostgreSQL instance** (for app/auth data)
+- Create a **Cloud Storage bucket** (for résumé files and generated assets)
+
+After provisioning, populate backend/frontend `.env` files with these resource names (project ID, bucket, region, OAuth creds, Cloud SQL host/db/user/password).
+
+### Step 3 — Set up the backend
 
 ```bash
 cd backend
@@ -281,7 +292,7 @@ python main.py
 # Interactive API docs at http://localhost:8080/docs
 ```
 
-### Step 3 — Set up the frontend
+### Step 4 — Set up the frontend
 
 ```bash
 cd frontend
@@ -302,7 +313,7 @@ npm run dev
 # Frontend is now running at http://localhost:3000
 ```
 
-### Step 4 — Use MockMate
+### Step 5 — Use MockMate
 
 1. Open http://localhost:3000 in your browser
 2. Sign in with Google
