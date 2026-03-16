@@ -363,11 +363,13 @@ function LiveInterviewContent() {
   const queryClient = useQueryClient();
 
   const sessionId = params.get("session_id") ?? "";
-  const personaId = params.get("persona") ?? "neutral";
-  const jobRole = params.get("job_role") ?? "Software Engineer";
-  const difficulty = params.get("difficulty") ?? "medium";
-  const interviewerName = params.get("interviewer_name") ?? "MockMate interviewer";
-  const avatarUrlPath = params.get("avatar_url") ?? "";
+
+  // Session details: initialize from URL params, then override with Firestore data
+  const [personaId, setPersonaId] = useState(params.get("persona") ?? "neutral");
+  const [jobRole, setJobRole] = useState(params.get("job_role") ?? "Software Engineer");
+  const [difficulty, setDifficulty] = useState(params.get("difficulty") ?? "medium");
+  const [interviewerName, setInterviewerName] = useState(params.get("interviewer_name") ?? "MockMate interviewer");
+  const [avatarUrlPath, setAvatarUrlPath] = useState(params.get("avatar_url") ?? "");
 
   // ── Auth guard: redirect to /login if not authenticated ──────────────────
   useEffect(() => {
@@ -376,7 +378,7 @@ function LiveInterviewContent() {
     }
   }, [session, sessionPending, router, params]);
 
-  // ── Ownership gate: verify this session belongs to the logged-in user ─────
+  // ── Ownership gate + session detail hydration ─────────────────────────────
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   useEffect(() => {
     if (sessionPending || !session || !sessionId) return;
@@ -386,14 +388,21 @@ function LiveInterviewContent() {
       .then(data => {
         if (cancelled) return;
         if (data?.user_id && data.user_id !== session.user.id) {
-          // Not the owner — kick back to dashboard immediately
           router.replace("/dashboard");
         } else {
+          // Hydrate session details from Firestore when available
+          if (data) {
+            if (data.persona) setPersonaId(data.persona);
+            if (data.job_role) setJobRole(data.job_role);
+            if (data.difficulty) setDifficulty(data.difficulty);
+            if (data.interviewer_name) setInterviewerName(data.interviewer_name);
+            if (data.interviewer_avatar_url) setAvatarUrlPath(data.interviewer_avatar_url);
+          }
           setOwnershipChecked(true);
         }
       })
       .catch(() => {
-        if (!cancelled) setOwnershipChecked(true); // let the WS enforce it
+        if (!cancelled) setOwnershipChecked(true);
       });
     return () => { cancelled = true; };
   }, [session, sessionPending, sessionId, router]);
